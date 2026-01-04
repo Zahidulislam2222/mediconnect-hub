@@ -81,6 +81,9 @@ export default function Index() {
             <a href="#testimonials" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
               Testimonials
             </a>
+            <button onClick={() => navigate("/knowledge")} className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+              Knowledge Base
+            </button>
           </div>
 
           <div className="flex items-center gap-3">
@@ -254,10 +257,10 @@ export default function Index() {
               <span className="text-xl font-bold">MediConnect</span>
             </div>
             <div className="flex items-center gap-6 text-sm text-muted-foreground">
-              <a href="#" className="hover:text-foreground transition-colors">Privacy Policy</a>
-              <a href="#" className="hover:text-foreground transition-colors">Terms of Service</a>
-              <a href="#" className="hover:text-foreground transition-colors">HIPAA Compliance</a>
-              <a href="#" className="hover:text-foreground transition-colors">Contact</a>
+              <button onClick={() => navigate("/privacy-policy")} className="hover:text-foreground transition-colors">Privacy Policy</button>
+              <button onClick={() => navigate("/terms-of-service")} className="hover:text-foreground transition-colors">Terms of Service</button>
+              <button onClick={() => navigate("/hipaa-compliance")} className="hover:text-foreground transition-colors">HIPAA Compliance</button>
+              <button onClick={() => navigate("/contact")} className="hover:text-foreground transition-colors">Contact</button>
             </div>
           </div>
           <div className="mt-8 pt-8 border-t border-border text-center text-sm text-muted-foreground">

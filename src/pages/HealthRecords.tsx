@@ -22,7 +22,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { currentUser, ehrTimeline, documents } from "@/lib/mockData";
+import { currentUser, currentDoctor, ehrTimeline, documents } from "@/lib/mockData";
 import { cn } from "@/lib/utils";
 
 const typeIcons = {
@@ -47,9 +47,14 @@ const docTypeIcons = {
   referral: "📨",
 };
 
-export default function HealthRecords() {
+interface HealthRecordsProps {
+  role?: "patient" | "doctor";
+}
+
+export default function HealthRecords({ role = "patient" }: HealthRecordsProps) {
   const navigate = useNavigate();
   const [viewMode, setViewMode] = useState<"timeline" | "grid" | "graph">("timeline");
+  const user = role === "patient" ? currentUser : currentDoctor;
 
   const handleLogout = () => {
     navigate("/");
@@ -59,9 +64,9 @@ export default function HealthRecords() {
     <DashboardLayout
       title="Health Records"
       subtitle="Your complete medical history in one place"
-      userRole="patient"
-      userName={currentUser.name}
-      userAvatar={currentUser.avatar}
+      userRole={role}
+      userName={user.name}
+      userAvatar={user.avatar}
       onLogout={handleLogout}
     >
       <div className="space-y-6 animate-fade-in">
@@ -231,7 +236,7 @@ export default function HealthRecords() {
                       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-20 h-20 rounded-full bg-primary flex items-center justify-center text-primary-foreground font-medium shadow-lg z-10">
                         You
                       </div>
-                      
+
                       {/* Connected Nodes */}
                       {[
                         { label: "Dr. Chen", pos: "top-0 left-1/2 -translate-x-1/2", color: "bg-accent" },

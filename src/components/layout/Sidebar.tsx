@@ -46,14 +46,15 @@ const doctorNavItems = [
   { icon: Users, label: "Patient Queue", path: "/patient-queue" },
   { icon: Video, label: "Consultation", path: "/consultation" },
   { icon: BarChart3, label: "Analytics", path: "/analytics" },
-  { icon: FileText, label: "Patient Records", path: "/patient-records" },
-  { icon: MessageSquare, label: "Messages", path: "/messages" },
+  { icon: FileText, label: "Patient Records", path: "/doctor/patient-records" },
+  { icon: MessageSquare, label: "Messages", path: "/doctor/messages" },
+  { icon: BookOpen, label: "Knowledge Base", path: "/doctor/knowledge" },
 ];
 
 export function Sidebar({ userRole, userName, userAvatar, onLogout }: SidebarProps) {
   const [collapsed, setCollapsed] = useState(false);
   const location = useLocation();
-  
+
   const navItems = userRole === "patient" ? patientNavItems : doctorNavItems;
 
   return (
@@ -100,8 +101,8 @@ export function Sidebar({ userRole, userName, userAvatar, onLogout }: SidebarPro
             variant="secondary"
             className={cn(
               "w-full justify-center py-1.5 text-xs font-medium",
-              userRole === "doctor" 
-                ? "bg-primary/10 text-primary border-primary/20" 
+              userRole === "doctor"
+                ? "bg-primary/10 text-primary border-primary/20"
                 : "bg-accent/10 text-accent border-accent/20"
             )}
           >
@@ -140,7 +141,7 @@ export function Sidebar({ userRole, userName, userAvatar, onLogout }: SidebarPro
       {/* Settings & User */}
       <div className="p-3">
         <NavLink
-          to="/settings"
+          to={userRole === 'doctor' ? "/doctor/settings" : "/settings"}
           className={cn(
             "nav-item",
             location.pathname === "/settings" ? "nav-item-active" : "nav-item-inactive",

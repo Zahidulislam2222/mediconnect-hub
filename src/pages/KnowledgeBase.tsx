@@ -18,7 +18,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { currentUser, knowledgeArticles } from "@/lib/mockData";
+import { currentUser, currentDoctor, knowledgeArticles } from "@/lib/mockData";
 import { cn } from "@/lib/utils";
 
 const categoryIcons: Record<string, any> = {
@@ -39,9 +39,15 @@ const categoryColors: Record<string, string> = {
   Pharmacy: "bg-warning/10 text-warning border-warning/30",
 };
 
-export default function KnowledgeBase() {
+interface KnowledgeBaseProps {
+  role?: "patient" | "doctor";
+}
+
+export default function KnowledgeBase({ role = "patient" }: KnowledgeBaseProps) {
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState("");
+
+  const user = role === "patient" ? currentUser : currentDoctor;
 
   const handleLogout = () => {
     navigate("/");
@@ -66,9 +72,9 @@ export default function KnowledgeBase() {
     <DashboardLayout
       title="Knowledge Base"
       subtitle="Evidence-based health information and guides"
-      userRole="patient"
-      userName={currentUser.name}
-      userAvatar={currentUser.avatar}
+      userRole={role}
+      userName={user.name}
+      userAvatar={user.avatar}
       onLogout={handleLogout}
     >
       <div className="space-y-6 animate-fade-in">
@@ -146,10 +152,13 @@ export default function KnowledgeBase() {
               const Icon = categoryIcons[article.category] || BookOpen;
               const colorClass = categoryColors[article.category] || "bg-primary/10 text-primary";
 
+              const basePath = role === "patient" ? "/knowledge" : "/doctor/knowledge";
+
               return (
                 <Card
                   key={article.id}
                   className="knowledge-card cursor-pointer group"
+                  onClick={() => navigate(`${basePath}/${article.id}`)}
                 >
                   <div className="h-40 bg-gradient-to-br from-secondary to-muted flex items-center justify-center">
                     <Icon className={cn("h-16 w-16 opacity-20", colorClass.split(" ")[1])} />
