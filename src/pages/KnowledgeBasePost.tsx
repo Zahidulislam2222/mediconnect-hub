@@ -1,162 +1,271 @@
-import { useNavigate, useParams } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { useParams, useNavigate } from "react-router-dom";
 import {
-    ArrowLeft,
-    Calendar,
-    Clock,
-    Share2,
-    Bookmark,
-    ThumbsUp,
-    MessageSquare,
-    User,
+    ArrowLeft, Clock, Calendar, Share2, Bookmark, Heart, TrendingUp,
+    Brain, Syringe, Apple, Pill, Moon, BookOpen, UserCheck, ShieldCheck,
+    ChevronRight,
+    MessageSquare
 } from "lucide-react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Separator } from "@/components/ui/separator";
-import { currentUser, currentDoctor, knowledgeArticles } from "@/lib/mockData";
+import { currentUser } from "@/lib/mockData";
+import { cn } from "@/lib/utils";
 
-interface KnowledgeBasePostProps {
-    role?: "patient" | "doctor";
-}
+const categoryIcons: Record<string, any> = {
+    "Heart Health": Heart,
+    Diabetes: TrendingUp,
+    Wellness: Brain,
+    Vaccines: Syringe,
+    Nutrition: Apple,
+    Pharmacy: Pill,
+    "Sleep & Mental Health": Moon,
+};
 
-export default function KnowledgeBasePost({ role = "patient" }: KnowledgeBasePostProps) {
-    const navigate = useNavigate();
+const categoryColors: Record<string, string> = {
+    "Heart Health": "bg-red-500/10 text-red-600 border-red-500/30",
+    Diabetes: "bg-purple-500/10 text-purple-600 border-purple-500/30",
+    Wellness: "bg-accent/10 text-accent border-accent/30",
+    Vaccines: "bg-primary/10 text-primary border-primary/30",
+    Nutrition: "bg-green-500/10 text-green-600 border-green-500/30",
+    Pharmacy: "bg-warning/10 text-warning border-warning/30",
+    "Sleep & Mental Health": "bg-indigo-500/10 text-indigo-600 border-indigo-500/30",
+};
+
+export default function KnowledgeBasePost() {
     const { slug } = useParams();
+    const navigate = useNavigate();
+    const [article, setArticle] = useState<any>(null);
+    const [isLoading, setIsLoading] = useState(true);
 
-    // In a real app, we would fetch the article based on the slug or ID
-    const article = knowledgeArticles[0];
-    const user = role === "patient" ? currentUser : currentDoctor;
-    const backLink = role === "patient" ? "/knowledge" : "/doctor/knowledge";
+    useEffect(() => {
+        async function fetchArticle() {
+            if (!slug) return;
+            try {
+                const response = await fetch(`http://localhost:1337/api/articles/${slug}?populate=*`);
+                const json = await response.json();
 
-    const handleLogout = () => {
-        navigate("/");
+                if (json.data) {
+                    const item = json.data;
+                    let imageUrl = null;
+                    const img = item.coverImage;
+
+                    if (img) {
+                        if (img.url) imageUrl = `http://localhost:1337${img.url}`;
+                        else if (img.data?.attributes?.url) imageUrl = `http://localhost:1337${img.data.attributes.url}`;
+                        else if (Array.isArray(img) && img[0]?.url) imageUrl = `http://localhost:1337${img[0].url}`;
+                    }
+
+                    setArticle({
+                        ...item,
+                        image: imageUrl,
+                        publishDate: new Date(item.publishedAt).toLocaleDateString('en-US', {
+                            month: 'long', day: 'numeric', year: 'numeric'
+                        })
+                    });
+                }
+            } catch (error) {
+                console.error("Failed to fetch article details:", error);
+            } finally {
+                setIsLoading(false);
+            }
+        }
+        fetchArticle();
+    }, [slug]);
+
+    const renderContent = (content: any[]) => {
+        if (!content) return null;
+        return content.map((block, index) => {
+            if (block.type === 'paragraph') {
+                return <p key={index} className="mb-6 text-slate-600 leading-relaxed text-lg font-normal">
+                    {block.children?.map((child: any, i: number) => (
+                        <span key={i} className={cn(child.bold && "font-bold text-slate-900", child.italic && "italic")}>
+                            {child.text}
+                        </span>
+                    ))}
+                </p>;
+            }
+            if (block.type === 'heading') {
+                return <h2 key={index} className="text-2xl font-bold mt-10 mb-5 text-slate-900 tracking-tight">
+                    {block.children?.[0]?.text}
+                </h2>;
+            }
+            return null;
+        });
     };
+
+    if (isLoading || !article) {
+        return (
+            <DashboardLayout title="Loading..." userRole="patient" userName={currentUser.name} userAvatar={currentUser.avatar} onLogout={() => navigate("/")}>
+                <div className="flex flex-col items-center justify-center h-[60vh] gap-4">
+                    <div className="h-10 w-10 border-4 border-primary/20 border-t-primary rounded-full animate-spin" />
+                    <p className="text-muted-foreground font-medium">Securing medical information...</p>
+                </div>
+            </DashboardLayout>
+        );
+    }
+
+    const Icon = categoryIcons[article.category] || BookOpen;
+    const colorClass = categoryColors[article.article] || "bg-primary/10 text-primary";
 
     return (
         <DashboardLayout
-            title="Knowledge Base"
-            subtitle="Article View"
-            userRole={role}
-            userName={user.name}
-            userAvatar={user.avatar}
-            onLogout={handleLogout}
+            title="Medical Library"
+            userRole="patient"
+            userName={currentUser.name}
+            userAvatar={currentUser.avatar}
+            onLogout={() => navigate("/")}
         >
-            <div className="max-w-4xl mx-auto space-y-6 animate-fade-in pb-10">
-                <Button
-                    variant="ghost"
-                    className="pl-0 hover:pl-2 transition-all"
-                    onClick={() => navigate(backLink)}
-                >
-                    <ArrowLeft className="h-4 w-4 mr-2" />
-                    Back to Knowledge Base
-                </Button>
-
-                <Card className="overflow-hidden border-border/50 shadow-card">
-                    <div className="h-48 md:h-64 bg-gradient-to-r from-primary/10 to-accent/10 relative">
-                        <div className="absolute inset-0 flex items-center justify-center">
-                            <span className="text-4xl font-bold text-primary/20">
-                                {article.category}
-                            </span>
-                        </div>
+            <div className="max-w-5xl mx-auto space-y-8 animate-fade-in pb-20">
+                {/* Top Navigation */}
+                <div className="flex items-center justify-between">
+                    <Button
+                        variant="ghost"
+                        onClick={() => navigate("/knowledge")}
+                        className="group hover:bg-slate-100 rounded-full px-4"
+                    >
+                        <ArrowLeft className="mr-2 h-4 w-4 transition-transform group-hover:-translate-x-1" />
+                        <span className="font-semibold text-slate-600">Back to Library</span>
+                    </Button>
+                    <div className="flex gap-2">
+                        <Button variant="outline" size="icon" className="rounded-full h-10 w-10 border-slate-200"><Bookmark className="h-4 w-4 text-slate-600" /></Button>
+                        <Button variant="outline" size="icon" className="rounded-full h-10 w-10 border-slate-200"><Share2 className="h-4 w-4 text-slate-600" /></Button>
                     </div>
-                    <CardContent className="p-6 md:p-8">
-                        <div className="flex flex-wrap items-center gap-3 mb-6">
-                            <Badge variant="secondary" className="bg-primary/10 text-primary border-primary/20 capitalize">
-                                {article.category}
-                            </Badge>
-                            <span className="flex items-center text-sm text-muted-foreground">
-                                <Clock className="h-4 w-4 mr-1" />
-                                {article.readTime}
-                            </span>
-                            <span className="flex items-center text-sm text-muted-foreground">
-                                <Calendar className="h-4 w-4 mr-1" />
-                                Jan 12, 2024
-                            </span>
-                        </div>
+                </div>
 
-                        <h1 className="text-3xl md:text-4xl font-bold text-foreground mb-6">
+                {/* Hero Banner */}
+                <div className="relative h-[480px] w-full rounded-[40px] overflow-hidden shadow-2xl group border border-white">
+                    {article.image ? (
+                        <img
+                            src={article.image}
+                            className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                            alt={article.title}
+                        />
+                    ) : (
+                        <div className="w-full h-full bg-slate-100 flex items-center justify-center">
+                            <Icon className="h-32 w-32 opacity-10 text-primary" />
+                        </div>
+                    )}
+                    <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-900/20 to-transparent" />
+
+                    <div className="absolute bottom-12 left-12 right-12 space-y-4">
+                        <Badge className="bg-white/20 backdrop-blur-md text-white border-white/30 px-4 py-1.5 text-xs font-bold uppercase tracking-widest">
+                            {article.category}
+                        </Badge>
+                        <h1 className="text-4xl md:text-6xl font-black text-white leading-[1.1] tracking-tight max-w-3xl drop-shadow-lg">
                             {article.title}
                         </h1>
+                    </div>
+                </div>
 
-                        <div className="flex items-center justify-between py-6 border-y border-border/50 mb-8">
-                            <div className="flex items-center gap-3">
-                                <Avatar>
-                                    <AvatarImage src={`https://api.dicebear.com/7.x/avataaars/svg?seed=Doctor`} />
-                                    <AvatarFallback>DR</AvatarFallback>
-                                </Avatar>
+                {/* Content Layout */}
+                <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-12 pt-4">
+
+                    {/* Main Article Body */}
+                    <div className="space-y-10">
+                        {/* Author Card Mobile-Friendly */}
+                        <div className="flex flex-wrap items-center justify-between gap-6 p-6 rounded-3xl bg-white border border-slate-100 shadow-soft">
+                            <div className="flex items-center gap-4">
+                                <div className="h-14 w-14 rounded-2xl bg-primary/5 flex items-center justify-center border border-primary/10">
+                                    <UserCheck className="h-7 w-7 text-primary" />
+                                </div>
                                 <div>
-                                    <p className="font-medium text-sm">Dr. Sarah Mitchell</p>
-                                    <p className="text-xs text-muted-foreground">Chief Cardiologist</p>
+                                    <h4 className="font-bold text-slate-900 text-lg flex items-center gap-2">
+                                        MediConnect Medical Board
+                                        <ShieldCheck className="h-4 w-4 text-blue-500" />
+                                    </h4>
+                                    <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Clinical Compliance Reviewer</p>
                                 </div>
                             </div>
-                            <div className="flex gap-2">
-                                <Button variant="ghost" size="icon">
-                                    <Bookmark className="h-4 w-4" />
-                                </Button>
-                                <Button variant="ghost" size="icon">
-                                    <Share2 className="h-4 w-4" />
-                                </Button>
+
+                            <div className="flex items-center gap-6">
+                                <div className="text-center px-4 border-r border-slate-100">
+                                    <p className="text-[10px] uppercase font-black text-slate-400 mb-1">Updated</p>
+                                    <p className="text-sm font-bold text-slate-700">{article.publishDate}</p>
+                                </div>
+                                <div className="text-center px-4">
+                                    <p className="text-[10px] uppercase font-black text-slate-400 mb-1">Duration</p>
+                                    <p className="text-sm font-bold text-slate-700">5 min read</p>
+                                </div>
                             </div>
                         </div>
 
-                        <div className="prose prose-slate dark:prose-invert max-w-none">
-                            <p className="text-lg leading-relaxed text-muted-foreground mb-6">
-                                {article.excerpt}
-                            </p>
+                        <article className="prose prose-slate max-w-none">
+                            {renderContent(article.content)}
+                        </article>
 
-                            <h2>Understanding the Basics</h2>
-                            <p>
-                                Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor
-                                incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud
-                                exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.
-                            </p>
-
-                            <p>
-                                Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu
-                                fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in
-                                culpa qui officia deserunt mollit anim id est laborum.
-                            </p>
-
-                            <blockquote className="border-l-4 border-primary pl-4 italic my-6 text-foreground">
-                                "Early detection and consistent monitoring are key factors in successful long-term health outcomes."
-                            </blockquote>
-
-                            <h2>Key Recommendations</h2>
-                            <ul className="list-disc pl-6 space-y-2 mb-6">
-                                <li>Maintain a balanced diet rich in vegetables, fruits, and whole grains.</li>
-                                <li>Exercise at least 30 minutes a day, 5 days a week.</li>
-                                <li>Monitor your vital signs regularly and keep a log.</li>
-                                <li>Stay hydrated and reduce sodium intake.</li>
-                            </ul>
-
-                            <h3>When to See a Doctor</h3>
-                            <p>
-                                If you experience any sudden changes in your condition or if your symptoms persist
-                                despite following these guidelines, please consult your healthcare provider immediately.
-                            </p>
-                        </div>
-
-                        <Separator className="my-8" />
-
-                        <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-4">
-                                <Button variant="outline" size="sm" className="gap-2">
-                                    <ThumbsUp className="h-4 w-4" />
-                                    Helpful (124)
-                                </Button>
-                                <Button variant="ghost" size="sm" className="gap-2">
-                                    <MessageSquare className="h-4 w-4" />
-                                    Comments (8)
-                                </Button>
-                            </div>
-                            <div className="text-sm text-muted-foreground">
-                                Reviewed by Medical Board
+                        {/* Disclaimer */}
+                        <div className="p-8 rounded-3xl bg-slate-50 border border-slate-100 mt-12">
+                            <div className="flex gap-4">
+                                <div className="h-10 w-10 rounded-full bg-white flex items-center justify-center shadow-sm flex-shrink-0">
+                                    <ShieldCheck className="h-5 w-5 text-slate-400" />
+                                </div>
+                                <div className="space-y-2">
+                                    <h5 className="font-bold text-slate-900">Medical Disclaimer</h5>
+                                    <p className="text-sm text-slate-500 leading-relaxed">
+                                        The information provided in this guide is for educational purposes only and is not intended as medical advice. Always consult with a qualified healthcare provider regarding your health and symptoms.
+                                    </p>
+                                </div>
                             </div>
                         </div>
-                    </CardContent>
-                </Card>
+                    </div>
+
+                    {/* Sidebar */}
+                    <aside className="space-y-8">
+                        {/* Quick Action Card */}
+                        <Card className="border-0 shadow-2xl bg-primary rounded-[32px] overflow-hidden relative">
+                            <div className="absolute top-0 right-0 p-4 opacity-10">
+                                <MessageSquare className="h-32 w-32 -mr-8 -mt-8" />
+                            </div>
+                            <CardContent className="p-8 space-y-6 relative z-10">
+                                <h4 className="text-2xl font-black text-white leading-tight">Discuss this topic with a doctor?</h4>
+                                <p className="text-white/80 text-sm leading-relaxed">
+                                    Connect with a certified specialist in less than 15 minutes via secure video call.
+                                </p>
+                                <Button
+                                    variant="secondary"
+                                    className="w-full h-14 rounded-2xl font-black text-primary shadow-lg hover:scale-[1.02] transition-transform"
+                                    onClick={() => navigate("/consultation")}
+                                >
+                                    Book Consultation
+                                    <ChevronRight className="ml-2 h-4 w-4" />
+                                </Button>
+                            </CardContent>
+                        </Card>
+
+                        {/* Specialty Info */}
+                        <Card className="border-0 shadow-soft bg-white rounded-[32px] border border-slate-100">
+                            <CardContent className="p-8 space-y-6">
+                                <div className="space-y-1">
+                                    <h5 className="font-bold text-slate-900">Topic Specialty</h5>
+                                    <p className="text-sm text-slate-500">Related Clinical Area</p>
+                                </div>
+
+                                <div className="flex items-center gap-4 p-4 rounded-2xl bg-slate-50 border border-slate-100">
+                                    <div className={cn("h-12 w-12 rounded-xl flex items-center justify-center shadow-sm", categoryColors[article.category]?.split(" ")[0])}>
+                                        <Icon className={cn("h-6 w-6", categoryColors[article.category]?.split(" ")[1])} />
+                                    </div>
+                                    <div>
+                                        <p className="font-bold text-slate-900">{article.category}</p>
+                                        <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Medical Hub</p>
+                                    </div>
+                                </div>
+
+                                <div className="space-y-3 pt-2">
+                                    <div className="flex items-center justify-between text-sm">
+                                        <span className="text-slate-500">Fact Checked</span>
+                                        <span className="font-bold text-green-600 flex items-center gap-1">Yes <ShieldCheck className="h-3 w-3" /></span>
+                                    </div>
+                                    <div className="flex items-center justify-between text-sm">
+                                        <span className="text-slate-500">User Rating</span>
+                                        <span className="font-bold text-slate-900">4.9/5.0</span>
+                                    </div>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    </aside>
+                </div>
             </div>
         </DashboardLayout>
     );

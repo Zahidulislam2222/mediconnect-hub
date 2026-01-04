@@ -1,4 +1,6 @@
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { signOut, fetchUserAttributes } from 'aws-amplify/auth';
 import {
   Heart,
   Activity,
@@ -14,28 +16,60 @@ import { VitalCard } from "@/components/dashboard/VitalCard";
 import { AppointmentCard } from "@/components/dashboard/AppointmentCard";
 import { ActionButton } from "@/components/dashboard/ActionButton";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { patientVitals, upcomingAppointments, currentUser } from "@/lib/mockData";
+import { patientVitals, upcomingAppointments } from "@/lib/mockData";
 
 export default function PatientDashboard() {
   const navigate = useNavigate();
 
-  const handleLogout = () => {
-    navigate("/");
+  // State to hold Real User Data
+  const [realName, setRealName] = useState("Loading...");
+  const [realAvatar, setRealAvatar] = useState("..");
+
+  // 1. Fetch the Real User from AWS Cognito on Load
+  useEffect(() => {
+    async function getUserData() {
+      try {
+        const attributes = await fetchUserAttributes();
+
+        // --- FIX: Check for Name FIRST, then Email ---
+        const displayName = attributes.name || attributes.email || "Patient";
+
+        setRealName(displayName);
+        // Create Initials
+        setRealAvatar(displayName.substring(0, 2).toUpperCase());
+
+      } catch (error) {
+        console.error("Error fetching user:", error);
+        setRealName("Guest User");
+      }
+    }
+    getUserData();
+  }, []);
+
+  // 2. Real AWS Logout
+  const handleLogout = async () => {
+    try {
+      await signOut();
+      navigate("/auth");
+    } catch (error) {
+      console.error("Error signing out:", error);
+    }
   };
 
   return (
     <DashboardLayout
-      title="Welcome back, Alex"
+      // --- FIX: Use the full name in the title ---
+      title={`Welcome, ${realName}`}
       subtitle="Here's an overview of your health today"
       userRole="patient"
-      userName={currentUser.name}
-      userAvatar={currentUser.avatar}
+      userName={realName}
+      userAvatar={realAvatar}
       onLogout={handleLogout}
     >
       <div className="space-y-6 animate-fade-in">
-        {/* Vitals Grid */}
+        {/* Vitals Grid (IoT Simulation) */}
         <section>
-          <h2 className="text-lg font-semibold text-foreground mb-4">Your Vitals</h2>
+          <h2 className="text-lg font-semibold text-foreground mb-4">Your Vitals (IoT Live Stream)</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <VitalCard
               title="Heart Rate"
@@ -81,7 +115,7 @@ export default function PatientDashboard() {
         </section>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Appointments */}
+          {/* Appointments List */}
           <Card className="lg:col-span-2 shadow-card border-border/50">
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between">
@@ -111,7 +145,7 @@ export default function PatientDashboard() {
             </CardContent>
           </Card>
 
-          {/* Quick Actions */}
+          {/* Quick Actions Panel */}
           <Card className="shadow-card border-border/50">
             <CardHeader className="pb-3">
               <CardTitle className="text-lg">Quick Actions</CardTitle>
@@ -147,7 +181,7 @@ export default function PatientDashboard() {
           </Card>
         </div>
 
-        {/* Health Tips Banner */}
+        {/* Marketing/Health Tip Banner */}
         <Card className="medical-gradient text-white shadow-elevated border-0 overflow-hidden">
           <CardContent className="py-6 relative">
             <div className="absolute right-0 top-0 w-64 h-full opacity-10">

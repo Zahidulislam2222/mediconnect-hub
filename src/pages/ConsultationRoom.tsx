@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Mic,
@@ -11,10 +11,9 @@ import {
   Pencil,
   Sparkles,
   ChevronRight,
-  User,
+  AlertCircle
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -27,36 +26,53 @@ export default function ConsultationRoom() {
   const [isVideoOff, setIsVideoOff] = useState(false);
   const [isScreenSharing, setIsScreenSharing] = useState(false);
   const [activeTab, setActiveTab] = useState("scribe");
+  const [cameraError, setCameraError] = useState(false);
+
+  // Video Ref to show Real Camera
+  const myVideoRef = useRef<HTMLVideoElement>(null);
+
+  // --- 1. ACCESS REAL CAMERA ---
+  useEffect(() => {
+    startCamera();
+    return () => stopCamera();
+  }, []);
+
+  // Watch for toggle button
+  useEffect(() => {
+    if (isVideoOff) stopCamera();
+    else startCamera();
+  }, [isVideoOff]);
+
+  const startCamera = async () => {
+    try {
+      if (myVideoRef.current) {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+        myVideoRef.current.srcObject = stream;
+        setCameraError(false);
+      }
+    } catch (err) {
+      console.error("Error accessing camera:", err);
+      setCameraError(true);
+    }
+  };
+
+  const stopCamera = () => {
+    if (myVideoRef.current && myVideoRef.current.srcObject) {
+      const stream = myVideoRef.current.srcObject as MediaStream;
+      stream.getTracks().forEach(track => track.stop());
+      myVideoRef.current.srcObject = null;
+    }
+  };
 
   const transcription = [
     { time: "0:00", speaker: "Dr. Chen", text: "Good afternoon, how are you feeling today?" },
-    {
-      time: "0:05",
-      speaker: "Patient",
-      text: "I've been having some chest discomfort and shortness of breath for the past few days.",
-    },
-    {
-      time: "0:15",
-      speaker: "Dr. Chen",
-      text: "I see. Can you describe the chest discomfort? Is it sharp or more of a pressure feeling?",
-    },
-    {
-      time: "0:25",
-      speaker: "Patient",
-      text: "It's more like a pressure, especially when I climb stairs or walk quickly.",
-    },
-  ];
-
-  const extractedSymptoms = [
-    { symptom: "Chest discomfort", confidence: 95 },
-    { symptom: "Shortness of breath", confidence: 92 },
-    { symptom: "Exercise-induced symptoms", confidence: 88 },
+    { time: "0:05", speaker: "Patient", text: "I've been having some chest discomfort." },
   ];
 
   return (
-    <div className="min-h-screen bg-slate-900 text-white">
+    <div className="min-h-screen bg-slate-950 text-white">
       {/* Header */}
-      <header className="flex items-center justify-between px-6 py-4 border-b border-white/10">
+      <header className="flex items-center justify-between px-6 py-4 border-b border-white/10 bg-slate-900/50">
         <div className="flex items-center gap-4">
           <Button
             variant="ghost"
@@ -67,185 +83,183 @@ export default function ConsultationRoom() {
             <ChevronRight className="h-5 w-5 rotate-180" />
           </Button>
           <div>
-            <h1 className="font-semibold">Consultation with John Doe</h1>
-            <p className="text-sm text-white/60">Chest Pain - Follow up</p>
+            <h1 className="font-semibold text-lg">Consultation with Dr. Sarah Chen</h1>
+            <p className="text-sm text-white/50">Cardiology • 2:30 PM</p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          <Badge className="bg-red-500/20 text-red-400 border-red-500/30">
-            <span className="animate-pulse mr-1.5 h-2 w-2 rounded-full bg-red-500 inline-block" />
-            Live
+        <div className="flex items-center gap-3">
+          <Badge className="bg-red-500/10 text-red-500 border-red-500/20 px-3 py-1">
+            <span className="animate-pulse mr-2 h-2 w-2 rounded-full bg-red-500 inline-block" />
+            REC
           </Badge>
-          <span className="text-sm text-white/60">24:35</span>
+          <span className="text-sm font-mono text-white/60 bg-white/5 px-2 py-1 rounded">24:35</span>
         </div>
       </header>
 
-      {/* Main Content */}
-      <div className="flex h-[calc(100vh-73px)]">
+      {/* Main Grid */}
+      <div className="flex h-[calc(100vh-80px)]">
         {/* Video Area */}
-        <div className="flex-1 p-6">
-          <div className="relative h-full rounded-2xl bg-gradient-to-br from-slate-800 to-slate-900 overflow-hidden">
-            {/* Main Video (Doctor) */}
-            <div className="absolute inset-0 flex items-center justify-center">
-              <div className="text-center">
-                <Avatar className="h-32 w-32 mx-auto mb-4 border-4 border-primary/30">
-                  <AvatarFallback className="bg-primary/20 text-primary text-4xl">
-                    SC
-                  </AvatarFallback>
-                </Avatar>
-                <p className="text-lg font-medium">Dr. Sarah Chen</p>
-                <p className="text-sm text-white/60">Cardiologist</p>
-              </div>
-            </div>
+        <div className="flex-1 p-6 relative">
+          <div className="relative h-full w-full rounded-2xl bg-gradient-to-b from-slate-800 to-slate-900 overflow-hidden shadow-2xl border border-white/10">
 
-            {/* PiP (Patient) */}
-            <div className="absolute bottom-6 right-6 w-48 h-36 rounded-xl bg-slate-800 border-2 border-white/10 overflow-hidden shadow-lg">
-              <div className="flex items-center justify-center h-full">
-                <div className="text-center">
-                  <Avatar className="h-12 w-12 mx-auto mb-2">
-                    <AvatarFallback className="bg-accent/20 text-accent">JD</AvatarFallback>
+            {/* MAIN VIDEO (The Doctor - Simulated with Avatar) */}
+            <div className="absolute inset-0 flex items-center justify-center bg-slate-800">
+              <div className="text-center">
+                <div className="relative inline-block">
+                  <Avatar className="h-40 w-40 mx-auto mb-4 border-4 border-emerald-500/30 shadow-xl">
+                    <AvatarFallback className="bg-slate-700 text-slate-300 text-5xl font-light">SC</AvatarFallback>
                   </Avatar>
-                  <p className="text-xs text-white/80">You</p>
+                  <div className="absolute bottom-2 right-2 h-6 w-6 bg-emerald-500 rounded-full border-4 border-slate-800"></div>
+                </div>
+                <h2 className="text-2xl font-semibold mt-4">Dr. Sarah Chen</h2>
+                <p className="text-emerald-400 text-sm font-medium mt-1">Speaking...</p>
+
+                {/* Audio Wave Animation */}
+                <div className="flex items-center justify-center gap-1 mt-6 h-8">
+                  {[1, 2, 3, 4, 5].map(i => (
+                    <div key={i} className="w-1 bg-emerald-500/50 rounded-full animate-pulse" style={{ height: `${Math.random() * 100}%`, animationDelay: `${i * 0.1}s` }} />
+                  ))}
                 </div>
               </div>
             </div>
 
-            {/* Controls */}
-            <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-3">
+            {/* PiP (PATIENT SELF VIEW - REAL CAMERA) */}
+            <div className="absolute bottom-24 right-6 w-64 aspect-video rounded-xl bg-black border-2 border-white/10 overflow-hidden shadow-2xl transition-all hover:scale-105 z-20">
+              {!isVideoOff && !cameraError ? (
+                <video
+                  ref={myVideoRef}
+                  autoPlay
+                  muted
+                  playsInline
+                  className="w-full h-full object-cover transform -scale-x-100"
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center bg-slate-800">
+                  <div className="text-center">
+                    <Avatar className="h-12 w-12 mx-auto mb-2 bg-slate-700">
+                      <AvatarFallback>YOU</AvatarFallback>
+                    </Avatar>
+                    <p className="text-xs text-white/50">{cameraError ? "Camera Error" : "Camera Off"}</p>
+                  </div>
+                </div>
+              )}
+              <div className="absolute bottom-2 left-2 bg-black/60 px-2 py-0.5 rounded text-[10px] font-medium backdrop-blur-sm">
+                You (Patient)
+              </div>
+            </div>
+
+            {/* Floating Controls Bar */}
+            <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex items-center gap-4 px-6 py-3 bg-slate-900/90 backdrop-blur-md rounded-full border border-white/10 shadow-xl z-30">
               <Button
                 variant="ghost"
-                size="lg"
-                className={cn(
-                  "h-14 w-14 rounded-full",
-                  isMuted ? "bg-red-500/20 text-red-400 hover:bg-red-500/30" : "bg-white/10 text-white hover:bg-white/20"
-                )}
+                size="icon"
+                className={cn("h-12 w-12 rounded-full transition-all", isMuted ? "bg-red-500/20 text-red-500 hover:bg-red-500/30" : "bg-white/5 hover:bg-white/10")}
                 onClick={() => setIsMuted(!isMuted)}
               >
-                {isMuted ? <MicOff className="h-6 w-6" /> : <Mic className="h-6 w-6" />}
+                {isMuted ? <MicOff className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
               </Button>
 
               <Button
                 variant="ghost"
-                size="lg"
-                className={cn(
-                  "h-14 w-14 rounded-full",
-                  isVideoOff ? "bg-red-500/20 text-red-400 hover:bg-red-500/30" : "bg-white/10 text-white hover:bg-white/20"
-                )}
+                size="icon"
+                className={cn("h-12 w-12 rounded-full transition-all", isVideoOff ? "bg-red-500/20 text-red-500 hover:bg-red-500/30" : "bg-white/5 hover:bg-white/10")}
                 onClick={() => setIsVideoOff(!isVideoOff)}
               >
-                {isVideoOff ? <VideoOff className="h-6 w-6" /> : <Video className="h-6 w-6" />}
+                {isVideoOff ? <VideoOff className="h-5 w-5" /> : <Video className="h-5 w-5" />}
               </Button>
 
               <Button
                 variant="ghost"
-                size="lg"
-                className={cn(
-                  "h-14 w-14 rounded-full",
-                  isScreenSharing ? "bg-primary/20 text-primary hover:bg-primary/30" : "bg-white/10 text-white hover:bg-white/20"
-                )}
+                size="icon"
+                className={cn("h-12 w-12 rounded-full transition-all", isScreenSharing ? "bg-emerald-500/20 text-emerald-500" : "bg-white/5 hover:bg-white/10")}
                 onClick={() => setIsScreenSharing(!isScreenSharing)}
               >
-                <MonitorUp className="h-6 w-6" />
+                <MonitorUp className="h-5 w-5" />
               </Button>
 
+              <div className="w-px h-8 bg-white/10 mx-2" />
+
               <Button
-                variant="ghost"
-                size="lg"
-                className="h-14 w-14 rounded-full bg-red-500 text-white hover:bg-red-600"
+                variant="destructive"
+                size="icon"
+                className="h-12 w-12 rounded-full shadow-lg hover:bg-red-600 transition-transform hover:scale-110"
                 onClick={() => navigate(-1)}
               >
-                <PhoneOff className="h-6 w-6" />
+                <PhoneOff className="h-5 w-5" />
               </Button>
             </div>
+
           </div>
         </div>
 
-        {/* Side Panel */}
-        <div className="w-96 border-l border-white/10 bg-slate-800/50">
+        {/* Side Panel (AI Scribe) */}
+        <div className="w-96 border-l border-white/10 bg-slate-900/50 backdrop-blur-sm">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="h-full flex flex-col">
-            <TabsList className="grid w-full grid-cols-3 bg-transparent border-b border-white/10 rounded-none p-0 h-auto">
-              <TabsTrigger
-                value="scribe"
-                className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent py-3"
-              >
-                <Sparkles className="h-4 w-4 mr-2" />
-                AI Scribe
-              </TabsTrigger>
-              <TabsTrigger
-                value="chat"
-                className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent py-3"
-              >
-                <MessageSquare className="h-4 w-4 mr-2" />
-                Chat
-              </TabsTrigger>
-              <TabsTrigger
-                value="whiteboard"
-                className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent py-3"
-              >
-                <Pencil className="h-4 w-4 mr-2" />
-                Draw
-              </TabsTrigger>
-            </TabsList>
+            <div className="px-4 pt-4">
+              <TabsList className="w-full grid grid-cols-2 bg-slate-800/50 p-1">
+                <TabsTrigger value="scribe" className="data-[state=active]:bg-slate-700">AI Scribe</TabsTrigger>
+                <TabsTrigger value="chat" className="data-[state=active]:bg-slate-700">Chat</TabsTrigger>
+              </TabsList>
+            </div>
 
-            <TabsContent value="scribe" className="flex-1 m-0 overflow-hidden">
-              <ScrollArea className="h-full">
-                <div className="p-4 space-y-6">
+            <TabsContent value="scribe" className="flex-1 overflow-hidden mt-4">
+              <ScrollArea className="h-full px-4">
+                <div className="space-y-6 pb-6">
                   {/* Real-time Transcription */}
-                  <div>
-                    <h3 className="text-sm font-medium text-white/80 mb-3 flex items-center gap-2">
-                      <span className="h-2 w-2 rounded-full bg-red-500 animate-pulse" />
-                      Real-time Transcription
-                    </h3>
-                    <div className="space-y-3">
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-sm font-medium text-white/90">Live Transcription</h3>
+                      <Badge variant="outline" className="text-[10px] border-emerald-500/30 text-emerald-400 bg-emerald-500/5">
+                        <Sparkles className="w-3 h-3 mr-1" /> AWS Transcribe
+                      </Badge>
+                    </div>
+
+                    <div className="space-y-4 pl-4 border-l-2 border-white/10">
                       {transcription.map((item, idx) => (
-                        <div key={idx} className="text-sm">
-                          <div className="flex items-center gap-2 mb-1">
-                            <span className="text-white/40 text-xs">{item.time}</span>
-                            <span className="font-medium text-primary">{item.speaker}</span>
+                        <div key={idx} className="relative">
+                          <div className={`absolute -left-[21px] top-0 w-3 h-3 rounded-full border-2 border-slate-900 ${item.speaker === "Dr. Chen" ? "bg-emerald-500" : "bg-blue-500"}`} />
+                          <div className="text-xs text-white/40 mb-1 flex justify-between">
+                            <span className={item.speaker === "Dr. Chen" ? "text-emerald-400 font-medium" : "text-blue-400 font-medium"}>
+                              {item.speaker}
+                            </span>
+                            <span>{item.time}</span>
                           </div>
-                          <p className="text-white/70 pl-10">{item.text}</p>
+                          <p className="text-sm text-white/80 leading-relaxed bg-white/5 p-2 rounded-lg rounded-tl-none">
+                            {item.text}
+                          </p>
                         </div>
                       ))}
                     </div>
                   </div>
 
-                  {/* AI Extracted Symptoms */}
-                  <div className="pt-4 border-t border-white/10">
-                    <h3 className="text-sm font-medium text-white/80 mb-3 flex items-center gap-2">
-                      <Sparkles className="h-4 w-4 text-primary" />
-                      AI Extracted Symptoms
+                  {/* AI Findings */}
+                  <div className="bg-gradient-to-br from-indigo-500/10 to-purple-500/10 rounded-xl p-4 border border-indigo-500/20">
+                    <h3 className="text-sm font-medium text-white/90 mb-3 flex items-center gap-2">
+                      <Sparkles className="w-4 h-4 text-indigo-400" />
+                      AWS Comprehend Findings
                     </h3>
                     <div className="space-y-2">
-                      {extractedSymptoms.map((item, idx) => (
-                        <div
-                          key={idx}
-                          className="flex items-center justify-between p-3 rounded-lg bg-white/5"
-                        >
-                          <span className="text-sm text-white/80">{item.symptom}</span>
-                          <Badge variant="outline" className="text-xs border-primary/30 text-primary">
-                            {item.confidence}%
-                          </Badge>
-                        </div>
-                      ))}
+                      <div className="flex items-center justify-between bg-black/20 p-2 rounded">
+                        <span className="text-sm">Chest discomfort</span>
+                        <Badge className="bg-indigo-500/20 text-indigo-300 hover:bg-indigo-500/30">98%</Badge>
+                      </div>
+                      <div className="flex items-center justify-between bg-black/20 p-2 rounded">
+                        <span className="text-sm">Shortness of breath</span>
+                        <Badge className="bg-indigo-500/20 text-indigo-300 hover:bg-indigo-500/30">92%</Badge>
+                      </div>
                     </div>
                   </div>
                 </div>
               </ScrollArea>
             </TabsContent>
 
-            <TabsContent value="chat" className="flex-1 m-0 p-4">
-              <div className="h-full flex flex-col items-center justify-center text-center">
-                <MessageSquare className="h-12 w-12 text-white/20 mb-3" />
-                <p className="text-white/60 text-sm">Chat messages will appear here</p>
+            <TabsContent value="chat" className="flex-1 flex flex-col mt-0">
+              <div className="flex-1 flex items-center justify-center text-white/30">
+                <p className="text-sm">No messages yet</p>
               </div>
-            </TabsContent>
-
-            <TabsContent value="whiteboard" className="flex-1 m-0 p-4">
-              <div className="h-full rounded-xl bg-white/5 border border-white/10 flex items-center justify-center">
-                <div className="text-center">
-                  <Pencil className="h-12 w-12 text-white/20 mx-auto mb-3" />
-                  <p className="text-white/60 text-sm">Digital Whiteboard</p>
-                  <p className="text-white/40 text-xs mt-1">Draw diagrams for patient</p>
+              <div className="p-4 border-t border-white/10">
+                <div className="relative">
+                  <input className="w-full bg-slate-800 border-none rounded-full py-3 px-4 text-sm text-white placeholder:text-white/30 focus:ring-1 focus:ring-emerald-500" placeholder="Type a message..." />
                 </div>
               </div>
             </TabsContent>

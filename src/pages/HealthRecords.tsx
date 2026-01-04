@@ -14,14 +14,20 @@ import {
   List,
   Share2,
   Network,
+  Upload,
+  Cloud,
+  Cpu,
+  AlertTriangle,
+  CheckCircle2,
+  ScanLine
 } from "lucide-react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import { Progress } from "@/components/ui/progress";
 import { currentUser, currentDoctor, ehrTimeline, documents } from "@/lib/mockData";
 import { cn } from "@/lib/utils";
 
@@ -54,68 +60,201 @@ interface HealthRecordsProps {
 export default function HealthRecords({ role = "patient" }: HealthRecordsProps) {
   const navigate = useNavigate();
   const [viewMode, setViewMode] = useState<"timeline" | "grid" | "graph">("timeline");
+
+  // --- AI SIMULATION STATE ---
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [aiProcessing, setAiProcessing] = useState(false);
+  const [resultReady, setResultReady] = useState(false);
+
   const user = role === "patient" ? currentUser : currentDoctor;
 
   const handleLogout = () => {
     navigate("/");
   };
 
+  // --- THE "HYBRID CLOUD" SIMULATION FUNCTION ---
+  const handleFileUpload = () => {
+    setIsUploading(true);
+    setUploadProgress(0);
+    setResultReady(false);
+
+    // 1. Simulate Upload to Google Cloud Storage (2 seconds)
+    const interval = setInterval(() => {
+      setUploadProgress((prev) => {
+        if (prev >= 100) {
+          clearInterval(interval);
+          setIsUploading(false);
+          startAiAnalysis(); // Trigger AI step
+          return 100;
+        }
+        return prev + 10;
+      });
+    }, 200);
+  };
+
+  const startAiAnalysis = () => {
+    setAiProcessing(true);
+    // 2. Simulate Google Vertex AI Processing (3 seconds)
+    setTimeout(() => {
+      setAiProcessing(false);
+      setResultReady(true);
+    }, 3000);
+  };
+
   return (
     <DashboardLayout
       title="Health Records"
-      subtitle="Your complete medical history in one place"
+      subtitle="Hybrid Cloud: AWS S3 Storage + Google Vertex AI Analysis"
       userRole={role}
       userName={user.name}
       userAvatar={user.avatar}
       onLogout={handleLogout}
     >
       <div className="space-y-6 animate-fade-in">
-        {/* Search & Filters */}
-        <div className="flex flex-col sm:flex-row gap-4">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input placeholder="Search records, documents, or prescriptions..." className="pl-10" />
-          </div>
-          <div className="flex gap-2">
-            <Button variant="outline" className="gap-2">
-              <Filter className="h-4 w-4" />
-              Filters
-            </Button>
-            <div className="flex border rounded-lg overflow-hidden">
-              <Button
-                variant={viewMode === "timeline" ? "secondary" : "ghost"}
-                size="icon"
-                className="rounded-none"
-                onClick={() => setViewMode("timeline")}
-              >
-                <List className="h-4 w-4" />
-              </Button>
-              <Button
-                variant={viewMode === "grid" ? "secondary" : "ghost"}
-                size="icon"
-                className="rounded-none"
-                onClick={() => setViewMode("grid")}
-              >
-                <Grid className="h-4 w-4" />
-              </Button>
-              <Button
-                variant={viewMode === "graph" ? "secondary" : "ghost"}
-                size="icon"
-                className="rounded-none"
-                onClick={() => setViewMode("graph")}
-              >
-                <Network className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
+
+        {/* Top Stats Banner */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <Card className="bg-primary/5 border-primary/20">
+            <CardContent className="p-4 flex items-center gap-4">
+              <div className="h-10 w-10 rounded-full bg-primary/20 flex items-center justify-center text-primary">
+                <FileText className="h-5 w-5" />
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Total Records</p>
+                <p className="text-2xl font-bold">24</p>
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="bg-blue-500/5 border-blue-500/20">
+            <CardContent className="p-4 flex items-center gap-4">
+              <div className="h-10 w-10 rounded-full bg-blue-500/20 flex items-center justify-center text-blue-600">
+                <ScanLine className="h-5 w-5" />
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Imaging Scans</p>
+                <p className="text-2xl font-bold">5</p>
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="bg-green-500/5 border-green-500/20">
+            <CardContent className="p-4 flex items-center gap-4">
+              <div className="h-10 w-10 rounded-full bg-green-500/20 flex items-center justify-center text-green-600">
+                <CheckCircle2 className="h-5 w-5" />
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Recent Results</p>
+                <p className="text-2xl font-bold">Normal</p>
+              </div>
+            </CardContent>
+          </Card>
         </div>
 
-        <Tabs defaultValue="timeline" className="space-y-6">
-          <TabsList className="bg-secondary/50">
+        <Tabs defaultValue="ai-analysis" className="space-y-6">
+          <TabsList className="bg-secondary/50 w-full justify-start overflow-x-auto">
+            <TabsTrigger value="ai-analysis" className="gap-2">
+              <Cpu className="h-4 w-4" /> AI Analysis (GCP)
+            </TabsTrigger>
             <TabsTrigger value="timeline">Timeline</TabsTrigger>
             <TabsTrigger value="documents">Document Vault</TabsTrigger>
             <TabsTrigger value="graph">Relationships</TabsTrigger>
           </TabsList>
+
+          {/* --- AI ANALYSIS TAB --- */}
+          <TabsContent value="ai-analysis" className="mt-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+              {/* Upload Zone */}
+              <Card className="border-2 border-dashed border-muted-foreground/25 hover:border-primary/50 transition-colors">
+                <CardContent className="flex flex-col items-center justify-center py-10 text-center space-y-4">
+                  <div className="h-20 w-20 bg-muted/50 rounded-full flex items-center justify-center relative">
+                    <Cloud className="h-10 w-10 text-muted-foreground" />
+                    <Badge className="absolute -top-2 -right-2 bg-blue-600 hover:bg-blue-700">GCP</Badge>
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-semibold">Upload X-Ray or MRI</h3>
+                    <p className="text-sm text-muted-foreground max-w-xs mx-auto mt-1">
+                      Drag and drop your DICOM or JPEG file here.
+                      Analysis provided by Google Vertex AI.
+                    </p>
+                  </div>
+
+                  {!isUploading && !aiProcessing && !resultReady && (
+                    <Button onClick={handleFileUpload}>Select File to Analyze</Button>
+                  )}
+
+                  {isUploading && (
+                    <div className="w-full max-w-xs space-y-2">
+                      <div className="flex justify-between text-xs text-muted-foreground">
+                        <span>Uploading to Google Cloud Storage...</span>
+                        <span>{uploadProgress}%</span>
+                      </div>
+                      <Progress value={uploadProgress} className="h-2" />
+                    </div>
+                  )}
+
+                  {aiProcessing && (
+                    <div className="flex flex-col items-center gap-3 text-primary font-medium animate-pulse">
+                      <Cpu className="h-8 w-8 text-purple-600" />
+                      <span className="text-purple-600">Processing with Vertex AI...</span>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Result Area */}
+              <div className="space-y-4">
+                {!resultReady && !aiProcessing && !isUploading && (
+                  <div className="h-full bg-muted/20 border rounded-xl flex items-center justify-center text-muted-foreground text-sm p-10 text-center">
+                    AI Analysis results will appear here after processing.
+                  </div>
+                )}
+
+                {resultReady && (
+                  <Card className="border-l-4 border-l-red-500 shadow-lg animate-in slide-in-from-bottom-4">
+                    <CardHeader>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <Badge variant="outline" className="text-red-500 border-red-200 bg-red-50">Abnormality Detected</Badge>
+                          <Badge variant="secondary" className="bg-blue-50 text-blue-700">Confidence: 94.2%</Badge>
+                        </div>
+                        <span className="text-[10px] text-muted-foreground uppercase tracking-wider font-bold">Vertex AI</span>
+                      </div>
+                      <CardTitle className="mt-2">Chest X-Ray Analysis Report</CardTitle>
+                      <CardDescription>Scan ID: XR-2025-8992 • Today, 2:41 PM</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="p-4 bg-red-50 rounded-lg border border-red-100">
+                        <h4 className="font-semibold text-red-900 flex items-center gap-2 mb-2">
+                          <AlertTriangle className="h-4 w-4" />
+                          Primary Finding: Pneumonia
+                        </h4>
+                        <p className="text-sm text-red-800/80">
+                          Localized opacity detected in the lower right lobe consistent with bacterial pneumonia. Immediate clinical correlation recommended.
+                        </p>
+                      </div>
+
+                      <div className="space-y-2">
+                        <div className="flex justify-between text-sm">
+                          <span className="text-muted-foreground">Right Lung Opacity</span>
+                          <span className="font-medium text-red-600">High Risk</span>
+                        </div>
+                        {/* FIXED: Removed indicatorClassName, used tailwind to style child div */}
+                        <Progress value={85} className="h-1.5 bg-red-100 [&>div]:bg-red-500" />
+                      </div>
+
+                      <div className="flex justify-end pt-2">
+                        <Button variant="outline" size="sm" className="gap-2">
+                          <Download className="h-4 w-4" />
+                          Download Full Report (PDF)
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+              </div>
+            </div>
+          </TabsContent>
 
           {/* Timeline View */}
           <TabsContent value="timeline" className="space-y-0">

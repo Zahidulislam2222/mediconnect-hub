@@ -1,4 +1,6 @@
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { signOut, fetchUserAttributes } from 'aws-amplify/auth'; // REAL AWS AUTH
 import {
   Users,
   DollarSign,
@@ -27,8 +29,35 @@ import {
 export default function DoctorDashboard() {
   const navigate = useNavigate();
 
-  const handleLogout = () => {
-    navigate("/");
+  // --- REAL DATA STATE ---
+  const [realName, setRealName] = useState("Loading...");
+  const [realAvatar, setRealAvatar] = useState("..");
+
+  // --- FETCH USER FROM AWS ---
+  useEffect(() => {
+    async function getUserData() {
+      try {
+        const attributes = await fetchUserAttributes();
+        // Use the 'name' attribute if it exists, otherwise use email
+        const displayName = attributes.name || attributes.email || "Doctor";
+        setRealName(displayName);
+        setRealAvatar(displayName.substring(0, 2).toUpperCase());
+      } catch (error) {
+        console.error("Error fetching user:", error);
+        setRealName("Guest Provider");
+      }
+    }
+    getUserData();
+  }, []);
+
+  // --- REAL LOGOUT FUNCTION ---
+  const handleLogout = async () => {
+    try {
+      await signOut(); // Clears AWS Session
+      navigate("/auth"); // Goes back to login
+    } catch (error) {
+      console.error("Error signing out:", error);
+    }
   };
 
   const todayStats = {
@@ -39,15 +68,14 @@ export default function DoctorDashboard() {
   };
 
   const totalRevenue = revenueData.reduce((sum, item) => sum + item.revenue, 0);
-  const totalConsultations = revenueData.reduce((sum, item) => sum + item.consultations, 0);
 
   return (
     <DashboardLayout
       title="Provider Dashboard"
-      subtitle="Welcome back, Dr. Chen"
+      subtitle={`Welcome back, ${realName}`}
       userRole="doctor"
-      userName={currentDoctor.name}
-      userAvatar={currentDoctor.avatar}
+      userName={realName}
+      userAvatar={realAvatar}
       onLogout={handleLogout}
     >
       <div className="space-y-6 animate-fade-in">
