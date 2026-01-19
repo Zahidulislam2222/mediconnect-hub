@@ -109,8 +109,8 @@ export function VitalCard({
                 isNeutral
                   ? "text-muted-foreground"
                   : isPositive
-                  ? "text-success"
-                  : "text-destructive"
+                    ? "text-success"
+                    : "text-destructive"
               )}
             >
               {change}

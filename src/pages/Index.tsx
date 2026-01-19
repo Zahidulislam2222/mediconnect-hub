@@ -15,6 +15,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { PublicHeader } from "@/components/PublicHeader"; // ✅ The new shared header
 
 export default function Index() {
   const navigate = useNavigate();
@@ -61,41 +62,8 @@ export default function Index() {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Navigation */}
-      <nav className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-lg border-b border-border">
-        <div className="container mx-auto px-6 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl medical-gradient">
-              <Stethoscope className="h-5 w-5 text-white" />
-            </div>
-            <span className="text-xl font-bold">MediConnect</span>
-          </div>
-
-          <div className="hidden md:flex items-center gap-8">
-            <a href="#features" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-              Features
-            </a>
-            <a href="#how-it-works" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-              How It Works
-            </a>
-            <a href="#testimonials" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-              Testimonials
-            </a>
-            <button onClick={() => navigate("/knowledge")} className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-              Knowledge Base
-            </button>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <Button variant="ghost" onClick={() => navigate("/auth")}>
-              Sign In
-            </Button>
-            <Button onClick={() => navigate("/auth")} className="bg-primary hover:bg-primary/90">
-              Get Started
-            </Button>
-          </div>
-        </div>
-      </nav>
+      {/* ✅ 1. SHARED HEADER */}
+      <PublicHeader />
 
       {/* Hero Section */}
       <section className="pt-32 pb-20 px-6">

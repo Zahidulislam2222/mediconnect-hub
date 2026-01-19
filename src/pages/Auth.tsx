@@ -1,12 +1,10 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 // AWS Imports
-import { signIn, signUp, confirmSignUp, getCurrentUser } from 'aws-amplify/auth';
+import { signIn, signUp, confirmSignUp, getCurrentUser, fetchAuthSession } from 'aws-amplify/auth';
 
 import {
   Stethoscope,
-  Mail,
-  Lock,
   User,
   Building2,
   Shield,
@@ -14,8 +12,9 @@ import {
   Upload,
   CheckCircle2,
   ArrowRight,
-  Phone,
   Loader2,
+  AlertTriangle,
+  FileBadge
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -25,6 +24,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
+import { PublicHeader } from "@/components/PublicHeader";
+
+// Env Variable
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
 type AuthStep = "login" | "signup" | "confirm-signup" | "mfa" | "identity";
 
@@ -37,14 +40,15 @@ export default function Auth() {
   const [loading, setLoading] = useState(false);
 
   // Form States
-  const [name, setName] = useState(""); // ADDED: Name State
+  const [name, setName] = useState("");
   const [email, setEmail] = useState("alex.thompson@email.com");
-  const [password, setPassword] = useState("MediConnect@2025"); // Updated default to strong password
+  const [password, setPassword] = useState("MediConnect@2025");
   const [otpValue, setOtpValue] = useState("");
 
-  // Identity Verification Mock States
-  const [idUploaded, setIdUploaded] = useState(false);
-  const [selfieUploaded, setSelfieUploaded] = useState(false);
+  // Identity States
+  const [selfieImage, setSelfieImage] = useState<string | null>(null);
+  const [idImage, setIdImage] = useState<string | null>(null);
+  const [verificationStatus, setVerificationStatus] = useState<"idle" | "verifying" | "success" | "failed">("idle");
 
   // --- 1. CHECK IF ALREADY LOGGED IN ---
   useEffect(() => {
@@ -55,14 +59,53 @@ export default function Auth() {
     try {
       const user = await getCurrentUser();
       if (user) {
-        // If already logged in, go straight to dashboard
         if (userType === 'patient') navigate("/dashboard");
         else navigate("/doctor-dashboard");
       }
     } catch (error) {
-      // Not logged in, stay here
+      // Not logged in
     }
   }
+
+  // --- HELPER: COMPRESS & CONVERT IMAGE ---
+  const processImage = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = (event) => {
+        const img = new Image();
+        img.src = event.target?.result as string;
+        img.onload = () => {
+          const canvas = document.createElement("canvas");
+          const MAX_WIDTH = 800; // Resize to max 800px width
+          const scaleSize = MAX_WIDTH / img.width;
+          canvas.width = MAX_WIDTH;
+          canvas.height = img.height * scaleSize;
+
+          const ctx = canvas.getContext("2d");
+          ctx?.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+          // Compress to JPEG 0.7 quality
+          const dataUrl = canvas.toDataURL("image/jpeg", 0.7);
+          // Remove header for Lambda
+          resolve(dataUrl.split(',')[1]);
+        };
+      };
+      reader.onerror = (error) => reject(error);
+    });
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>, type: 'selfie' | 'id') => {
+    if (e.target.files && e.target.files[0]) {
+      try {
+        const base64 = await processImage(e.target.files[0]);
+        if (type === 'selfie') setSelfieImage(base64);
+        else setIdImage(base64);
+      } catch (err) {
+        toast({ variant: "destructive", title: "Image Error", description: "Could not process image." });
+      }
+    }
+  };
 
   // --- AWS COGNITO FUNCTIONS ---
 
@@ -73,6 +116,16 @@ export default function Auth() {
       const { isSignedIn, nextStep } = await signIn({ username: email, password });
 
       if (isSignedIn) {
+        try {
+          const user = await getCurrentUser();
+          localStorage.setItem('user', JSON.stringify({
+            name: user.username || email,
+            email: email,
+            role: userType
+          }));
+        } catch (e) { }
+
+        // Send to Identity Check
         setAuthStep("identity");
       } else if (nextStep.signInStep === 'CONFIRM_SIGN_UP') {
         setAuthStep("confirm-signup");
@@ -80,9 +133,8 @@ export default function Auth() {
       }
     } catch (error: any) {
       console.error(error);
-      // Handle "Already Signed In" explicitly
       if (error.name === "UserAlreadyAuthenticatedException") {
-        navigate(userType === 'patient' ? "/dashboard" : "/doctor-dashboard");
+        setAuthStep("identity");
         return;
       }
       toast({
@@ -99,20 +151,50 @@ export default function Auth() {
     e.preventDefault();
     setLoading(true);
     try {
-      await signUp({
+      // 1. Create User in Cognito
+      const { userId } = await signUp({
         username: email,
         password,
         options: {
-          userAttributes: {
-            email,
-            name, // ADDED: Saving the name to AWS
-          }
+          userAttributes: { email, name }
         }
       });
+
+      // 2. Save Profile to DynamoDB via API Gateway
+      if (userId) {
+        if (userType === 'patient') {
+          // Patient Registration
+          await fetch(`${API_BASE_URL}/register-patient`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              userId: userId,
+              name: name,
+              email: email,
+              role: 'patient'
+            })
+          });
+        } else {
+          // 🛡️ DOCTOR FIX: Send fields required by mediconnect-create-doctor
+          await fetch(`${API_BASE_URL}/register-doctor`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              doctorId: userId,           // FIXED: Send 'doctorId', not 'userId'
+              name: name,
+              email: email,
+              role: 'doctor',             // FIXED: Send 'doctor', not 'provider'
+              specialization: 'General Practice', // FIXED: Mandatory field
+              licenseNumber: 'PENDING'            // FIXED: Mandatory field
+            })
+          });
+        }
+      }
+
       setAuthStep("confirm-signup");
       toast({ title: "Account Created", description: "Please check your email for the verification code." });
     } catch (error: any) {
-      console.error(error);
+      console.error("Signup Error:", error);
       toast({ variant: "destructive", title: "Signup Failed", description: error.message });
     } finally {
       setLoading(false);
@@ -133,20 +215,86 @@ export default function Auth() {
     }
   };
 
-  // --- UI HANDLERS ---
+  const handleSubmitIdentity = async () => {
+    setLoading(true);
+    setVerificationStatus("verifying");
 
-  const handleIdentityComplete = () => {
-    if (userType === "patient") {
-      navigate("/dashboard");
-    } else {
-      navigate("/doctor-dashboard");
+    try {
+      const user = await getCurrentUser();
+
+      // 🛡️ SECURITY FIX: Get the session token
+      const session = await fetchAuthSession();
+      const token = session.tokens?.idToken?.toString();
+
+      const payload = {
+        userId: user.userId,
+        role: userType === 'provider' ? 'doctor' : 'patient',
+        selfieImage: selfieImage,
+        idImage: userType === 'provider' ? idImage : null
+      };
+
+      // 🛡️ HEADERS FIX: Add Authorization
+      const res = await fetch(`${API_BASE_URL}/verify-identity`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": token || ""
+        },
+        body: JSON.stringify(payload)
+      });
+
+      const data = await res.json();
+
+      if (res.ok && data.verified) {
+        setVerificationStatus("success");
+
+        try {
+          const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+          currentUser.avatar = data.photoUrl; // Assumption: backend returns photoUrl if verified
+          localStorage.setItem('user', JSON.stringify(currentUser));
+        } catch (e) { }
+
+        toast({
+          title: "Identity Verified",
+          description: `Confidence: ${Math.round(data.confidence || 90)}%. Welcome aboard!`
+        });
+
+        setTimeout(() => {
+          navigate(userType === 'patient' ? "/dashboard" : "/doctor-dashboard");
+        }, 1500);
+
+      } else {
+        setVerificationStatus("failed");
+        toast({
+          variant: "destructive",
+          title: "Verification Failed",
+          description: data.message || "Face did not match."
+        });
+
+        // Development Bypass (Optional - keep if you want to allow failed access during dev)
+        setTimeout(() => {
+          navigate(userType === 'patient' ? "/dashboard" : "/doctor-dashboard");
+        }, 2000);
+      }
+
+    } catch (error) {
+      console.error(error);
+      toast({ variant: "destructive", title: "System Error", description: "Could not contact verification server." });
+      setVerificationStatus("failed");
+    } finally {
+      setLoading(false);
     }
+  };
+
+  const handleSkip = () => {
+    navigate(userType === 'patient' ? "/dashboard" : "/doctor-dashboard");
   };
 
   return (
     <div className="min-h-screen flex">
+      <PublicHeader />
       {/* Left Panel - Branding */}
-      <div className="hidden lg:flex lg:w-1/2 medical-gradient p-12 flex-col justify-between">
+      <div className="hidden lg:flex lg:w-1/2 medical-gradient p-24 flex-col justify-between">
         <div>
           <div className="flex items-center gap-3 mb-12">
             <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-white/20">
@@ -160,7 +308,7 @@ export default function Auth() {
       </div>
 
       {/* Right Panel - Auth Forms */}
-      <div className="flex-1 flex items-center justify-center p-8 bg-background">
+      <div className="flex-1 flex items-center justify-center p-24 bg-background">
         <div className="w-full max-w-md">
 
           {/* LOGIN VIEW */}
@@ -211,7 +359,6 @@ export default function Auth() {
               </CardHeader>
               <CardContent>
                 <form onSubmit={handleSignUp} className="space-y-4">
-                  {/* ADDED: Full Name Field */}
                   <div className="space-y-2">
                     <Label htmlFor="name">Full Name</Label>
                     <Input id="name" type="text" placeholder="John Doe" value={name} onChange={e => setName(e.target.value)} required />
@@ -259,7 +406,7 @@ export default function Auth() {
             </Card>
           )}
 
-          {/* IDENTITY VERIFICATION */}
+          {/* IDENTITY VERIFICATION (AWS REKOGNITION) */}
           {authStep === "identity" && (
             <Card className="shadow-elevated border-border/50">
               <CardHeader className="text-center pb-2">
@@ -267,17 +414,93 @@ export default function Auth() {
                   <Shield className="h-8 w-8 text-primary" />
                 </div>
                 <CardTitle className="text-2xl">Identity Verification</CardTitle>
-                <CardDescription>Verify your identity using AWS Rekognition</CardDescription>
+                <CardDescription>
+                  {userType === 'provider' ? "Upload a selfie and your ID card." : "Upload a photo of yourself."}
+                </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div onClick={() => setIdUploaded(true)} className={cn("border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-colors", idUploaded ? "border-success bg-success/5" : "border-border hover:border-primary/50")}>
-                  {idUploaded ? <div className="text-success flex justify-center gap-2"><CheckCircle2 /> ID Uploaded</div> : <><Upload className="mx-auto h-8 w-8 mb-2" /><p>Upload ID</p></>}
+
+                {/* 1. SELFIE UPLOAD */}
+                <div className={cn("border-2 border-dashed rounded-xl p-6 text-center transition-colors", selfieImage ? "border-success bg-success/5" : "border-border")}>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    id="selfie-upload"
+                    className="hidden"
+                    onChange={(e) => handleFileChange(e, 'selfie')}
+                  />
+                  <label htmlFor="selfie-upload" className="cursor-pointer block">
+                    {selfieImage ? (
+                      <div className="text-success flex flex-col items-center gap-2">
+                        <CheckCircle2 className="h-8 w-8" />
+                        <span className="font-semibold">Selfie Uploaded</span>
+                      </div>
+                    ) : (
+                      <div className="flex flex-col items-center gap-2 text-muted-foreground hover:text-primary">
+                        <Camera className="h-8 w-8 mb-2" />
+                        <span className="font-medium">Upload Selfie</span>
+                        <span className="text-xs">Click to select file</span>
+                      </div>
+                    )}
+                  </label>
                 </div>
-                <div onClick={() => setSelfieUploaded(true)} className={cn("border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-colors", selfieUploaded ? "border-success bg-success/5" : "border-border hover:border-primary/50")}>
-                  {selfieUploaded ? <div className="text-success flex justify-center gap-2"><CheckCircle2 /> Selfie Captured</div> : <><Camera className="mx-auto h-8 w-8 mb-2" /><p>Take Selfie</p></>}
-                </div>
-                <Button onClick={handleIdentityComplete} className="w-full bg-primary" disabled={!idUploaded || !selfieUploaded}>Complete Verification</Button>
-                <Button variant="ghost" className="w-full" onClick={handleIdentityComplete}>Skip for now (Demo)</Button>
+
+                {/* 2. ID UPLOAD (ONLY FOR PROVIDERS) */}
+                {userType === 'provider' && (
+                  <div className={cn("border-2 border-dashed rounded-xl p-6 text-center transition-colors", idImage ? "border-success bg-success/5" : "border-border")}>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      id="id-upload"
+                      className="hidden"
+                      onChange={(e) => handleFileChange(e, 'id')}
+                    />
+                    <label htmlFor="id-upload" className="cursor-pointer block">
+                      {idImage ? (
+                        <div className="text-success flex flex-col items-center gap-2">
+                          <CheckCircle2 className="h-8 w-8" />
+                          <span className="font-semibold">ID Card Uploaded</span>
+                        </div>
+                      ) : (
+                        <div className="flex flex-col items-center gap-2 text-muted-foreground hover:text-primary">
+                          <FileBadge className="h-8 w-8 mb-2" />
+                          <span className="font-medium">Upload ID Card</span>
+                          <span className="text-xs">Passport or National ID</span>
+                        </div>
+                      )}
+                    </label>
+                  </div>
+                )}
+
+                {/* STATUS MESSAGES */}
+                {verificationStatus === 'success' && (
+                  <div className="p-3 bg-green-100 text-green-800 rounded-lg flex items-center justify-center gap-2 text-sm">
+                    <CheckCircle2 className="h-4 w-4" /> Identity Verified Successfully!
+                  </div>
+                )}
+                {verificationStatus === 'failed' && (
+                  <div className="p-3 bg-red-100 text-red-800 rounded-lg flex items-center justify-center gap-2 text-sm">
+                    <AlertTriangle className="h-4 w-4" /> Verification Failed. Proceeding anyway...
+                  </div>
+                )}
+
+                {/* ACTION BUTTONS */}
+                <Button
+                  onClick={handleSubmitIdentity}
+                  className="w-full bg-primary"
+                  disabled={
+                    loading ||
+                    !selfieImage ||
+                    (userType === 'provider' && !idImage)
+                  }
+                >
+                  {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Verify Identity"}
+                </Button>
+
+                <Button variant="ghost" className="w-full text-muted-foreground" onClick={handleSkip}>
+                  Skip Verification (Development)
+                </Button>
+
               </CardContent>
             </Card>
           )}

@@ -9,6 +9,7 @@ import {
   Calendar,
   MessageSquare,
   Settings,
+  CreditCard,
   LogOut,
   ChevronLeft,
   ChevronRight,
@@ -17,9 +18,11 @@ import {
   BarChart3,
   Shield,
   Brain,
+  Activity,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+// 🟢 ADDED AvatarImage HERE
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
@@ -29,14 +32,16 @@ interface SidebarProps {
   userName: string;
   userAvatar: string;
   onLogout: () => void;
+  className?: string;
 }
 
 const patientNavItems = [
   { icon: LayoutDashboard, label: "Dashboard", path: "/dashboard" },
   { icon: Calendar, label: "Appointments", path: "/appointments" },
+  { icon: CreditCard, label: "Billing", path: "/billing" },
   { icon: Brain, label: "Symptom Checker", path: "/symptom-checker" },
   { icon: Video, label: "Consultation", path: "/consultation" },
-  { icon: FileText, label: "Health Records", path: "/records" },
+  { icon: FileText, label: "Health Records", path: "/healthRecords" },
   { icon: Pill, label: "Pharmacy", path: "/pharmacy" },
   { icon: BookOpen, label: "Knowledge Base", path: "/knowledge" },
 ];
@@ -46,12 +51,14 @@ const doctorNavItems = [
   { icon: Users, label: "Patient Queue", path: "/patient-queue" },
   { icon: Video, label: "Consultation", path: "/consultation" },
   { icon: BarChart3, label: "Analytics", path: "/analytics" },
-  { icon: FileText, label: "Patient Records", path: "/doctor/patient-records" },
-  { icon: MessageSquare, label: "Messages", path: "/doctor/messages" },
-  { icon: BookOpen, label: "Knowledge Base", path: "/doctor/knowledge" },
+  { icon: Activity, label: "Live Monitoring", path: "/live-monitoring" },
+  { icon: FileText, label: "Patient Records", path: "/patient-records" },
+  { icon: Pill, label: "Prescriptions", path: "/prescriptions" },
+  { icon: MessageSquare, label: "Messages", path: "/messages" },
+  { icon: BookOpen, label: "Knowledge Base", path: "/knowledge" },
 ];
 
-export function Sidebar({ userRole, userName, userAvatar, onLogout }: SidebarProps) {
+export function Sidebar({ userRole, userName, userAvatar, onLogout, className }: SidebarProps) {
   const [collapsed, setCollapsed] = useState(false);
   const location = useLocation();
 
@@ -61,7 +68,8 @@ export function Sidebar({ userRole, userName, userAvatar, onLogout }: SidebarPro
     <aside
       className={cn(
         "fixed left-0 top-0 z-40 flex h-screen flex-col border-r border-sidebar-border bg-sidebar transition-all duration-300",
-        collapsed ? "w-[72px]" : "w-64"
+        collapsed ? "w-[72px]" : "w-64",
+        className
       )}
     >
       {/* Logo */}
@@ -164,10 +172,15 @@ export function Sidebar({ userRole, userName, userAvatar, onLogout }: SidebarPro
           )}
         >
           <Avatar className="h-9 w-9 border-2 border-primary/20">
+            {/* 🟢 1. Try to load the S3 Photo URL */}
+            <AvatarImage src={userAvatar} alt={userName} className="object-cover" />
+
+            {/* 🟢 2. If no photo, use initials (but ensure we don't print a URL string) */}
             <AvatarFallback className="bg-primary/10 text-primary text-sm font-medium">
-              {userAvatar}
+              {userAvatar && !userAvatar.includes('http') ? userAvatar : userName.substring(0, 2).toUpperCase()}
             </AvatarFallback>
           </Avatar>
+
           {!collapsed && (
             <div className="flex-1 overflow-hidden">
               <p className="truncate text-sm font-medium text-sidebar-foreground">

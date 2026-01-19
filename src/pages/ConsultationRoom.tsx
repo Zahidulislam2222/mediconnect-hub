@@ -1,18 +1,25 @@
 import { useState, useEffect, useRef } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation, useSearchParams } from "react-router-dom";
+import { getCurrentUser } from 'aws-amplify/auth';
+import {
+  ConsoleLogger,
+  DefaultDeviceController,
+  DefaultMeetingSession,
+  LogLevel,
+  MeetingSessionConfiguration
+} from "amazon-chime-sdk-js";
 import {
   Mic,
   MicOff,
   Video,
   VideoOff,
-  MonitorUp,
   PhoneOff,
-  MessageSquare,
   Sparkles,
   ChevronRight,
   Settings,
   Users,
-  ShieldCheck
+  ShieldCheck,
+  Loader2
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -21,126 +28,204 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import { useToast } from "@/hooks/use-toast";
+
+
+const API_URL = import.meta.env.VITE_API_BASE_URL || "";
 
 export default function ConsultationRoom() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const [searchParams] = useSearchParams(); // <--- Init Search Params
+  const { toast } = useToast();
 
-  // --- STATE MANAGEMENT ---
-  const [hasJoined, setHasJoined] = useState(false); // Controls Lobby vs Room
+  // --- 1. DATA FROM NAVIGATION (The "Keys" to the Room) ---
+  const appointmentId = location.state?.appointmentId || searchParams.get("appointmentId");
+  const patientName = location.state?.patientName || searchParams.get("patientName") || "Patient";
+
+  // --- 2. STATE ---
+  const [hasJoined, setHasJoined] = useState(false);
+  const [isJoining, setIsJoining] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [isVideoOff, setIsVideoOff] = useState(false);
-  const [isScreenSharing, setIsScreenSharing] = useState(false);
-  const [cameraError, setCameraError] = useState(false);
   const [activeTab, setActiveTab] = useState("scribe");
+  const [roster, setRoster] = useState<any>({}); // Tracks who is in the meeting
 
-  // Video Ref for Real Camera
-  const myVideoRef = useRef<HTMLVideoElement>(null);
+  // --- 3. REFS (Direct HTML/SDK Access) ---
+  const meetingSessionRef = useRef<DefaultMeetingSession | null>(null);
+  const audioVideoRef = useRef<HTMLVideoElement>(null); // For Local Preview
+  const remoteVideoRef = useRef<HTMLVideoElement>(null); // For Doctor's Video
+  const hiddenAudioRef = useRef<HTMLAudioElement>(null); // For Incoming Audio (Voice)
 
-  // --- CAMERA LOGIC ---
+  // --- 4. CLEANUP ON UNMOUNT ---
   useEffect(() => {
-    startCamera();
-    return () => stopCamera();
-  }, [hasJoined]); // Restart camera when switching views
+    return () => {
+      leaveMeeting();
+    };
+  }, []);
 
-  // Watch for toggle button
-  useEffect(() => {
-    if (isVideoOff) stopCamera();
-    else startCamera();
-  }, [isVideoOff]);
+  // --- 5. TOGGLE HANDLERS (Real SDK Logic) ---
+  const toggleMute = () => {
+    if (meetingSessionRef.current) {
+      const muted = !isMuted;
+      if (muted) meetingSessionRef.current.audioVideo.realtimeMuteLocalAudio();
+      else meetingSessionRef.current.audioVideo.realtimeUnmuteLocalAudio();
+      setIsMuted(muted);
+    }
+  };
 
-  const startCamera = async () => {
-    try {
-      if (myVideoRef.current && !isVideoOff) {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-        myVideoRef.current.srcObject = stream;
-        setCameraError(false);
+  const toggleVideo = async () => {
+    if (meetingSessionRef.current) {
+      const videoOff = !isVideoOff;
+      if (videoOff) {
+        await meetingSessionRef.current.audioVideo.stopLocalVideoTile();
+      } else {
+        await meetingSessionRef.current.audioVideo.startLocalVideoTile();
       }
-    } catch (err) {
-      console.error("Error accessing camera:", err);
-      setCameraError(true);
+      setIsVideoOff(videoOff);
     }
   };
 
-  const stopCamera = () => {
-    if (myVideoRef.current && myVideoRef.current.srcObject) {
-      const stream = myVideoRef.current.srcObject as MediaStream;
-      stream.getTracks().forEach(track => track.stop());
-      myVideoRef.current.srcObject = null;
+  const leaveMeeting = () => {
+    if (meetingSessionRef.current) {
+      meetingSessionRef.current.audioVideo.stop();
+      meetingSessionRef.current.audioVideo.stopLocalVideoTile();
+      setHasJoined(false);
     }
   };
 
-  // --- LOBBY SCREEN (PRE-CALL) ---
+  const handleExit = () => {
+    leaveMeeting();
+    navigate(-1);
+  };
+
+  // --- 6. THE CORE JOIN LOGIC ---
+  const handleJoin = async () => {
+    if (!appointmentId) {
+      toast({ variant: "destructive", title: "Error", description: "Missing Appointment ID. Please join from Dashboard." });
+      return;
+    }
+
+    setIsJoining(true);
+    try {
+      const currentUser = await getCurrentUser();
+      const userId = currentUser.userId;
+
+      // A. CALL BACKEND
+      const res = await fetch(`${API_URL}/video-service`, {
+        method: 'POST',
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          appointmentId: appointmentId,
+          userId: userId,
+          userName: patientName || "Patient"
+        })
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || "Failed to join");
+      }
+
+      const { Meeting, Attendee } = await res.json();
+
+      // B. INITIALIZE CHIME SDK
+      const logger = new ConsoleLogger('MediConnectLogger', LogLevel.INFO);
+      const deviceController = new DefaultDeviceController(logger);
+      const configuration = new MeetingSessionConfiguration(Meeting, Attendee);
+
+      const meetingSession = new DefaultMeetingSession(configuration, logger, deviceController);
+      meetingSessionRef.current = meetingSession;
+
+      // C. CONFIGURE DEVICES
+      const audioInputs = await meetingSession.audioVideo.listAudioInputDevices();
+      const videoInputs = await meetingSession.audioVideo.listVideoInputDevices();
+
+      if (audioInputs.length > 0) await meetingSession.audioVideo.startAudioInput(audioInputs[0].deviceId);
+      if (videoInputs.length > 0) await meetingSession.audioVideo.startVideoInput(videoInputs[0].deviceId);
+
+      const audioOutputElement = hiddenAudioRef.current;
+      if (audioOutputElement) {
+        meetingSession.audioVideo.bindAudioElement(audioOutputElement);
+      }
+
+      // D. BIND VIDEO OBSERVERS (Visuals)
+      meetingSession.audioVideo.addObserver({
+        videoTileDidUpdate: (tileState: any) => {
+          if (!tileState.boundAttendeeId || tileState.isContent) return;
+
+          if (tileState.localTile && audioVideoRef.current) {
+            meetingSession.audioVideo.bindVideoElement(tileState.tileId, audioVideoRef.current);
+          }
+          else if (!tileState.localTile && remoteVideoRef.current) {
+            meetingSession.audioVideo.bindVideoElement(tileState.tileId, remoteVideoRef.current);
+          }
+        }
+      });
+
+      // E. SUBSCRIBE TO PRESENCE (Who is here?) - MOVED OUTSIDE
+      meetingSession.audioVideo.realtimeSubscribeToAttendeeIdPresence(
+        (attendeeId: string, present: boolean) => {
+          setRoster((prev: any) => ({
+            ...prev,
+            [attendeeId]: present
+          }));
+        }
+      );
+
+      // F. START
+      meetingSession.audioVideo.start();
+      meetingSession.audioVideo.startLocalVideoTile();
+
+      setHasJoined(true);
+      toast({ title: "Connected", description: "Secure session established." });
+
+    } catch (error: any) {
+      console.error("Join Error:", error);
+      toast({ variant: "destructive", title: "Connection Failed", description: error.message });
+    } finally {
+      setIsJoining(false);
+    }
+  };
+
+  // --- LOBBY SCREEN ---
   if (!hasJoined) {
     return (
       <div className="min-h-screen bg-slate-950 text-white flex flex-col items-center justify-center p-4">
-        <div className="w-full max-w-4xl grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
+        {/* HIDDEN AUDIO ELEMENT FOR CHIME */}
+        <audio ref={hiddenAudioRef} style={{ display: 'none' }} />
 
-          {/* Left: Camera Preview */}
+        <div className="w-full max-w-4xl grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
+          {/* Camera Preview */}
           <div className="space-y-4">
             <div className="relative aspect-video bg-slate-900 rounded-2xl overflow-hidden border border-slate-800 shadow-2xl">
-              {!isVideoOff && !cameraError ? (
-                <video
-                  ref={myVideoRef}
-                  autoPlay
-                  muted
-                  playsInline
-                  className="w-full h-full object-cover transform -scale-x-100"
-                />
-              ) : (
-                <div className="w-full h-full flex flex-col items-center justify-center text-slate-500">
-                  <div className="h-20 w-20 rounded-full bg-slate-800 flex items-center justify-center mb-4">
-                    {cameraError ? <VideoOff className="h-8 w-8 text-red-500" /> : <VideoOff className="h-8 w-8" />}
-                  </div>
-                  <p>{cameraError ? "Camera Access Denied" : "Camera is Off"}</p>
-                </div>
-              )}
-
-              {/* Controls Overlay */}
-              <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-4">
-                <Button
-                  variant="secondary"
-                  size="icon"
-                  className={cn("h-12 w-12 rounded-full", isMuted && "bg-red-500 hover:bg-red-600 text-white")}
-                  onClick={() => setIsMuted(!isMuted)}
-                >
-                  {isMuted ? <MicOff className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
-                </Button>
-                <Button
-                  variant="secondary"
-                  size="icon"
-                  className={cn("h-12 w-12 rounded-full", isVideoOff && "bg-red-500 hover:bg-red-600 text-white")}
-                  onClick={() => setIsVideoOff(!isVideoOff)}
-                >
-                  {isVideoOff ? <VideoOff className="h-5 w-5" /> : <Video className="h-5 w-5" />}
-                </Button>
+              {/* Note: We use a simple getUserMedia preview here for the lobby, 
+                   or we could init SDK early. For simplicity, we use a placeholder icon in lobby until join. */}
+              <div className="w-full h-full flex flex-col items-center justify-center text-slate-500">
+                <Video className="h-16 w-16 mb-4 opacity-50" />
+                <p>Camera preview starts after joining</p>
               </div>
-            </div>
-
-            <div className="flex justify-between items-center text-sm text-slate-400 px-2">
-              <div className="flex items-center gap-2">
-                <Mic className="h-4 w-4" />
-                <span>Default Microphone (Realtek Audio)</span>
-              </div>
-              <Button variant="ghost" size="sm" className="h-8 text-xs">Test Audio</Button>
             </div>
           </div>
 
-          {/* Right: Join Details */}
+          {/* Join Details */}
           <div className="space-y-6 text-center md:text-left">
             <div>
               <h1 className="text-3xl font-bold mb-2">Ready to join?</h1>
-              <p className="text-slate-400">Dr. Sarah Chen is waiting in the lobby.</p>
+              <p className="text-slate-400">Appointment ID: {appointmentId || "Unknown"}</p>
             </div>
 
             <div className="flex flex-col gap-3">
               <Button
                 size="lg"
                 className="w-full h-14 text-lg bg-emerald-600 hover:bg-emerald-700 shadow-lg shadow-emerald-900/20"
-                onClick={() => setHasJoined(true)}
+                onClick={handleJoin}
+                disabled={isJoining || !appointmentId}
               >
-                Join Consultation Now
+                {isJoining ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : null}
+                {isJoining ? "Connecting..." : "Join Consultation Now"}
               </Button>
-              <Button variant="outline" className="w-full border-slate-700 hover:bg-slate-800" onClick={() => navigate(-1)}>
+              <Button variant="outline" className="w-full bg-slate-800 text-white border-slate-700 hover:bg-slate-700" onClick={() => navigate(-1)}>
                 Cancel
               </Button>
             </div>
@@ -157,31 +242,29 @@ export default function ConsultationRoom() {
     );
   }
 
-  // --- MAIN CONSULTATION ROOM ---
+  // --- MAIN ROOM ---
   return (
     <div className="min-h-screen bg-slate-950 text-white overflow-hidden">
+      {/* REQUIRED FOR INCOMING AUDIO */}
+      <audio ref={hiddenAudioRef} style={{ display: 'none' }} />
+
       {/* Header */}
       <header className="h-16 flex items-center justify-between px-6 border-b border-white/10 bg-slate-900/50 backdrop-blur-sm fixed top-0 left-0 right-0 z-50">
         <div className="flex items-center gap-4">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="text-white/70 hover:text-white hover:bg-white/10"
-            onClick={() => setHasJoined(false)} // Go back to lobby
-          >
+          <Button variant="ghost" size="icon" onClick={() => setHasJoined(false)}>
             <ChevronRight className="h-5 w-5 rotate-180" />
           </Button>
           <div>
-            <h1 className="font-semibold text-sm md:text-base">Dr. Sarah Chen</h1>
+            <h1 className="font-semibold text-sm md:text-base">Consultation Room</h1>
             <div className="flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-              <p className="text-xs text-white/50">04:23 • Encrypted</p>
+              <p className="text-xs text-white/50">Encrypted Connection</p>
             </div>
           </div>
         </div>
         <div className="flex items-center gap-2">
           <Badge variant="outline" className="border-white/10 bg-white/5 hidden md:flex">
-            <Users className="w-3 h-3 mr-1" /> 2 Participants
+            <Users className="w-3 h-3 mr-1" /> {Object.keys(roster).length} Participants
           </Badge>
           <Button variant="ghost" size="icon"><Settings className="w-5 h-5" /></Button>
         </div>
@@ -193,32 +276,32 @@ export default function ConsultationRoom() {
         {/* Video Grid */}
         <div className="flex-1 p-4 flex flex-col gap-4 relative">
 
-          {/* Dr. Chen (Mocked) */}
+          {/* 🟢 REMOTE VIDEO (The Doctor) */}
           <div className="flex-1 rounded-2xl bg-slate-800 relative overflow-hidden flex items-center justify-center border border-white/10 shadow-2xl">
-            <div className="text-center">
-              <Avatar className="h-32 w-32 mx-auto mb-4 border-4 border-emerald-500/20">
-                <AvatarFallback className="bg-slate-700 text-3xl">SC</AvatarFallback>
-              </Avatar>
-              <h2 className="text-xl font-medium">Dr. Sarah Chen</h2>
-              <p className="text-emerald-400 text-sm mt-1 animate-pulse">Speaking...</p>
-            </div>
-            {/* Audio Wave */}
-            <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex items-end gap-1 h-8">
-              {[...Array(5)].map((_, i) => (
-                <div key={i} className="w-1 bg-emerald-500 rounded-full animate-music" style={{ animationDelay: `${i * 0.1}s`, height: '40%' }} />
-              ))}
+            <video
+              ref={remoteVideoRef}
+              className="w-full h-full object-cover"
+              // Hide video if no source to show avatar fallback
+              style={{ display: remoteVideoRef.current?.srcObject ? 'block' : 'none' }}
+            />
+            {/* Fallback if no video yet */}
+            <div className={`absolute inset-0 flex items-center justify-center ${remoteVideoRef.current?.srcObject ? 'hidden' : 'flex'}`}>
+              <div className="text-center">
+                <Avatar className="h-32 w-32 mx-auto mb-4 border-4 border-emerald-500/20">
+                  <AvatarFallback className="bg-slate-700 text-3xl">DR</AvatarFallback>
+                </Avatar>
+                <h2 className="text-xl font-medium">Waiting for Doctor...</h2>
+              </div>
             </div>
           </div>
 
-          {/* Self View (Real Camera - PiP) */}
+          {/* 🟢 LOCAL VIDEO (Self - PiP) */}
           <div className="absolute bottom-24 right-8 w-48 md:w-64 aspect-video bg-black rounded-xl overflow-hidden border-2 border-slate-700 shadow-2xl hover:scale-105 transition-transform cursor-pointer">
             {!isVideoOff ? (
               <video
-                ref={myVideoRef}
-                autoPlay
-                muted
-                playsInline
-                className="w-full h-full object-cover transform -scale-x-100"
+                ref={audioVideoRef} // Binds to Local Tile
+                className="w-full h-full object-cover transform -scale-x-100" // Mirror effect
+                muted // Always mute local video to prevent echo
               />
             ) : (
               <div className="w-full h-full flex items-center justify-center bg-slate-900 text-slate-500 text-xs">
@@ -235,16 +318,16 @@ export default function ConsultationRoom() {
             <Button
               variant="secondary"
               size="icon"
-              className={cn("h-14 w-14 rounded-full shadow-lg transition-all", isMuted ? "bg-red-500 hover:bg-red-600 text-white" : "bg-slate-800 hover:bg-slate-700 text-white")}
-              onClick={() => setIsMuted(!isMuted)}
+              className={cn("h-14 w-14 rounded-full shadow-lg transition-all", isMuted ? "bg-red-500 text-white" : "bg-slate-800 text-white")}
+              onClick={toggleMute}
             >
               {isMuted ? <MicOff className="h-6 w-6" /> : <Mic className="h-6 w-6" />}
             </Button>
             <Button
               variant="secondary"
               size="icon"
-              className={cn("h-14 w-14 rounded-full shadow-lg transition-all", isVideoOff ? "bg-red-500 hover:bg-red-600 text-white" : "bg-slate-800 hover:bg-slate-700 text-white")}
-              onClick={() => setIsVideoOff(!isVideoOff)}
+              className={cn("h-14 w-14 rounded-full shadow-lg transition-all", isVideoOff ? "bg-red-500 text-white" : "bg-slate-800 text-white")}
+              onClick={toggleVideo}
             >
               {isVideoOff ? <VideoOff className="h-6 w-6" /> : <Video className="h-6 w-6" />}
             </Button>
@@ -252,14 +335,14 @@ export default function ConsultationRoom() {
               variant="destructive"
               size="icon"
               className="h-14 w-14 rounded-full shadow-lg bg-red-600 hover:bg-red-700"
-              onClick={() => navigate(-1)}
+              onClick={handleExit}
             >
               <PhoneOff className="h-6 w-6" />
             </Button>
           </div>
         </div>
 
-        {/* Right Sidebar (AI Scribe) */}
+        {/* Right Sidebar (Unchanged - Ready for WebSocket Integration) */}
         <div className="w-80 md:w-96 border-l border-white/10 bg-slate-900/90 hidden lg:flex flex-col">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col">
             <div className="p-4 border-b border-white/10">
@@ -268,7 +351,6 @@ export default function ConsultationRoom() {
                 <TabsTrigger value="chat">Chat</TabsTrigger>
               </TabsList>
             </div>
-
             <TabsContent value="scribe" className="flex-1 p-0 m-0 overflow-hidden">
               <ScrollArea className="h-full p-4">
                 <div className="space-y-6">
@@ -277,31 +359,14 @@ export default function ConsultationRoom() {
                       <Sparkles className="w-4 h-4" /> Live Transcription
                     </div>
                     <div className="space-y-4">
-                      <div className="text-sm">
-                        <p className="text-slate-400 text-xs mb-1">Dr. Chen • 00:15</p>
-                        <p className="text-slate-200">Good afternoon. I see you uploaded your X-Ray.</p>
-                      </div>
-                      <div className="text-sm">
-                        <p className="text-emerald-500/80 text-xs mb-1">You • 00:22</p>
-                        <p className="text-slate-200">Yes, I was worried about the chest pain.</p>
-                      </div>
+                      <p className="text-slate-400 italic text-sm">Transcription service connecting...</p>
                     </div>
                   </Card>
                 </div>
               </ScrollArea>
             </TabsContent>
-
             <TabsContent value="chat" className="flex-1 p-0 m-0 flex flex-col">
-              <div className="flex-1 flex items-center justify-center text-slate-500 text-sm">
-                No messages yet
-              </div>
-              <div className="p-4 border-t border-white/10">
-                <input
-                  type="text"
-                  placeholder="Type a message..."
-                  className="w-full bg-slate-800 border-none rounded-full px-4 py-2 text-sm focus:ring-1 focus:ring-emerald-500"
-                />
-              </div>
+              {/* Chat UI - Ready for WebSocket */}
             </TabsContent>
           </Tabs>
         </div>
