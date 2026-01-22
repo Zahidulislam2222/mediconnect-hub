@@ -1,10 +1,11 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { getCurrentUser, signOut } from 'aws-amplify/auth';
+import { getCurrentUser, signOut, fetchAuthSession } from 'aws-amplify/auth';
 import {
     Search, FileText, Activity, Calendar, Clock,
     Save, Loader2, Brain, Thermometer, Heart,
-    AlertTriangle, CheckCircle2, TrendingUp, User, ChevronLeft
+    AlertTriangle, CheckCircle2, TrendingUp, User, ChevronLeft,
+    Image as ImageIcon, Plus, Server, Eye, Database, Upload
 } from "lucide-react";
 
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
@@ -50,6 +51,9 @@ export default function PatientRecords() {
         bpSys: 120,
         age: 0 // Will be updated from real DOB
     });
+    const [records, setRecords] = useState<any[]>([]);
+    const [isUploading, setIsUploading] = useState(false);
+    const vaultInputRef = useRef<HTMLInputElement>(null);
 
     // --- 1. INITIAL LOAD (Doctor Profile & Patient List) ---
     useEffect(() => {
@@ -60,24 +64,39 @@ export default function PatientRecords() {
         try {
             const user = await getCurrentUser();
 
+            // 🟢 1. GET TOKEN
+            const session = await fetchAuthSession();
+            const token = session.tokens?.idToken?.toString();
+
             // A. Fetch Doctor Profile
-            const profileRes = await fetch(`${API_URL}/register-doctor?id=${user.userId}`);
+            // (We add headers here just in case, though public endpoints might not need it)
+            const profileRes = await fetch(`${API_URL}/register-doctor?id=${user.userId}`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
             if (profileRes.ok) {
                 const data = await profileRes.json();
                 const profile = data.doctors?.find((d: any) => d.doctorId === user.userId) || data;
                 setDoctorProfile(profile);
             }
 
-            // B. Fetch Appointments (To build Patient List)
-            const scheduleRes = await fetch(`${API_URL}/doctor-schedule?doctorId=${user.userId}`);
+            // B. Fetch Appointments (WITH HEADERS & CORRECT PARSING)
+            const scheduleRes = await fetch(`${API_URL}/doctor-appointments?doctorId=${user.userId}`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+
             if (scheduleRes.ok) {
-                const items = await scheduleRes.json();
-                const rawList = Array.isArray(items) ? items : [];
+                const data = await scheduleRes.json();
+
+                // 🟢 2. HANDLE DATA STRUCTURE CORRECTLY
+                // The API might return { existingBookings: [...] } or just [...]
+                const rawList = data.existingBookings ? data.existingBookings : (Array.isArray(data) ? data : []);
+
                 setAllAppointments(rawList);
 
                 // C. Deduplicate to get Unique Patients
                 const uniqueMap = new Map();
                 rawList.forEach((apt: any) => {
+                    // Filter out bad data
                     if (apt.patientId && apt.patientName && !uniqueMap.has(apt.patientId)) {
                         uniqueMap.set(apt.patientId, {
                             id: apt.patientId,
@@ -108,20 +127,32 @@ export default function PatientRecords() {
 
     const loadPatientDetails = async (pid: string) => {
         try {
-            // Fetch Profile to get DOB (Real Age)
+            // 1. Fetch Profile (Existing Logic)
             const res = await fetch(`${API_URL}/register-patient?id=${pid}`);
             if (res.ok) {
                 const profile = await res.json();
                 setSelectedPatientProfile(profile);
-
-                // Calculate Real Age
                 if (profile.dob) {
                     const dobYear = new Date(profile.dob).getFullYear();
                     const currentYear = new Date().getFullYear();
-                    const realAge = currentYear - dobYear;
-                    setVitals(prev => ({ ...prev, age: realAge }));
+                    setVitals(prev => ({ ...prev, age: currentYear - dobYear }));
                 }
             }
+
+            // 🟢 2. ADDED: Fetch Document Vault Records
+            const ehrRes = await fetch(`${API_URL}/ehr`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ action: "list_records", patientId: pid })
+            });
+            if (ehrRes.ok) {
+                const data = await ehrRes.json();
+                const sorted = Array.isArray(data) ? data.sort((a: any, b: any) =>
+                    new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+                ) : [];
+                setRecords(sorted);
+            }
+
         } catch (e) { console.error("Patient Detail Error", e); }
     };
 
@@ -219,6 +250,52 @@ export default function PatientRecords() {
         if (r === "CRITICAL" || r === "HIGH") return "bg-red-500 hover:bg-red-600";
         if (r === "MODERATE") return "bg-orange-500 hover:bg-orange-600";
         return "bg-green-500 hover:bg-green-600";
+    };
+
+    // 🟢 ADD THIS FUNCTION:
+    const handleDoctorUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (!e.target.files || !e.target.files[0] || !selectedPatientId) return;
+        const file = e.target.files[0];
+        setIsUploading(true);
+
+        try {
+            // 1. Get Presigned URL
+            const initRes = await fetch(`${API_URL}/ehr`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    action: "request_upload",
+                    patientId: selectedPatientId, // 🔒 Linked to specific patient
+                    fileName: file.name,
+                    fileType: file.type,
+                    doctorId: doctorProfile.doctorId, // 🔒 Tracked by you
+                    description: "Uploaded by Doctor"
+                })
+            });
+
+            if (!initRes.ok) throw new Error("Init Failed");
+            const { uploadUrl } = await initRes.json();
+
+            // 2. Upload to S3
+            const uploadRes = await fetch(uploadUrl, {
+                method: "PUT",
+                headers: { "Content-Type": file.type },
+                body: file
+            });
+
+            if (!uploadRes.ok) throw new Error("S3 Upload Failed");
+
+            toast({ title: "Success", description: "File added to patient record." });
+
+            // 3. Refresh List
+            loadPatientDetails(selectedPatientId);
+
+        } catch (error) {
+            toast({ variant: "destructive", title: "Error", description: "Upload failed." });
+        } finally {
+            setIsUploading(false);
+            if (vaultInputRef.current) vaultInputRef.current.value = "";
+        }
     };
 
     return (
@@ -331,6 +408,7 @@ export default function PatientRecords() {
                             <div className="flex-1 p-6 overflow-y-auto">
                                 <Tabs defaultValue="clinical-notes" className="space-y-6">
                                     <TabsList className="bg-slate-100 p-1">
+                                        <TabsTrigger value="documents" className="gap-2"><Server className="h-4 w-4" /> Documents</TabsTrigger>
                                         <TabsTrigger value="clinical-notes" className="gap-2"><FileText className="h-4 w-4" /> Clinical Notes</TabsTrigger>
                                         <TabsTrigger value="history" className="gap-2"><Clock className="h-4 w-4" /> History</TabsTrigger>
                                         <TabsTrigger value="ai-analysis" className="gap-2 data-[state=active]:bg-indigo-600 data-[state=active]:text-white transition-all">
@@ -359,6 +437,55 @@ export default function PatientRecords() {
                                                         Save to Record
                                                     </Button>
                                                 </div>
+                                            </CardContent>
+                                        </Card>
+                                    </TabsContent>
+
+                                    {/* 🟢 NEW DOCUMENT VAULT TAB */}
+                                    <TabsContent value="documents" className="space-y-4">
+                                        <Card className="border-border/50 shadow-sm bg-blue-50/20 border-blue-100">
+                                            <CardHeader className="pb-3 flex flex-row items-center justify-between">
+                                                <div>
+                                                    <CardTitle className="text-lg flex items-center gap-2 text-blue-800">
+                                                        <Database className="h-5 w-5" /> Patient Files
+                                                    </CardTitle>
+                                                    <CardDescription>Securely shared documents and scans.</CardDescription>
+                                                </div>
+                                                <div>
+                                                    <input type="file" ref={vaultInputRef} className="hidden" onChange={handleDoctorUpload} />
+                                                    <Button size="sm" onClick={() => vaultInputRef.current?.click()} disabled={isUploading}>
+                                                        {isUploading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Upload className="h-4 w-4 mr-2" />}
+                                                        Upload File
+                                                    </Button>
+                                                </div>
+                                            </CardHeader>
+                                            <CardContent>
+                                                {records.length === 0 ? (
+                                                    <div className="text-center py-12 text-muted-foreground border-2 border-dashed rounded-xl bg-white/50">
+                                                        <p>No documents found for this patient.</p>
+                                                    </div>
+                                                ) : (
+                                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                                        {records.map((doc, idx) => (
+                                                            <div key={idx} className="bg-white border p-3 rounded-xl shadow-sm hover:shadow-md transition-all group relative">
+                                                                <div className="aspect-square bg-slate-50 rounded-lg flex items-center justify-center mb-2">
+                                                                    {doc.fileType?.includes("image") ?
+                                                                        <ImageIcon className="h-8 w-8 text-blue-400" /> :
+                                                                        <FileText className="h-8 w-8 text-slate-400" />
+                                                                    }
+                                                                </div>
+                                                                <p className="text-xs font-semibold truncate">{doc.fileName}</p>
+                                                                <p className="text-[10px] text-muted-foreground">{new Date(doc.createdAt).toLocaleDateString()}</p>
+                                                                {/* Open Button */}
+                                                                {doc.s3Url && (
+                                                                    <a href={doc.s3Url} target="_blank" rel="noreferrer" className="absolute inset-0 bg-black/5 rounded-xl opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                                                                        <Button variant="secondary" size="icon" className="h-8 w-8 rounded-full shadow-sm"><Eye className="h-4 w-4" /></Button>
+                                                                    </a>
+                                                                )}
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                )}
                                             </CardContent>
                                         </Card>
                                     </TabsContent>

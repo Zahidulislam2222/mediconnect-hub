@@ -17,6 +17,7 @@ import {
   ScanLine,
   Server,
   Loader2,
+  Plus,
   Upload,
   Database
 } from "lucide-react";
@@ -44,8 +45,16 @@ export default function HealthRecords() {
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const vaultInputRef = useRef<HTMLInputElement>(null); // New (for Vault)
+  const [isUploading, setIsUploading] = useState(false);
+
   // --- STATE ---
-  const [user, setUser] = useState<any>({ name: "Patient", id: "", avatar: null });
+  const [user, setUser] = useState<any>(() => {
+    try {
+      const saved = localStorage.getItem('user');
+      return saved ? JSON.parse(saved) : { name: "Patient", id: "", avatar: null };
+    } catch (e) { return { name: "Patient", id: "", avatar: null }; }
+  });
   const [records, setRecords] = useState<any[]>([]);
   const [graphConnections, setGraphConnections] = useState<any[]>([]);
 
@@ -70,9 +79,13 @@ export default function HealthRecords() {
         const profileRes = await fetch(`${API_BASE_URL}/register-patient?id=${userId}`);
         if (profileRes.ok) {
           const profile = await profileRes.json();
-          setUser({ name: profile.name || "Patient", id: userId, avatar: profile.avatar });
-        } else {
-          setUser({ name: "Patient", id: userId, avatar: null });
+          const userData = { name: profile.name || "Patient", id: userId, avatar: profile.avatar };
+
+          setUser(userData);
+
+          // 🟢 FIX: Update Storage Safely
+          const currentLocal = JSON.parse(localStorage.getItem('user') || '{}');
+          localStorage.setItem('user', JSON.stringify({ ...currentLocal, ...userData }));
         }
 
         // B. Fetch Document Vault (Using POST-RPC Pattern)
@@ -180,6 +193,69 @@ export default function HealthRecords() {
     ];
     return positions[index % positions.length];
   };
+  // 🟢 ADD THIS FUNCTION:
+  const handleVaultUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files || !e.target.files[0]) return;
+
+    const file = e.target.files[0];
+    setIsUploading(true);
+
+    try {
+      // Step 1: Request Presigned URL from Lambda
+      const token = (await getCurrentUser()).userId; // Or fetch session token if needed
+
+      const initRes = await fetch(`${API_BASE_URL}/ehr`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "request_upload",
+          patientId: user.id,
+          fileName: file.name,
+          fileType: file.type,
+          description: "Uploaded by Patient via Portal"
+        })
+      });
+
+      if (!initRes.ok) throw new Error("Failed to initialize upload");
+
+      const { uploadUrl } = await initRes.json();
+
+      // Step 2: Upload directly to S3
+      const uploadRes = await fetch(uploadUrl, {
+        method: "PUT",
+        headers: { "Content-Type": file.type },
+        body: file
+      });
+
+      if (!uploadRes.ok) throw new Error("S3 Upload Failed");
+
+      toast({ title: "Success", description: "Document securely uploaded to vault." });
+
+      // Step 3: Refresh List
+      // We essentially re-run the "list_records" logic here
+      const listRes = await fetch(`${API_BASE_URL}/ehr`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "list_records", patientId: user.id })
+      });
+
+      if (listRes.ok) {
+        const data = await listRes.json();
+        const sorted = Array.isArray(data) ? data.sort((a: any, b: any) =>
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        ) : [];
+        setRecords(sorted);
+      }
+
+    } catch (error) {
+      console.error("Upload Error:", error);
+      toast({ variant: "destructive", title: "Upload Failed", description: "Could not save document." });
+    } finally {
+      setIsUploading(false);
+      // Reset input so same file can be selected again if needed
+      if (vaultInputRef.current) vaultInputRef.current.value = "";
+    }
+  };
 
   return (
     <DashboardLayout
@@ -244,17 +320,40 @@ export default function HealthRecords() {
             <Card className="shadow-card border-blue-200 bg-blue-50/20">
               <CardHeader className="pb-3">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                  <CardTitle className="text-lg flex items-center gap-2 text-blue-800">
-                    <Server className="h-5 w-5" />
-                    Encrypted Document Vault
-                  </CardTitle>
-                  <Badge variant="outline" className="bg-blue-100 text-blue-700 border-blue-200">
-                    Encrypted: AES-256
-                  </Badge>
+                  <div className="space-y-1">
+                    <CardTitle className="text-lg flex items-center gap-2 text-blue-800">
+                      <Server className="h-5 w-5" />
+                      Encrypted Document Vault
+                    </CardTitle>
+                    <CardDescription>
+                      Secure storage for your medical history.
+                    </CardDescription>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <Badge variant="outline" className="bg-blue-100 text-blue-700 border-blue-200 hidden sm:flex">
+                      AES-256
+                    </Badge>
+
+                    {/* 🟢 NEW UPLOAD BUTTON */}
+                    <Button size="sm" onClick={() => vaultInputRef.current?.click()} disabled={isUploading}>
+                      {isUploading ? (
+                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                      ) : (
+                        <Plus className="h-4 w-4 mr-2" />
+                      )}
+                      Upload Record
+                    </Button>
+
+                    {/* 🟢 HIDDEN INPUT FOR VAULT */}
+                    <input
+                      type="file"
+                      ref={vaultInputRef}
+                      className="hidden"
+                      onChange={handleVaultUpload}
+                    />
+                  </div>
                 </div>
-                <CardDescription>
-                  Your private space for lab results, prescriptions, and imaging scans. Accessible only to you and your authorized doctors.
-                </CardDescription>
               </CardHeader>
               <CardContent>
                 {loadingRecords ? (

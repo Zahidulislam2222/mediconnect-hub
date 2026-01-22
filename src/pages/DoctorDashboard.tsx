@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { getCurrentUser, signOut } from 'aws-amplify/auth';
+import { getCurrentUser, signOut, fetchAuthSession } from 'aws-amplify/auth';
 import {
   Users,
   Clock,
@@ -8,13 +8,12 @@ import {
   MoreVertical,
   MapPin,
   Video,
-  FileText,
-  Upload,
   Loader2,
   TrendingUp,
   Activity,
   Star,
-  CreditCard
+  CreditCard,
+  CheckCircle2
 } from "lucide-react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -28,13 +27,14 @@ import {
   DropdownMenuTrigger
 } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
+import { cn } from "@/lib/utils";
 
 const API_URL = import.meta.env.VITE_API_BASE_URL || "";
 
-// --- HELPER: Smart Initials (e.g. "Dr. John Smith" -> "DS") ---
+// Helper: Smart Initials
 const getInitials = (name: string) => {
   if (!name) return "DR";
-  const cleanName = name.replace("Dr. ", ""); // Remove title for initials
+  const cleanName = name.replace("Dr. ", "");
   const parts = cleanName.split(" ");
   if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
   return cleanName.substring(0, 2).toUpperCase();
@@ -46,17 +46,10 @@ export default function DoctorDashboard() {
 
   const [appointments, setAppointments] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [uploading, setUploading] = useState(false);
 
-  // 🟢 PROFILE STATE (Initialized from LocalStorage for speed, updated by API)
   const [doctorProfile, setDoctorProfile] = useState(() => {
     const saved = localStorage.getItem('user');
-    return saved ? JSON.parse(saved) : {
-      name: "Doctor",
-      avatar: null,
-      role: "doctor",
-      specialization: "General Practice"
-    };
+    return saved ? JSON.parse(saved) : { name: "Doctor", role: "doctor" };
   });
 
   useEffect(() => {
@@ -65,92 +58,77 @@ export default function DoctorDashboard() {
 
   const loadDashboardData = async () => {
     try {
+      setIsLoading(true);
+      const session = await fetchAuthSession();
+      const token = session.tokens?.idToken?.toString();
       const user = await getCurrentUser();
       const userId = user.userId;
 
-      // 🟢 STEP 1: FETCH PROFILE
-      try {
-        const profileRes = await fetch(`${API_URL}/register-doctor?id=${userId}`, { cache: "no-store" });
-        if (profileRes.ok) {
-          const data = await profileRes.json();
+      if (!token) return;
 
-          let myProfile = null;
+      const [profileRes, scheduleRes] = await Promise.all([
+        fetch(`${API_URL}/register-doctor?id=${userId}`, { headers: { 'Authorization': `Bearer ${token}` } }),
+        fetch(`${API_URL}/doctor-appointments?doctorId=${userId}`, { headers: { 'Authorization': `Bearer ${token}` } })
+      ]);
 
-          // 🔍 LOGIC: Handle both List and Single Object responses
-          if (data.doctors && Array.isArray(data.doctors)) {
-            // Case A: API returns a list (Your current situation)
-            myProfile = data.doctors.find((d: any) => d.doctorId === userId);
-          } else if (data.doctorId || data.name) {
-            // Case B: API returns a single object
-            myProfile = data;
-          }
+      if (profileRes.ok) {
+        const data = await profileRes.json();
+        let myProfile = data.Item || (data.doctors ? data.doctors.find((d: any) => d.doctorId === userId) : data);
 
-          // Force update the name if found
-          if (myProfile && myProfile.name) {
-            console.log("✅ Found Profile:", myProfile.name);
-            const updatedProfile = {
-              ...doctorProfile,
-              ...myProfile,
-              name: myProfile.name
-            };
-            setDoctorProfile(updatedProfile);
-            localStorage.setItem('user', JSON.stringify(updatedProfile));
-          } else {
-            console.warn("❌ Could not find my profile in the API response", data);
-          }
+        if (myProfile && myProfile.name) {
+          setDoctorProfile(prev => ({ ...prev, ...myProfile }));
+          const currentLocal = JSON.parse(localStorage.getItem('user') || '{}');
+          localStorage.setItem('user', JSON.stringify({ ...currentLocal, ...myProfile }));
         }
-      } catch (pErr) {
-        console.error("Profile Network Error:", pErr);
       }
 
-      // 🟢 STEP 2: FETCH SCHEDULE
-      try {
-        const scheduleRes = await fetch(`${API_URL}/doctor-schedule?doctorId=${userId}`, { cache: "no-store" });
-        if (scheduleRes.ok) {
-          const data = await scheduleRes.json();
-          const list = Array.isArray(data) ? data : [];
+      if (scheduleRes.ok) {
+        const data = await scheduleRes.json();
+        let list = [];
+        if (Array.isArray(data)) list = data;
+        else if (data.existingBookings) list = data.existingBookings;
 
-          const sorted = list
-            .filter((a: any) => a.status !== 'CANCELLED')
-            .sort((a: any, b: any) => new Date(a.timeSlot).getTime() - new Date(b.timeSlot).getTime());
+        // 🟢 SMART FILTER: Filter for Today & Valid Data
+        const startOfToday = new Date();
+        startOfToday.setHours(0, 0, 0, 0);
+        const endOfToday = new Date();
+        endOfToday.setHours(23, 59, 59, 999);
 
-          setAppointments(sorted);
-        }
-      } catch (sErr) {
-        console.error("Schedule Network Error:", sErr);
+        const sorted = list
+          .filter((a: any) => {
+            // 1. Strict Data Check
+            if (!a.patientName || !a.timeSlot) return false;
+            if (isNaN(new Date(a.timeSlot).getTime())) return false;
+
+            // 2. Status Check
+            if (a.status === 'CANCELLED' || a.status === 'COMPLETED') return false;
+
+            // 3. Date Check (Today Only)
+            const aptDate = new Date(a.timeSlot);
+            return aptDate >= startOfToday && aptDate <= endOfToday;
+          })
+          .sort((a: any, b: any) => {
+            // Priority: Patient Arrived -> Time
+            if (a.patientArrived && !b.patientArrived) return -1;
+            if (!a.patientArrived && b.patientArrived) return 1;
+            return new Date(a.timeSlot).getTime() - new Date(b.timeSlot).getTime();
+          });
+
+        setAppointments(sorted);
       }
 
     } catch (err) {
-      console.error("Auth Error:", err);
+      console.error("Dashboard Load Error:", err);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleLogout = async () => {
-    await signOut();
-    localStorage.removeItem('user');
-    navigate("/");
-  };
-
   const handleJoinConsultation = (apt: any) => {
-    navigate(`/consultation`, {
-      state: {
-        appointmentId: apt.appointmentId,
-        patientName: apt.patientName
-      }
-    });
+    navigate(`/consultation`, { state: { appointmentId: apt.appointmentId, patientName: apt.patientName } });
   };
 
-  const handleUploadReport = () => {
-    setUploading(true);
-    setTimeout(() => {
-      setUploading(false);
-      toast({ title: "Report Uploaded", description: "Patient record updated successfully." });
-    }, 1500);
-  };
-
-  // --- SKELETON LOADER ---
+  // SKELETON LOADING
   const SkeletonRow = () => (
     <div className="flex items-center justify-between p-4 rounded-xl border border-border bg-card animate-pulse">
       <div className="flex items-center gap-4">
@@ -169,13 +147,13 @@ export default function DoctorDashboard() {
       title={`Welcome, ${doctorProfile.name}`}
       subtitle="Here is your daily practice overview"
       userRole="doctor"
-      userName={doctorProfile.name} // 🟢 Fixes Sidebar Name
+      userName={doctorProfile.name}
       userAvatar={doctorProfile.avatar}
-      onLogout={handleLogout}
+      onLogout={async () => { await signOut(); navigate("/"); }}
     >
       <div className="space-y-6 animate-fade-in pb-10">
 
-        {/* 1. KEY METRICS GRID */}
+        {/* 1. METRICS */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
           <Card className="shadow-sm border-border/50">
             <CardContent className="p-6">
@@ -220,7 +198,7 @@ export default function DoctorDashboard() {
           </Card>
         </div>
 
-        {/* 2. MAIN CONTENT AREA */}
+        {/* 2. MAIN LAYOUT */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
           {/* LEFT: SCHEDULE */}
@@ -228,9 +206,7 @@ export default function DoctorDashboard() {
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <div className="space-y-1">
                 <CardTitle>Today's Schedule</CardTitle>
-                <CardDescription>
-                  Your upcoming appointments
-                </CardDescription>
+                <CardDescription>Your upcoming appointments for today</CardDescription>
               </div>
               <Button variant="outline" size="sm" onClick={loadDashboardData} disabled={isLoading}>
                 {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Refresh"}
@@ -239,26 +215,35 @@ export default function DoctorDashboard() {
             <CardContent>
               {isLoading ? (
                 <div className="space-y-4">
-                  <SkeletonRow />
-                  <SkeletonRow />
-                  <SkeletonRow />
+                  <SkeletonRow /><SkeletonRow /><SkeletonRow />
                 </div>
               ) : appointments.length === 0 ? (
                 <div className="text-center py-12 text-muted-foreground bg-muted/10 rounded-xl border border-dashed">
                   <Calendar className="h-12 w-12 mx-auto mb-3 opacity-20" />
-                  <p>No appointments scheduled for today.</p>
+                  <p>No appointments remaining for today.</p>
                 </div>
               ) : (
                 <div className="space-y-3">
                   {appointments.map((apt: any) => (
-                    <div key={apt.appointmentId} className="flex items-center justify-between p-4 rounded-xl border border-border hover:shadow-md transition-all bg-card group">
+                    <div
+                      key={apt.appointmentId}
+                      className={cn(
+                        "flex items-center justify-between p-4 rounded-xl border transition-all bg-card group",
+                        apt.patientArrived ? "border-green-500/50 bg-green-50/10" : "border-border hover:shadow-md"
+                      )}
+                    >
                       <div className="flex items-center gap-4">
-                        {/* 🟢 SMART INITIALS AVATAR */}
-                        <Avatar className="h-12 w-12 border-2 border-background shadow-sm">
-                          <AvatarFallback className="bg-primary/10 text-primary font-bold">
-                            {getInitials(apt.patientName)}
-                          </AvatarFallback>
-                        </Avatar>
+                        <div className="relative">
+                          <Avatar className="h-12 w-12 border-2 border-background shadow-sm">
+                            <AvatarFallback className="bg-primary/10 text-primary font-bold">
+                              {getInitials(apt.patientName)}
+                            </AvatarFallback>
+                          </Avatar>
+                          {/* 🟢 Patient Ready Indicator */}
+                          {apt.patientArrived && (
+                            <span className="absolute -bottom-1 -right-1 h-4 w-4 bg-green-500 border-2 border-white rounded-full animate-pulse shadow-sm" title="Patient Online" />
+                          )}
+                        </div>
                         <div>
                           <h4 className="font-semibold text-lg group-hover:text-primary transition-colors">{apt.patientName}</h4>
                           <div className="flex items-center gap-3 text-sm text-muted-foreground mt-1">
@@ -266,21 +251,22 @@ export default function DoctorDashboard() {
                               <Clock className="h-3 w-3" />
                               {new Date(apt.timeSlot).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                             </span>
-                            <span className="flex items-center gap-1">
-                              {apt.type === 'In-Person' ? <MapPin className="h-3 w-3 text-emerald-500" /> : <Video className="h-3 w-3 text-blue-500" />}
-                              {apt.type || "Video Call"}
-                            </span>
                             {apt.paymentStatus === 'paid' && (
                               <span className="flex items-center gap-1 text-emerald-600 text-xs font-medium">
                                 <CreditCard className="h-3 w-3" /> Paid
                               </span>
                             )}
+                            {apt.patientArrived && <span className="text-xs font-bold text-green-600">Online</span>}
                           </div>
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
-                        <Button size="sm" onClick={() => handleJoinConsultation(apt)} className="bg-blue-600 hover:bg-blue-700 shadow-sm">
-                          <Video className="h-4 w-4 mr-2" /> Join
+                        <Button
+                          size="sm"
+                          onClick={() => handleJoinConsultation(apt)}
+                          className={cn("shadow-sm", apt.patientArrived ? "bg-green-600 hover:bg-green-700 animate-pulse" : "bg-blue-600 hover:bg-blue-700")}
+                        >
+                          <Video className="h-4 w-4 mr-2" /> {apt.patientArrived ? "Join Now" : "Join"}
                         </Button>
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
@@ -288,7 +274,6 @@ export default function DoctorDashboard() {
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
                             <DropdownMenuItem>View Patient Record</DropdownMenuItem>
-                            <DropdownMenuItem>Reschedule</DropdownMenuItem>
                             <DropdownMenuItem className="text-red-500">Cancel Appointment</DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
@@ -300,10 +285,8 @@ export default function DoctorDashboard() {
             </CardContent>
           </Card>
 
-          {/* RIGHT: ACTIONS & INSIGHTS */}
+          {/* RIGHT: INSIGHTS (Quick Actions Removed) */}
           <div className="space-y-6">
-
-            {/* 🟢 REPLACED SYSTEM STATUS WITH INSIGHTS */}
             <Card className="medical-gradient text-white border-none shadow-elevated overflow-hidden relative">
               <CardContent className="p-6 relative z-10">
                 <div className="flex items-center justify-between mb-4">
@@ -325,37 +308,8 @@ export default function DoctorDashboard() {
                   </div>
                 </div>
               </CardContent>
-              {/* Decorative Background */}
               <div className="absolute -bottom-10 -right-10 w-32 h-32 bg-white/10 rounded-full blur-2xl"></div>
             </Card>
-
-            {/* QUICK ACTIONS (Cleaned Up) */}
-            <Card className="shadow-card border-border/50">
-              <CardHeader>
-                <CardTitle>Quick Actions</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <Button
-                  className="w-full justify-start gap-3 h-12 text-base font-medium"
-                  variant="outline"
-                  onClick={handleUploadReport}
-                  disabled={uploading}
-                >
-                  {uploading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Upload className="h-5 w-5 text-primary" />}
-                  Upload Medical Report
-                </Button>
-                <Button
-                  className="w-full justify-start gap-3 h-12 text-base font-medium"
-                  variant="outline"
-                  onClick={() => navigate('/pharmacy')}
-                >
-                  <FileText className="h-5 w-5 text-primary" />
-                  Write E-Prescription
-                </Button>
-                {/* 🟢 Removed "Sign Out" from here. It is now handled by the Sidebar/Layout */}
-              </CardContent>
-            </Card>
-
           </div>
         </div>
       </div>

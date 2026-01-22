@@ -32,9 +32,15 @@ function AppointmentsContent() {
     const elements = useElements();
 
     // User State
-    const [user, setUser] = useState<any>(null);
+    const [user, setUser] = useState<any>(() => {
+        try {
+            const saved = localStorage.getItem('user');
+            return saved ? JSON.parse(saved) : null;
+        } catch (e) { return null; }
+    });
 
     // Data State
+
     const [doctors, setDoctors] = useState<any[]>([]); // This is our Directory for Lookups
     const [appointments, setAppointments] = useState<any[]>([]);
     const [loadingAppointments, setLoadingAppointments] = useState(true);
@@ -55,6 +61,8 @@ function AppointmentsContent() {
     // Dynamic Slot State
     const [availableSlots, setAvailableSlots] = useState<string[]>([]);
     const [loadingSlots, setLoadingSlots] = useState(false);
+    // 🟢 NEW: Store the Doctor's Timezone
+    const [doctorTimezone, setDoctorTimezone] = useState("UTC");
 
     // Price
     const price = (formData.insuranceProvider && formData.policyId) ? 20 : 50;
@@ -80,7 +88,14 @@ function AppointmentsContent() {
             });
             if (!res.ok) throw new Error("Failed to fetch");
             const data = await res.json();
-            const list = Array.isArray(data) ? data : [];
+            // 🟢 THIS IS THE FIX: Check for the 'existingBookings' key inside the object
+            let list = [];
+            if (Array.isArray(data)) {
+                list = data;
+            } else if (data.existingBookings) {
+                list = data.existingBookings;
+            }
+
 
             // Sort by date descending
             list.sort((a: any, b: any) => new Date(b.timeSlot || b.date).getTime() - new Date(a.timeSlot || a.date).getTime());
@@ -121,6 +136,8 @@ function AppointmentsContent() {
                     avatar: ""
                 };
                 setUser(u);
+                const currentLocal = JSON.parse(localStorage.getItem('user') || '{}');
+                localStorage.setItem('user', JSON.stringify({ ...currentLocal, ...u }));
                 await fetchAppointments(u.id);
             } catch (e) { }
         }
@@ -128,7 +145,7 @@ function AppointmentsContent() {
         fetchDoctors();
     }, []);
 
-    // --- SMART SCHEDULE LOGIC ---
+    // --- SMART SCHEDULE LOGIC (TIMEZONE AWARE) ---
     useEffect(() => {
         if (!formData.doctorId || !formData.date) return;
 
@@ -145,9 +162,14 @@ function AppointmentsContent() {
                 const bookings = data.existingBookings || [];
                 const weeklySchedule = data.weeklySchedule || {};
 
+                // 🟢 NEW: Capture Timezone from Backend
+                const tz = data.timezone || "UTC";
+                setDoctorTimezone(tz);
+
                 // 1. Determine Day
                 const dateObj = new Date(formData.date);
-                const dayName = dateObj.toLocaleDateString('en-US', { weekday: 'short' });
+                // Fix: Ensure we get the weekday name correctly even if date is picked in different timezone
+                const dayName = dateObj.toLocaleDateString('en-US', { weekday: 'long', timeZone: 'UTC' });
 
                 // 2. Get Shift
                 const shift = weeklySchedule[dayName];
@@ -165,8 +187,19 @@ function AppointmentsContent() {
                 const slots = [];
                 for (let h = startHour; h < endHour; h++) {
                     const timeStr = `${h.toString().padStart(2, '0')}:00`;
-                    const slotISO = new Date(`${formData.date}T${timeStr}:00`).toISOString();
-                    const isTaken = bookings.some((b: any) => b.timeSlot === slotISO);
+
+                    // 🟢 CRITICAL FIX: FORCE UTC CONSTRUCTION
+                    // We treat the Doctor's "09:00" as a specific ID. 
+                    // We append 'Z' to force it to be Universal Time in the database.
+                    // This prevents "Browser Timezone" from shifting the slot by +/- 5 hours.
+                    const slotISO = `${formData.date}T${timeStr}:00Z`;
+
+                    // Check if this specific ISO string exists in bookings
+                    // We strictly compare the first 19 chars (YYYY-MM-DDTHH:mm:00) to avoid millisecond mismatches
+                    const isTaken = bookings.some((b: any) =>
+                        b.timeSlot.substring(0, 19) === slotISO.substring(0, 19) &&
+                        b.status !== 'CANCELLED'
+                    );
 
                     if (!isTaken) slots.push(timeStr);
                 }
@@ -181,7 +214,6 @@ function AppointmentsContent() {
         fetchSlots();
     }, [formData.doctorId, formData.date]);
 
-
     // --- HANDLING BOOKING ---
     const handleBook = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -191,7 +223,7 @@ function AppointmentsContent() {
         try {
             const token = await getAuthToken();
             const selectedDoc = doctors.find(d => d.doctorId === formData.doctorId);
-            const timeSlotISO = new Date(`${formData.date}T${formData.time}:00`).toISOString();
+            const timeSlotISO = `${formData.date}T${formData.time}:00`;
 
             // 1. Get Stripe Token
             const cardElement = elements.getElement(CardElement);
@@ -254,7 +286,33 @@ function AppointmentsContent() {
             toast({ variant: "destructive", title: "Error", description: "Could not cancel." });
         }
     };
+    // 🟢 NEW: Check-In Logic (Add this before the return statement)
+    const handleJoin = async (apt: any) => {
+        // 1. Notify Backend: "I am here"
+        try {
+            const token = await getAuthToken();
+            console.log("📍 Check-in signal sending...");
 
+            await fetch(`${import.meta.env.VITE_API_BASE_URL}/book-appointment`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                    appointmentId: apt.appointmentId,
+                    status: "CONFIRMED", // Keep status as is
+                    patientArrived: true // 🟢 SIGNAL: Patient is ready
+                })
+            });
+            console.log("✅ Check-in successful");
+        } catch (e) {
+            console.error("Check-in failed (Connection error)", e);
+        }
+
+        // 2. Go to Video Room
+        navigate(`/consultation?appointmentId=${apt.appointmentId}&patientName=${user?.name}`);
+    };
     return (
         <DashboardLayout
             title="Appointments"
@@ -313,7 +371,16 @@ function AppointmentsContent() {
 
                                     {/* TIME SELECT */}
                                     <div className="space-y-2">
-                                        <Label>Time Slot {loadingSlots && <span className="text-xs text-muted-foreground">(Loading...)</span>}</Label>
+                                        <Label>
+                                            Time Slot
+                                            {loadingSlots && <span className="text-xs text-muted-foreground ml-2">(Loading...)</span>}
+                                            {/* 🟢 NEW: Show Timezone info to user */}
+                                            {!loadingSlots && doctorTimezone && (
+                                                <span className="text-xs text-blue-600 ml-2 font-medium">
+                                                    ({doctorTimezone} Time)
+                                                </span>
+                                            )}
+                                        </Label>
                                         <select
                                             className="flex h-10 w-full rounded-md border bg-background px-3"
                                             value={formData.time}
@@ -359,7 +426,7 @@ function AppointmentsContent() {
 
                                 {/* PAYMENT SECTION */}
                                 <div className="p-4 bg-white rounded-md border mt-2">
-                                    <Label className="mb-2 block flex items-center justify-between">
+                                    <Label className="mb-2 flex items-center justify-between">
                                         <span className="flex items-center gap-2"><CreditCard className="w-4 h-4" /> Credit Card</span>
                                         <span className={price === 20 ? "text-green-600 font-bold" : "text-gray-900 font-bold"}>
                                             Total: ${price}.00 {price === 20 && "(Insurance Applied)"}
@@ -389,38 +456,57 @@ function AppointmentsContent() {
                     </TabsList>
 
                     <TabsContent value="upcoming" className="mt-6 space-y-4">
-                        {loadingAppointments ? (
-                            <div className="text-center py-10"><Loader2 className="h-8 w-8 animate-spin mx-auto" /></div>
-                        ) : appointments.filter(a => a.status !== 'CANCELLED').length > 0 ? (
-                            appointments.filter(a => a.status !== 'CANCELLED').map((apt, i) => {
-                                // 🟢 DYNAMIC LOOKUP LOGIC
-                                // 1. Find doctor profile from the directory
+                        {(() => {
+                            // 🟢 STEP 1: Filter the list ONE time and save it.
+                            const upcomingAppointments = appointments.filter(apt => {
+                                // Standard data integrity checks
+                                if (apt.status === 'CANCELLED' || apt.status === 'COMPLETED') return false;
+                                if (!apt.timeSlot) return false;
+                                const aptDate = new Date(apt.timeSlot);
+                                if (isNaN(aptDate.getTime())) return false;
+
+                                // The critical date check
+                                const startOfToday = new Date();
+                                startOfToday.setHours(0, 0, 0, 0);
+                                return aptDate >= startOfToday;
+                            });
+
+                            // 🟢 STEP 2: Check the length of the new, filtered list.
+                            if (loadingAppointments) {
+                                return <div className="text-center py-10"><Loader2 className="h-8 w-8 animate-spin mx-auto" /></div>;
+                            }
+
+                            if (upcomingAppointments.length === 0) {
+                                return <div className="text-center text-muted-foreground py-10">No upcoming appointments.</div>;
+                            }
+
+                            // 🟢 STEP 3: Map over the SAME filtered list to render the cards.
+                            return upcomingAppointments.map((apt, i) => {
                                 const docProfile = doctors.find(d => d.doctorId === apt.doctorId);
-                                // 2. Use Live Name or Fallback
-                                const docName = docProfile?.name || apt.doctorName || "Dr. Medical Officer";
-                                // 3. Use Live Specialization or Fallback
+                                const docName = docProfile?.name || apt.doctorName || "Doctor";
                                 const docSpecialty = docProfile?.specialization || "General Practice";
+                                const dateObj = new Date(apt.timeSlot);
 
                                 return (
                                     <Card key={i} className="hover:shadow-md transition-shadow">
                                         <CardContent className="p-6 flex flex-col md:flex-row justify-between items-center gap-4">
                                             <div className="flex gap-4 items-center">
                                                 <div className="bg-primary/10 p-3 rounded-lg text-primary text-center min-w-[60px]">
-                                                    <div className="font-bold text-xl">{new Date(apt.timeSlot || apt.date).getDate()}</div>
-                                                    <div className="text-xs font-bold uppercase">{new Date(apt.timeSlot || apt.date).toLocaleString('default', { month: 'short' })}</div>
+                                                    <div className="font-bold text-xl">{dateObj.getDate()}</div>
+                                                    <div className="text-xs font-bold uppercase">{dateObj.toLocaleString('default', { month: 'short' })}</div>
                                                 </div>
                                                 <div>
                                                     <div className="flex items-center gap-2">
                                                         <h3 className="font-semibold text-lg">{docName}</h3>
                                                         {apt.coverageType?.includes('INSURANCE') && <Badge variant="secondary">Insured</Badge>}
                                                     </div>
-                                                    {/* 🟢 NEW: DISPLAY SPECIALIZATION */}
                                                     <div className="flex gap-4 text-sm text-muted-foreground mt-1 items-center">
                                                         <span className="flex items-center gap-1 text-primary/80 font-medium">
                                                             <Stethoscope className="h-3 w-3" /> {docSpecialty}
                                                         </span>
                                                         <span className="flex items-center gap-1">
-                                                            <Clock className="h-3 w-3" /> {new Date(apt.timeSlot || apt.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                            <Clock className="h-3 w-3" />
+                                                            {dateObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                                         </span>
                                                     </div>
                                                 </div>
@@ -429,39 +515,64 @@ function AppointmentsContent() {
                                                 <Button variant="outline" className="text-red-600 hover:text-red-700" onClick={() => handleCancel(apt.appointmentId)}>
                                                     Cancel
                                                 </Button>
-                                                <Button onClick={() => navigate("/consultation")}>
+                                                <Button onClick={() => handleJoin(apt)}>
                                                     <Video className="h-4 w-4 mr-2" /> Join
                                                 </Button>
                                             </div>
                                         </CardContent>
                                     </Card>
                                 );
-                            })
-                        ) : (
-                            <div className="text-center text-muted-foreground py-10">No upcoming appointments.</div>
-                        )}
+                            });
+                        })()}
                     </TabsContent>
 
                     <TabsContent value="past" className="mt-6">
-                        {appointments.filter(a => a.status === 'CANCELLED' || new Date(a.timeSlot) < new Date()).map((apt, i) => {
-                            // Dynamic Lookup also for Past History
-                            const docProfile = doctors.find(d => d.doctorId === apt.doctorId);
-                            const docName = docProfile?.name || apt.doctorName || "Dr. Medical Officer";
+                        {appointments
+                            .filter(apt => {
+                                // Logic: Show ONLY Cancelled/Completed/Past items
+                                // AND ensure they have valid data
+                                const isPast = new Date(apt.timeSlot) < new Date();
+                                const isDone = apt.status === 'CANCELLED' || apt.status === 'COMPLETED';
+                                const hasData = apt.timeSlot && apt.doctorId; // Block bad data
 
-                            return (
-                                <Card key={i} className="mb-4 opacity-75 bg-gray-50">
-                                    <CardContent className="p-4 flex justify-between items-center">
-                                        <div>
-                                            <div className="font-semibold">{docName}</div>
-                                            <div className="text-sm text-muted-foreground">{new Date(apt.timeSlot).toLocaleDateString()}</div>
-                                        </div>
-                                        <Badge variant={apt.status === 'CANCELLED' ? 'destructive' : 'outline'}>
-                                            {apt.status || 'COMPLETED'}
-                                        </Badge>
-                                    </CardContent>
-                                </Card>
-                            );
-                        })}
+                                // Check if doctor exists in directory
+                                const realDoctor = doctors.find(d => d.doctorId === apt.doctorId);
+
+                                return (isPast || isDone) && hasData && realDoctor;
+                            })
+                            .map((apt, i) => {
+                                const docProfile = doctors.find(d => d.doctorId === apt.doctorId);
+                                const dateObj = new Date(apt.timeSlot);
+
+                                return (
+                                    <Card key={i} className="mb-4 opacity-75 bg-gray-50 hover:opacity-100 transition-opacity">
+                                        <CardContent className="p-4 flex justify-between items-center">
+                                            <div className="flex items-center gap-4">
+                                                <div className="bg-gray-200 p-2 rounded text-center min-w-[50px]">
+                                                    <div className="font-bold text-gray-600">{dateObj.getDate()}</div>
+                                                    <div className="text-[10px] font-bold uppercase text-gray-500">{dateObj.toLocaleString('default', { month: 'short' })}</div>
+                                                </div>
+                                                <div>
+                                                    <div className="font-semibold text-lg">{docProfile?.name}</div>
+                                                    <div className="text-sm text-muted-foreground flex items-center gap-2">
+                                                        <span>{docProfile?.specialization}</span>
+                                                        <span>•</span>
+                                                        <span>{dateObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <Badge variant={apt.status === 'CANCELLED' ? 'destructive' : 'outline'}>
+                                                {apt.status || 'COMPLETED'}
+                                            </Badge>
+                                        </CardContent>
+                                    </Card>
+                                );
+                            })}
+
+                        {/* Empty State for Past */}
+                        {appointments.filter(a => a.status === 'CANCELLED' || a.status === 'COMPLETED' || new Date(a.timeSlot) < new Date()).length === 0 && (
+                            <div className="text-center text-muted-foreground py-10">No past appointments.</div>
+                        )}
                     </TabsContent>
                 </Tabs>
             </div>

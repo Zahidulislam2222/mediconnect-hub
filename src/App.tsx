@@ -2,7 +2,8 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, HashRouter, Routes, Route } from "react-router-dom";
+import { Capacitor } from "@capacitor/core"; // <--- Import this
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import PatientDashboard from "./pages/PatientDashboard";
@@ -30,6 +31,7 @@ import PatientRecords from "./pages/PatientRecords";
 import Prescriptions from "./pages/Prescriptions";
 import LiveMonitoring from "./pages/LiveMonitoring";
 
+const Router = Capacitor.isNativePlatform() ? HashRouter : BrowserRouter;
 const queryClient = new QueryClient();
 
 const App = () => (
@@ -37,7 +39,7 @@ const App = () => (
     <TooltipProvider>
       <Toaster />
       <Sonner />
-      <BrowserRouter>
+      <Router>
         <Routes>
           {/* ========================================================= */}
           {/* 🌍 PUBLIC ZONE - NO LOGIN REQUIRED                      */}
@@ -87,7 +89,7 @@ const App = () => (
           {/* Catch-all */}
           <Route path="*" element={<NotFound />} />
         </Routes>
-      </BrowserRouter>
+      </Router>
     </TooltipProvider>
   </QueryClientProvider>
 );

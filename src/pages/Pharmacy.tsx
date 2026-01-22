@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { getCurrentUser } from 'aws-amplify/auth';
+import { getCurrentUser, signOut, fetchAuthSession } from 'aws-amplify/auth';
+import QRCode from "react-qr-code";
 import {
   Pill,
   RefreshCw,
@@ -9,9 +10,9 @@ import {
   CheckCircle2,
   AlertTriangle,
   MapPin,
-  Phone,
   Loader2,
-  FileWarning
+  FileWarning,
+  History
 } from "lucide-react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -31,15 +32,34 @@ import { useToast } from "@/hooks/use-toast";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
+// Authenticated API Wrapper
+const apiCall = async (endpoint: string, options: RequestInit = {}) => {
+  const session = await fetchAuthSession();
+  const token = session.tokens?.accessToken?.toString();
+
+  const headers = {
+    "Content-Type": "application/json",
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    ...options.headers,
+  };
+
+  return fetch(`${API_BASE_URL}${endpoint}`, { ...options, headers });
+};
+
 export default function Pharmacy() {
   const navigate = useNavigate();
   const { toast } = useToast();
 
   // --- STATE ---
-  const [user, setUser] = useState<any>({ name: "Patient", id: "", avatar: null });
+  const [user, setUser] = useState<any>(() => {
+    try {
+      const saved = localStorage.getItem('user');
+      return saved ? JSON.parse(saved) : { name: "Patient", id: "", avatar: null };
+    } catch (e) { return { name: "Patient", id: "", avatar: null }; }
+  });
   const [prescriptions, setPrescriptions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [processingId, setProcessingId] = useState<string | null>(null); // For loading buttons
+  const [processingId, setProcessingId] = useState<string | null>(null);
 
   // Modals
   const [showQRModal, setShowQRModal] = useState(false);
@@ -53,18 +73,20 @@ export default function Pharmacy() {
       setLoading(true);
       const authUser = await getCurrentUser();
 
-      // Get Profile (for Avatar/Name)
-      const profileRes = await fetch(`${API_BASE_URL}/register-patient?id=${authUser.userId}`);
+      const [profileRes, rxRes] = await Promise.all([
+        apiCall(`/register-patient?id=${authUser.userId}`),
+        apiCall(`/prescription?patientId=${authUser.userId}`)
+      ]);
+
       if (profileRes.ok) {
         const profile = await profileRes.json();
-        setUser({ name: profile.name || "Patient", id: authUser.userId, avatar: profile.avatar });
+        const userData = { name: profile.name || "Patient", id: authUser.userId, avatar: profile.avatar };
+        setUser(userData);
+        localStorage.setItem('user', JSON.stringify({ ...user, ...userData }));
       }
 
-      // Get Prescriptions (Using the NEW GET Endpoint)
-      const rxRes = await fetch(`${API_BASE_URL}/prescription?patientId=${authUser.userId}`);
       if (rxRes.ok) {
         const data = await rxRes.json();
-        // Backend returns { count: n, prescriptions: [...] }
         setPrescriptions(data.prescriptions || []);
       }
     } catch (error) {
@@ -72,7 +94,7 @@ export default function Pharmacy() {
       toast({
         variant: "destructive",
         title: "Connection Error",
-        description: "Could not load prescriptions from backend."
+        description: "Could not sync with pharmacy network."
       });
     } finally {
       setLoading(false);
@@ -83,29 +105,27 @@ export default function Pharmacy() {
     fetchPrescriptions();
   }, []);
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    await signOut();
     navigate("/");
   };
 
-  // --- 2. ACTIONS: GENERATE QR / PICKUP ---
+  // --- 2. ACTIONS ---
   const handleGenerateQR = async (rx: any) => {
     setProcessingId(rx.prescriptionId);
     try {
-      // Logic: Generating a QR code implies "Getting it ready for pickup"
-      const response = await fetch(`${API_BASE_URL}/pharmacy/generate-qr`, {
+      const response = await apiCall(`/pharmacy/generate-qr`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ prescriptionId: rx.prescriptionId })
       });
 
       if (!response.ok) throw new Error("Failed to generate code");
 
       const data = await response.json();
-      setGeneratedQR(data.qrPayload); // e.g., "PICKUP-1234-5678"
+      setGeneratedQR(data.qrPayload || `PICKUP-${rx.prescriptionId.substring(0, 8)}`);
       setSelectedRx(rx);
       setShowQRModal(true);
 
-      // Update local state to reflect status change immediately
       updateLocalStatus(rx.prescriptionId, "READY_FOR_PICKUP");
 
     } catch (error) {
@@ -115,17 +135,14 @@ export default function Pharmacy() {
     }
   };
 
-  // --- 3. ACTIONS: REFILL REQUEST ---
   const handleRefillRequest = async () => {
     if (!selectedRx) return;
-    setProcessingId(selectedRx.prescriptionId); // Use generic loading state
+    setProcessingId(selectedRx.prescriptionId);
     setShowRefillModal(false);
 
     try {
-      // Re-using Generate QR endpoint as the "Trigger" for a refill/pickup
-      const response = await fetch(`${API_BASE_URL}/pharmacy/generate-qr`, {
+      const response = await apiCall(`/pharmacy/request-refill`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ prescriptionId: selectedRx.prescriptionId })
       });
 
@@ -133,20 +150,19 @@ export default function Pharmacy() {
 
       toast({
         title: "Refill Requested",
-        description: `Order sent to Pharmacy for ${selectedRx.medication}.`,
+        description: `Doctor notified for ${selectedRx.medication}.`,
         variant: "default"
       });
 
-      updateLocalStatus(selectedRx.prescriptionId, "READY_FOR_PICKUP");
+      updateLocalStatus(selectedRx.prescriptionId, "REFILL_REQUESTED");
 
     } catch (error) {
-      toast({ variant: "destructive", title: "Error", description: "Could not process refill." });
+      toast({ variant: "destructive", title: "Error", description: "Could not send request." });
     } finally {
       setProcessingId(null);
     }
   };
 
-  // Helper to update UI without refetching
   const updateLocalStatus = (id: string, newStatus: string) => {
     setPrescriptions(prev => prev.map(item =>
       item.prescriptionId === id ? { ...item, status: newStatus } : item
@@ -154,17 +170,14 @@ export default function Pharmacy() {
   };
 
   // --- HELPERS ---
-  const getStatusColor = (status: string) => {
+  const getStatusBadge = (status: string) => {
     switch (status) {
-      case "ISSUED": return "bg-blue-100 text-blue-700 border-blue-200";
-      case "READY_FOR_PICKUP": return "bg-green-100 text-green-700 border-green-200";
-      case "PICKED_UP": return "bg-slate-100 text-slate-700 border-slate-200";
-      default: return "bg-gray-100 text-gray-700 border-gray-200";
+      case "ISSUED": return <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-200 border-blue-200">Active</Badge>;
+      case "READY_FOR_PICKUP": return <Badge className="bg-green-100 text-green-700 hover:bg-green-200 border-green-200">Ready for Pickup</Badge>;
+      case "REFILL_REQUESTED": return <Badge className="bg-orange-100 text-orange-700 hover:bg-orange-200 border-orange-200">Pending Approval</Badge>;
+      case "PICKED_UP": return <Badge variant="secondary">Completed</Badge>;
+      default: return <Badge variant="outline">{status}</Badge>;
     }
-  };
-
-  const getFormatDate = (isoString: string) => {
-    return new Date(isoString).toLocaleDateString();
   };
 
   return (
@@ -176,249 +189,192 @@ export default function Pharmacy() {
       userAvatar={user.avatar}
       onLogout={handleLogout}
     >
-      <div className="space-y-6 animate-fade-in">
-        {/* Quick Stats */}
+      <div className="space-y-6 animate-fade-in pb-10">
+
+        {/* STATS */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <Card className="shadow-soft border-border/50">
-            <CardContent className="pt-5 flex items-center gap-4">
-              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10">
-                <Pill className="h-6 w-6 text-primary" />
-              </div>
+          <Card className="shadow-sm border-slate-200">
+            <CardContent className="pt-6 flex items-center gap-4">
+              <div className="bg-blue-50 p-3 rounded-xl"><Pill className="text-blue-600 h-6 w-6" /></div>
               <div>
-                <p className="text-2xl font-bold">{prescriptions.length}</p>
-                <p className="text-sm text-muted-foreground">Active Medications</p>
+                <div className="text-2xl font-bold">{prescriptions.length}</div>
+                <div className="text-xs text-slate-500 font-medium uppercase tracking-wide">Total Meds</div>
               </div>
             </CardContent>
           </Card>
-
-          <Card className="shadow-soft border-border/50">
-            <CardContent className="pt-5 flex items-center gap-4">
-              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-warning/10">
-                <RefreshCw className="h-6 w-6 text-warning" />
-              </div>
+          <Card className="shadow-sm border-slate-200">
+            <CardContent className="pt-6 flex items-center gap-4">
+              <div className="bg-orange-50 p-3 rounded-xl"><RefreshCw className="text-orange-600 h-6 w-6" /></div>
               <div>
-                <p className="text-2xl font-bold">
-                  {prescriptions.filter(p => p.status === "ISSUED").length}
-                </p>
-                <p className="text-sm text-muted-foreground">Pending Refills</p>
+                <div className="text-2xl font-bold">
+                  {prescriptions.filter(p => p.status === "REFILL_REQUESTED").length}
+                </div>
+                <div className="text-xs text-slate-500 font-medium uppercase tracking-wide">Pending Approval</div>
               </div>
             </CardContent>
           </Card>
-
-          <Card className="shadow-soft border-border/50">
-            <CardContent className="pt-5 flex items-center gap-4">
-              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-success/10">
-                <CheckCircle2 className="h-6 w-6 text-success" />
-              </div>
+          <Card className="shadow-sm border-slate-200">
+            <CardContent className="pt-6 flex items-center gap-4">
+              <div className="bg-green-50 p-3 rounded-xl"><CheckCircle2 className="text-green-600 h-6 w-6" /></div>
               <div>
                 <p className="text-2xl font-bold">
                   {prescriptions.filter(p => p.status === "READY_FOR_PICKUP").length}
                 </p>
-                <p className="text-sm text-muted-foreground">Ready for Pickup</p>
+                <p className="text-xs text-slate-500 font-medium uppercase tracking-wide">Ready for Pickup</p>
               </div>
             </CardContent>
           </Card>
         </div>
 
-        {/* Prescriptions List */}
-        <Card className="shadow-card border-border/50">
-          <CardHeader className="pb-3">
+        {/* LIST */}
+        <Card className="shadow-sm border-slate-200">
+          <CardHeader className="border-b bg-slate-50/50 pb-3">
             <div className="flex items-center justify-between">
-              <CardTitle className="text-lg">Your Prescriptions</CardTitle>
-              <Button variant="outline" size="sm" className="gap-2" onClick={fetchPrescriptions} disabled={loading}>
-                <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
-                Sync with Pharmacy
+              <CardTitle className="text-base font-semibold">Current Medications</CardTitle>
+              <Button variant="ghost" size="sm" onClick={fetchPrescriptions} disabled={loading} className="h-8">
+                <History className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} /> Sync
               </Button>
             </div>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="p-0">
             {loading ? (
-              <div className="text-center py-8 text-muted-foreground">
-                <Loader2 className="h-8 w-8 animate-spin mx-auto mb-2" />
-                <p>Loading prescription history...</p>
-              </div>
+              <div className="p-8 text-center"><Loader2 className="h-8 w-8 animate-spin mx-auto text-slate-300" /></div>
             ) : prescriptions.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground border-2 border-dashed rounded-xl">
-                <FileWarning className="h-10 w-10 mx-auto mb-2 opacity-50" />
-                <p>No active prescriptions found.</p>
-                <p className="text-xs">Ask your doctor to send a digital prescription.</p>
+              <div className="p-12 text-center text-slate-500">
+                <FileWarning className="h-10 w-10 mx-auto mb-3 opacity-20" />
+                <p>No prescriptions found.</p>
               </div>
             ) : (
-              prescriptions.map((rx) => (
-                <div
-                  key={rx.prescriptionId}
-                  className="flex flex-col md:flex-row md:items-center gap-4 p-4 rounded-xl border border-border bg-card hover:shadow-soft transition-all"
-                >
-                  {/* Icon */}
-                  <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl bg-primary/10">
-                    <Pill className="h-6 w-6 text-primary" />
-                  </div>
+              <div className="divide-y">
+                {prescriptions.map((rx) => (
+                  <div key={rx.prescriptionId} className="p-4 flex flex-col md:flex-row md:items-center gap-4 hover:bg-slate-50/50 transition-colors">
 
-                  {/* Details */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      <h4 className="font-semibold text-foreground">{rx.medication}</h4>
-                      <Badge variant="outline" className={getStatusColor(rx.status)}>
-                        {rx.status?.replace(/_/g, " ")}
-                      </Badge>
+                    {/* Icon & Name */}
+                    <div className="flex items-start gap-4 flex-1">
+                      <div className="h-10 w-10 rounded-full bg-slate-100 flex items-center justify-center shrink-0">
+                        <Pill className="h-5 w-5 text-slate-500" />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h4 className="font-semibold text-slate-900">{rx.medication}</h4>
+                          {getStatusBadge(rx.status)}
+                        </div>
+                        <p className="text-sm text-slate-500 mt-0.5">{rx.dosage} • {rx.instructions || "Follow label instructions"}</p>
+                        <div className="flex items-center gap-3 mt-1 text-xs text-slate-400">
+                          <span className="flex items-center gap-1"><Clock className="h-3 w-3" /> Issued: {new Date(rx.timestamp).toLocaleDateString()}</span>
+                          <span>ID: #{rx.prescriptionId.substring(0, 6)}</span>
+                        </div>
+                      </div>
                     </div>
-                    <p className="text-sm text-muted-foreground">
-                      {rx.dosage} • {rx.instructions || "Follow doctor's orders"}
-                    </p>
-                    <div className="flex flex-wrap items-center gap-4 mt-2 text-xs text-muted-foreground">
-                      <span className="flex items-center gap-1">
-                        <Clock className="h-3.5 w-3.5" />
-                        Issued: {getFormatDate(rx.timestamp)}
-                      </span>
-                      <span>•</span>
-                      <span>Rx ID: {rx.prescriptionId.slice(-4).toUpperCase()}</span>
-                      <span>•</span>
-                      <span className="flex items-center gap-1">
-                        <MapPin className="h-3.5 w-3.5" />
-                        CVS Pharmacy (Default)
-                      </span>
-                    </div>
-                  </div>
 
-                  {/* Actions */}
-                  <div className="flex items-center gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="gap-2"
-                      onClick={() => handleGenerateQR(rx)}
-                      disabled={processingId === rx.prescriptionId}
-                    >
-                      {processingId === rx.prescriptionId ? <Loader2 className="h-4 w-4 animate-spin" /> : <QrCode className="h-4 w-4" />}
-                      Pickup Code
-                    </Button>
-                    <Button
-                      size="sm"
-                      className="gap-2 bg-primary hover:bg-primary/90"
-                      onClick={() => {
-                        setSelectedRx(rx);
-                        setShowRefillModal(true);
-                      }}
-                      disabled={rx.status === "PICKED_UP"}
-                    >
-                      <RefreshCw className="h-4 w-4" />
-                      Request Refill
-                    </Button>
+                    {/* Action Buttons */}
+                    <div className="flex items-center gap-2">
+                      {(rx.status === "ISSUED" || rx.status === "READY_FOR_PICKUP") && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleGenerateQR(rx)}
+                          disabled={processingId === rx.prescriptionId}
+                        >
+                          {processingId === rx.prescriptionId ? <Loader2 className="h-4 w-4 animate-spin" /> : <QrCode className="h-4 w-4 mr-2" />}
+                          Pickup Code
+                        </Button>
+                      )}
+
+                      <Button
+                        size="sm"
+                        className="bg-primary"
+                        onClick={() => { setSelectedRx(rx); setShowRefillModal(true); }}
+                        disabled={rx.status === "REFILL_REQUESTED" || rx.status === "READY_FOR_PICKUP"}
+                      >
+                        <RefreshCw className="h-3.5 w-3.5 mr-2" />
+                        {rx.status === "REFILL_REQUESTED" ? "Pending" : "Refill"}
+                      </Button>
+                    </div>
+
                   </div>
-                </div>
-              ))
+                ))}
+              </div>
             )}
           </CardContent>
         </Card>
 
-        {/* Pharmacy Info & Interactions (Static but Useful) */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <Card className="shadow-card border-border/50">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-lg">Preferred Pharmacy</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-start gap-4">
-                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-accent/10">
-                  <MapPin className="h-6 w-6 text-accent" />
-                </div>
-                <div>
-                  <h4 className="font-semibold">CVS Pharmacy</h4>
-                  <p className="text-sm text-muted-foreground">123 Main Street, San Francisco, CA 94102</p>
-                  <div className="flex items-center gap-2 mt-2 text-sm text-muted-foreground">
-                    <Phone className="h-4 w-4" />
-                    (415) 555-0123
-                  </div>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    Hours: Mon-Sat 9am-9pm, Sun 10am-6pm
-                  </p>
-                </div>
+        {/* STATIC INFO */}
+        <div className="grid md:grid-cols-2 gap-4">
+          <Card className="border-slate-200 shadow-sm">
+            <CardContent className="p-4 flex gap-4">
+              <div className="bg-purple-50 p-3 rounded-lg"><MapPin className="text-purple-600 h-5 w-5" /></div>
+              <div>
+                <h4 className="font-semibold text-sm">Preferred Pharmacy</h4>
+                <p className="text-sm text-slate-600">CVS Pharmacy #4402</p>
+                <p className="text-xs text-slate-400 mt-1">123 Market St • (415) 555-0123</p>
               </div>
             </CardContent>
           </Card>
-
-          <Card className="shadow-card border-border/50">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-lg flex items-center gap-2">
-                <AlertTriangle className="h-5 w-5 text-warning" />
-                Drug Interactions Alert
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="p-3 rounded-lg bg-warning/10 border border-warning/20">
-                <p className="text-sm text-foreground mb-2">
-                  <strong>Automated Safety Check:</strong>
-                </p>
-                <p className="text-sm text-muted-foreground">
-                  Our system automatically screens all new prescriptions against your current medication list to prevent dangerous interactions.
+          <Card className="border-slate-200 shadow-sm">
+            <CardContent className="p-4 flex gap-4">
+              <div className="bg-red-50 p-3 rounded-lg"><AlertTriangle className="text-red-600 h-5 w-5" /></div>
+              <div>
+                <h4 className="font-semibold text-sm">Interaction Guard™</h4>
+                <p className="text-xs text-slate-600 mt-1">
+                  Your prescriptions are automatically screened against known drug interactions by our AI engine.
                 </p>
               </div>
-              <Button variant="link" className="p-0 h-auto mt-3 text-primary">
-                View interaction history →
-              </Button>
             </CardContent>
           </Card>
         </div>
+
       </div>
 
-      {/* QR Code Modal */}
+      {/* QR MODAL */}
       <Dialog open={showQRModal} onOpenChange={setShowQRModal}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-xs text-center">
           <DialogHeader>
-            <DialogTitle>Pickup Code</DialogTitle>
-            <DialogDescription>
-              Show this code at CVS Pharmacy to pick up your prescription.
-            </DialogDescription>
+            <DialogTitle>Scan at Pharmacy</DialogTitle>
+            <DialogDescription>Show this code to the pharmacist.</DialogDescription>
           </DialogHeader>
-          <div className="flex flex-col items-center py-6">
-            <div className="w-48 h-48 bg-white rounded-xl p-4 shadow-lg mb-4 flex items-center justify-center">
-              {/* Real QR Code Generated via API */}
-              <img
-                src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${generatedQR}`}
-                alt="Pickup QR"
-                className="w-full h-full object-contain"
+          <div className="flex justify-center py-4 bg-white rounded-lg border my-2">
+            {/* 🔴 WAS: qrValue && ( ... ) */}
+            {/* 🟢 CHANGE TO: generatedQR && ( ... ) */}
+            {generatedQR && (
+              <QRCode
+                value={generatedQR} // 🟢 FIX HERE
+                size={180}
+                style={{ height: "auto", maxWidth: "100%", width: "100%" }}
+                viewBox={`0 0 256 256`}
               />
-            </div>
-            <p className="text-lg font-mono font-bold">{generatedQR}</p>
-            <p className="text-sm text-muted-foreground mt-2">{selectedRx?.medication} - {selectedRx?.dosage}</p>
+            )}
           </div>
+          {/* 🟢 FIX HERE TOO */}
+          <p className="font-mono text-lg font-bold tracking-widest text-slate-700">{generatedQR}</p>
         </DialogContent>
       </Dialog>
 
-      {/* Refill Request Modal */}
+      {/* REFILL CONFIRM MODAL */}
       <Dialog open={showRefillModal} onOpenChange={setShowRefillModal}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Request Refill</DialogTitle>
+            <DialogTitle>Confirm Refill Request</DialogTitle>
             <DialogDescription>
-              Request a refill for {selectedRx?.medication} {selectedRx?.dosage}
+              This will send a request to your doctor to approve a refill for <strong>{selectedRx?.medication}</strong>.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label>Pharmacy</Label>
-              <Input value="CVS Pharmacy (Default)" disabled />
-            </div>
-            <div className="space-y-2">
-              <Label>Instructions</Label>
-              <Input value={selectedRx?.instructions || "Standard"} disabled />
-            </div>
-            <div className="space-y-2">
-              <Label>Notes (Optional)</Label>
-              <Textarea placeholder="Any special instructions for your pharmacist..." />
+          <div className="space-y-4 py-2">
+            <div className="grid gap-2">
+              <Label>Additional Notes (Optional)</Label>
+              <Textarea placeholder="e.g. I am traveling next week..." />
             </div>
           </div>
-          <div className="flex justify-end gap-3">
-            <Button variant="outline" onClick={() => setShowRefillModal(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleRefillRequest} disabled={!!processingId}>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setShowRefillModal(false)}>Cancel</Button>
+            <Button onClick={handleRefillRequest} disabled={!!processingId} className="bg-primary">
               {processingId ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-              Confirm Request
+              Send Request
             </Button>
           </div>
         </DialogContent>
       </Dialog>
+
     </DashboardLayout>
   );
 }

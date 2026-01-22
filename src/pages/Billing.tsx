@@ -93,7 +93,8 @@ function BillingContent() {
                     setUserProfile(freshProfile);
 
                     // Update Cache (Fixes next load)
-                    localStorage.setItem('user', JSON.stringify(freshProfile));
+                    const currentLocal = JSON.parse(localStorage.getItem('user') || '{}');
+                    localStorage.setItem('user', JSON.stringify({ ...currentLocal, ...freshProfile }));
                 }
 
                 // 5. Update Billing Data

@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">MediConnect</string>
+    <string name="title_activity_main">MediConnect</string>
+    <string name="package_name">com.mediconnect.app</string>
+    <string name="custom_url_scheme">com.mediconnect.app</string>
+</resources>

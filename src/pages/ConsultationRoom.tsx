@@ -96,13 +96,38 @@ export default function ConsultationRoom() {
 
   const handleExit = () => {
     leaveMeeting();
-    navigate(-1);
+
+    // 🟢 THE WORKFLOW FIX:
+    // We need to know who is leaving the call. Get user role from localStorage.
+    const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+
+    if (currentUser.role === 'doctor') {
+      // If the doctor leaves, send them back to the queue to complete the paperwork.
+      navigate('/patient-queue');
+    } else {
+      // If the patient leaves, send them back to their appointments list.
+      navigate('/appointments');
+    }
+  };
+
+  // --- HELPER FOR SPEAKERS ---
+  const getBestAudioOutput = async (meetingSession: DefaultMeetingSession) => {
+    // We fixed Windows, so now we just trust the "Default" setting.
+    // This connects to whatever works for YouTube.
+    const audioOutputs = await meetingSession.audioVideo.listAudioOutputDevices();
+    const defaultDevice = audioOutputs.find(d => d.deviceId === 'default');
+    if (defaultDevice) return defaultDevice.deviceId;
+
+    // Fallback if something is weird
+    if (audioOutputs.length > 0) return audioOutputs[0].deviceId;
+
+    return null;
   };
 
   // --- 6. THE CORE JOIN LOGIC ---
   const handleJoin = async () => {
     if (!appointmentId) {
-      toast({ variant: "destructive", title: "Error", description: "Missing Appointment ID. Please join from Dashboard." });
+      toast({ variant: "destructive", title: "Error", description: "Missing Appointment ID." });
       return;
     }
 
@@ -122,54 +147,88 @@ export default function ConsultationRoom() {
         })
       });
 
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || "Failed to join");
-      }
-
+      if (!res.ok) throw new Error("Failed to join");
       const { Meeting, Attendee } = await res.json();
 
       // B. INITIALIZE CHIME SDK
       const logger = new ConsoleLogger('MediConnectLogger', LogLevel.INFO);
       const deviceController = new DefaultDeviceController(logger);
       const configuration = new MeetingSessionConfiguration(Meeting, Attendee);
-
       const meetingSession = new DefaultMeetingSession(configuration, logger, deviceController);
       meetingSessionRef.current = meetingSession;
 
-      // C. CONFIGURE DEVICES
+      // C. CONFIGURE AUDIO INPUT (SMART SELECTION)
       const audioInputs = await meetingSession.audioVideo.listAudioInputDevices();
-      const videoInputs = await meetingSession.audioVideo.listVideoInputDevices();
 
-      if (audioInputs.length > 0) await meetingSession.audioVideo.startAudioInput(audioInputs[0].deviceId);
-      if (videoInputs.length > 0) await meetingSession.audioVideo.startVideoInput(videoInputs[0].deviceId);
+      // 1. PRIORITY: System Default (Mic #2 in your test - Best Volume)
+      let bestMic = audioInputs.find(d => d.deviceId === 'default');
 
-      const audioOutputElement = hiddenAudioRef.current;
-      if (audioOutputElement) {
-        meetingSession.audioVideo.bindAudioElement(audioOutputElement);
+      // 2. SECONDARY: Realtek (Mic #1 in your test - Working)
+      if (!bestMic) {
+        bestMic = audioInputs.find(d => d.label.includes("Realtek"));
       }
 
-      // D. BIND VIDEO OBSERVERS (Visuals)
+      // 3. FALLBACK: Whatever is first (Mic #0 - DroidCam - BAD, but last resort)
+      const micId = bestMic ? bestMic.deviceId : audioInputs[0]?.deviceId;
+
+      if (micId) {
+        console.log(`🎤 Connecting to Mic: ${bestMic ? bestMic.label : "First Available"}...`);
+        await meetingSession.audioVideo.startAudioInput(micId);
+      }
+
+      // --- VIDEO INPUT (Keep existing logic) ---
+      const videoInputs = await meetingSession.audioVideo.listVideoInputDevices();
+      if (videoInputs.length > 0) {
+        await meetingSession.audioVideo.startVideoInput(videoInputs[0].deviceId);
+      }
+
+      // D. CONFIGURE OUTPUT (The Fix)
+      const bestSpeakerId = await getBestAudioOutput(meetingSession);
+      if (bestSpeakerId) {
+        await meetingSession.audioVideo.chooseAudioOutput(bestSpeakerId);
+      }
+
+      // E. BIND OBSERVERS
       meetingSession.audioVideo.addObserver({
         videoTileDidUpdate: (tileState: any) => {
           if (!tileState.boundAttendeeId || tileState.isContent) return;
+          if (tileState.localTile) {
+            if (audioVideoRef.current) meetingSession.audioVideo.bindVideoElement(tileState.tileId, audioVideoRef.current);
+          } else {
+            if (remoteVideoRef.current) meetingSession.audioVideo.bindVideoElement(tileState.tileId, remoteVideoRef.current);
+          }
+        },
+        audioVideoDidStart: async () => {
+          console.log("🔊 Meeting Started. Binding Audio...");
+          const audioOutputElement = hiddenAudioRef.current;
+          if (audioOutputElement) {
+            // 1. Bind the stream
+            await meetingSession.audioVideo.bindAudioElement(audioOutputElement);
 
-          if (tileState.localTile && audioVideoRef.current) {
-            meetingSession.audioVideo.bindVideoElement(tileState.tileId, audioVideoRef.current);
+            // 2. Force Volume & Play
+            audioOutputElement.volume = 1.0;
+            try {
+              await audioOutputElement.setSinkId('default'); // Force Default
+              await audioOutputElement.play();
+            } catch (err) {
+              console.warn("Autoplay blocked:", err);
+            }
           }
-          else if (!tileState.localTile && remoteVideoRef.current) {
-            meetingSession.audioVideo.bindVideoElement(tileState.tileId, remoteVideoRef.current);
-          }
-        }
+        },
+
       });
-
-      // E. SUBSCRIBE TO PRESENCE (Who is here?) - MOVED OUTSIDE
+      // Real-time presence subscription (Corrected)
       meetingSession.audioVideo.realtimeSubscribeToAttendeeIdPresence(
         (attendeeId: string, present: boolean) => {
-          setRoster((prev: any) => ({
-            ...prev,
-            [attendeeId]: present
-          }));
+          setRoster((prev: any) => {
+            const newRoster = { ...prev };
+            if (present) {
+              newRoster[attendeeId] = true;
+            } else {
+              delete newRoster[attendeeId];
+            }
+            return newRoster;
+          });
         }
       );
 
@@ -281,8 +340,9 @@ export default function ConsultationRoom() {
             <video
               ref={remoteVideoRef}
               className="w-full h-full object-cover"
-              // Hide video if no source to show avatar fallback
               style={{ display: remoteVideoRef.current?.srcObject ? 'block' : 'none' }}
+              autoPlay      // <--- ADD THIS
+              playsInline   // <--- ADD THIS
             />
             {/* Fallback if no video yet */}
             <div className={`absolute inset-0 flex items-center justify-center ${remoteVideoRef.current?.srcObject ? 'hidden' : 'flex'}`}>
@@ -299,9 +359,11 @@ export default function ConsultationRoom() {
           <div className="absolute bottom-24 right-8 w-48 md:w-64 aspect-video bg-black rounded-xl overflow-hidden border-2 border-slate-700 shadow-2xl hover:scale-105 transition-transform cursor-pointer">
             {!isVideoOff ? (
               <video
-                ref={audioVideoRef} // Binds to Local Tile
-                className="w-full h-full object-cover transform -scale-x-100" // Mirror effect
-                muted // Always mute local video to prevent echo
+                ref={audioVideoRef}
+                className="w-full h-full object-cover transform -scale-x-100"
+                muted
+                autoPlay      // <--- ADD THIS
+                playsInline   // <--- ADD THIS
               />
             ) : (
               <div className="w-full h-full flex items-center justify-center bg-slate-900 text-slate-500 text-xs">
@@ -370,6 +432,7 @@ export default function ConsultationRoom() {
             </TabsContent>
           </Tabs>
         </div>
+
       </div>
     </div>
   );

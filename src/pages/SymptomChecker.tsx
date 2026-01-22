@@ -44,7 +44,12 @@ export default function SymptomChecker() {
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // --- STATE ---
-  const [user, setUser] = useState<any>({ name: "Patient", id: "guest", avatar: null });
+  const [user, setUser] = useState<any>(() => {
+    try {
+      const saved = localStorage.getItem('user');
+      return saved ? JSON.parse(saved) : { name: "Patient", id: "guest", avatar: null };
+    } catch (e) { return { name: "Patient", id: "guest", avatar: null }; }
+  });
   const [messages, setMessages] = useState<any[]>([
     {
       id: "welcome",
@@ -69,11 +74,16 @@ export default function SymptomChecker() {
         const res = await fetch(`${API_BASE_URL}/register-patient?id=${authUser.userId}`);
         if (res.ok) {
           const profile = await res.json();
-          setUser({
+          const userData = {
             name: profile.name || "Patient",
             id: authUser.userId,
             avatar: profile.avatar
-          });
+          };
+          setUser(userData);
+
+          // 🟢 FIX: Update Storage Safely
+          const currentLocal = JSON.parse(localStorage.getItem('user') || '{}');
+          localStorage.setItem('user', JSON.stringify({ ...currentLocal, ...userData }));
         }
       } catch (err) {
         console.warn("Auth load failed, using guest mode");
@@ -135,12 +145,17 @@ export default function SymptomChecker() {
       if (response.ok) {
         const data = await response.json();
 
-        // CHECK FOR INTERNAL AWS ERRORS IN DATA
-        if (data.assessment && data.assessment.risk !== "Error") {
-          riskLevel = data.assessment.risk;
-          aiContent = `Risk Assessment: ${riskLevel}\n\n${data.assessment.reason}`;
+        // 1. FIX: Check for 'risk_analysis' (from Lambda) OR 'assessment' (old way)
+        const result = data.risk_analysis || data.assessment;
+
+        if (result && result.risk !== "Error") {
+          riskLevel = result.risk;
+
+          // 2. VIDEO FEATURE: Show which Cloud provided the answer
+          const providerName = data.provider || "AWS Bedrock";
+          aiContent = `[System: ${providerName}]\n\nRisk: ${riskLevel}\n${result.reason}`;
+
         } else {
-          // AWS Limit Reached inside Lambda logic
           throw new Error("AI Service Limit");
         }
       } else {

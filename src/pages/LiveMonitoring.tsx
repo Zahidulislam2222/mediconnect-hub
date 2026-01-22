@@ -11,7 +11,9 @@ import {
     User,
     ArrowLeft,
     Loader2,
-    Clock
+    Clock,
+    Users,       // Added
+    ArrowRight   // Added
 } from "lucide-react";
 import {
     AreaChart,
@@ -28,7 +30,7 @@ import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { getCurrentUser, signOut } from 'aws-amplify/auth';
+import { getCurrentUser, signOut, fetchAuthSession } from 'aws-amplify/auth'; // 🟢 Added fetchAuthSession
 
 const API_URL = import.meta.env.VITE_API_BASE_URL || "";
 
@@ -69,18 +71,91 @@ export default function LiveMonitoring() {
     const location = useLocation();
     const { toast } = useToast();
 
+    // 🟢 FIX: Define patientId HERE (At the very top)
+    const queryParams = new URLSearchParams(location.search);
+    const patientId = queryParams.get("patientId");
+
     // Refs
     const pollingRef = useRef<NodeJS.Timeout | null>(null);
     const isPageVisible = useRef(true);
 
     // --- STATE ---
-    // Doctor Profile (Required for Layout)
-    const [doctorProfile, setDoctorProfile] = useState(() => {
+    // Doctor Profile
+    const [doctorProfile] = useState(() => {
         const saved = localStorage.getItem('user');
         return saved ? JSON.parse(saved) : { name: "Doctor", avatar: null, role: "doctor" };
     });
 
-    // Patient Data
+    // --- REAL DATA STATE ---
+    const [myPatients, setMyPatients] = useState<any[]>([]);
+    const [isListLoading, setIsListLoading] = useState(true);
+
+    // --- FETCH REAL PATIENTS (AUTHENTICATED) ---
+    useEffect(() => {
+        const fetchMyList = async () => {
+            try {
+                // 1. Get Current User & Credentials from Amplify
+                const currentUser = await getCurrentUser();
+                const session = await fetchAuthSession();
+                const token = session.tokens?.idToken?.toString(); // 🟢 Get the security token
+
+                // 2. Determine Doctor ID (User ID)
+                // Use the ID from Amplify, which is safer than localStorage
+                const doctorId = currentUser.userId || currentUser.username;
+
+                console.log("🔍 Fetching list for Doctor:", doctorId);
+
+                // 3. Fetch with Headers (The Fix)
+                const response = await fetch(`${API_URL}/doctor-appointments?doctorId=${doctorId}`, {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${token}`, // 🟢 REQUIRED for API Gateway
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    console.log("📦 API Data:", data);
+
+                    // 4. Extract 'existingBookings' (Confirmed by your Lambda Code)
+                    const bookingList = data.existingBookings || [];
+
+                    // 5. Filter Unique Patients
+                    const uniquePatientsMap = new Map();
+
+                    bookingList.forEach((appt: any) => {
+                        // Ensure we rely on the correct field 'patientId'
+                        if (appt.patientId && !uniquePatientsMap.has(appt.patientId)) {
+                            uniquePatientsMap.set(appt.patientId, {
+                                id: appt.patientId,
+                                name: appt.patientName || "Unknown Patient",
+                                status: "Offline",
+                                lastVitals: "Waiting..."
+                            });
+                        }
+                    });
+
+                    setMyPatients(Array.from(uniquePatientsMap.values()));
+                } else {
+                    console.error("❌ API Error:", response.status);
+                }
+            } catch (e) {
+                console.error("❌ Network Error:", e);
+            } finally {
+                setIsListLoading(false);
+            }
+        };
+
+        // Trigger logic
+        if (!patientId) {
+            fetchMyList();
+        } else {
+            setIsListLoading(false);
+        }
+    }, [patientId]);
+
+    // Patient Detail Data
     const [patient, setPatient] = useState<PatientProfile | null>(null);
     const [vitals, setVitals] = useState<VitalReading[]>([]);
     const [loading, setLoading] = useState(true);
@@ -89,11 +164,7 @@ export default function LiveMonitoring() {
     const [useSimulation, setUseSimulation] = useState(false);
     const [emergencyLoading, setEmergencyLoading] = useState(false);
 
-    // Get Patient ID
-    const queryParams = new URLSearchParams(location.search);
-    const patientId = queryParams.get("patientId") || location.state?.patientId || "p-101";
-
-    // --- MOCK GENERATORS (Moved Up for Scope Access) ---
+    // --- MOCK GENERATORS ---
     const generateMockReading = (): VitalReading => {
         const now = new Date();
         const baseHr = 75;
@@ -125,20 +196,25 @@ export default function LiveMonitoring() {
     useEffect(() => {
         const handleVisibilityChange = () => {
             isPageVisible.current = document.visibilityState === "visible";
-            if (isPageVisible.current) {
+            if (isPageVisible.current && patientId) {
                 fetchLatestVitals();
             }
         };
         document.addEventListener("visibilitychange", handleVisibilityChange);
         return () => document.removeEventListener("visibilitychange", handleVisibilityChange);
-    }, []);
+    }, [patientId]);
 
     // --- 2. INITIAL LOAD ---
     useEffect(() => {
-        fetchInitialData();
-        pollingRef.current = setInterval(() => {
-            if (isPageVisible.current) fetchLatestVitals();
-        }, 5000);
+        // Only fetch if an ID is selected
+        if (patientId) {
+            fetchInitialData();
+            pollingRef.current = setInterval(() => {
+                if (isPageVisible.current) fetchLatestVitals();
+            }, 5000);
+        } else {
+            setLoading(false); // Stop loading if showing list
+        }
 
         return () => {
             if (pollingRef.current) clearInterval(pollingRef.current);
@@ -153,6 +229,8 @@ export default function LiveMonitoring() {
 
     // --- 3. DATA FETCHING ---
     const fetchInitialData = async () => {
+        if (!patientId) return;
+
         try {
             setLoading(true);
             await getCurrentUser();
@@ -195,6 +273,8 @@ export default function LiveMonitoring() {
     };
 
     const fetchLatestVitals = useCallback(async () => {
+        if (!patientId) return;
+
         if (useSimulation) {
             setVitals(prev => {
                 const newPoint = generateMockReading();
@@ -229,7 +309,6 @@ export default function LiveMonitoring() {
                 timestamp: item.timestamp,
                 heartRate: hr,
                 temperature: item.temperature ? Number(item.temperature) : undefined,
-                // 🟢 FIX 1: Explicitly cast the status string to match the type union
                 status: (hr > 100 ? 'CRITICAL' : hr > 90 ? 'WARNING' : 'NORMAL') as 'NORMAL' | 'WARNING' | 'CRITICAL'
             };
         }).sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
@@ -247,23 +326,22 @@ export default function LiveMonitoring() {
         setLastUpdated(new Date());
     };
 
-    // --- 5. EMERGENCY ACTION HANDLER (REAL) ---
+    // --- 5. EMERGENCY ACTION HANDLER ---
     const handleEmergencyDispatch = async () => {
+        if (!patientId) return;
         setEmergencyLoading(true);
         try {
-            // CALL THE REAL BACKEND
             const response = await fetch(`${API_URL}/emergency`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     patientId: patientId,
-                    type: 'MANUAL_OVERRIDE', // Triggers the logic
+                    type: 'MANUAL_OVERRIDE',
                     heartRate: latestVital?.heartRate || 0
                 })
             });
 
             if (!response.ok) throw new Error("Dispatch failed");
-
             const data = await response.json();
 
             toast({
@@ -279,12 +357,84 @@ export default function LiveMonitoring() {
         }
     };
 
-    // --- RENDER ---
+    // --- VIEW 1: PATIENT LIST (MASTER VIEW) ---
+    if (!patientId) {
+        return (
+            <DashboardLayout
+                title="Live Monitoring"
+                subtitle="Select a patient to view real-time telemetry"
+                userRole="doctor"
+                userName={doctorProfile.name}
+                userAvatar={doctorProfile.avatar}
+                onLogout={handleLogout}
+            >
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 animate-fade-in">
+
+                    {/* SHOW LOADING SKELETON */}
+                    {isListLoading && (
+                        <div className="col-span-3 text-center py-10 text-muted-foreground">
+                            <Loader2 className="h-8 w-8 animate-spin mx-auto mb-2" />
+                            <p>Loading your patients...</p>
+                        </div>
+                    )}
+
+                    {/* SHOW REAL PATIENTS */}
+                    {!isListLoading && myPatients.length > 0 && myPatients.map((pt) => (
+                        <Card
+                            key={pt.id}
+                            className="hover:shadow-lg transition-all cursor-pointer border-l-4 border-l-blue-500 hover:scale-105"
+                            onClick={() => navigate(`/live-monitoring?patientId=${pt.id}`)}
+                        >
+                            {/* 1. Header: Just say "Patient" (Removed the ugly ID) */}
+                            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                                <CardTitle className="text-sm font-medium text-muted-foreground">
+                                    Patient
+                                </CardTitle>
+                                <WifiOff className="h-4 w-4 text-gray-300" />
+                            </CardHeader>
+
+                            <CardContent>
+                                <div className="flex items-center gap-4 mt-2">
+                                    <Avatar className="h-12 w-12 border-2 border-blue-50">
+                                        <AvatarFallback className="bg-blue-100 text-blue-700 font-bold text-lg">
+                                            {getInitials(pt.name)}
+                                        </AvatarFallback>
+                                    </Avatar>
+                                    <div>
+                                        {/* 2. Content: Only show Name (Removed the ID line below) */}
+                                        <div className="text-xl font-bold capitalize">{pt.name}</div>
+                                        <p className="text-xs text-green-600 font-medium mt-1">
+                                            Click to Monitor
+                                        </p>
+                                    </div>
+                                </div>
+                                <Button className="w-full mt-4" variant="secondary">
+                                    View Vitals <ArrowRight className="ml-2 h-4 w-4" />
+                                </Button>
+                            </CardContent>
+                        </Card>
+                    ))}
+
+                    {/* SHOW EMPTY STATE (If no appointments found) */}
+                    {!isListLoading && myPatients.length === 0 && (
+                        <div className="col-span-3 text-center py-10 border-2 border-dashed rounded-xl bg-muted/20">
+                            <Users className="h-10 w-10 mx-auto text-muted-foreground mb-3" />
+                            <h3 className="text-lg font-semibold">No Patients Found</h3>
+                            <p className="text-sm text-muted-foreground">
+                                You have no appointments scheduled. Patients will appear here once they book a slot.
+                            </p>
+                        </div>
+                    )}
+                </div></DashboardLayout>
+        );
+    }
+
+    // --- VIEW 2: MONITORING DASHBOARD (DETAIL VIEW) ---
+    // Extract vital logic for view
     const latestVital = vitals.length > 0 ? vitals[vitals.length - 1] : null;
     const isCritical = latestVital && latestVital.status === 'CRITICAL';
 
     if (loading) {
-        // 🟢 FIX 2: Pass required props to DashboardLayout even in loading state
         return (
             <DashboardLayout
                 title="Live Monitoring"
@@ -306,7 +456,6 @@ export default function LiveMonitoring() {
     }
 
     return (
-        // 🟢 FIX 3: Pass required props to DashboardLayout in main return
         <DashboardLayout
             title="Live Patient Monitoring"
             subtitle={`Real-time telemetry for ${patient?.name}`}
@@ -320,7 +469,8 @@ export default function LiveMonitoring() {
                 {/* HEADER BAR */}
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-card p-4 rounded-xl border shadow-sm">
                     <div className="flex items-center gap-4">
-                        <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
+                        {/* UPDATE: Back Button now clears the ID to show list */}
+                        <Button variant="ghost" size="icon" onClick={() => navigate("/live-monitoring")}>
                             <ArrowLeft className="h-5 w-5" />
                         </Button>
                         <Avatar className="h-12 w-12 border-2 border-primary/10">

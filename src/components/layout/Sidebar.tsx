@@ -39,22 +39,23 @@ const patientNavItems = [
   { icon: LayoutDashboard, label: "Dashboard", path: "/dashboard" },
   { icon: Calendar, label: "Appointments", path: "/appointments" },
   { icon: CreditCard, label: "Billing", path: "/billing" },
-  { icon: Brain, label: "Symptom Checker", path: "/symptom-checker" },
   { icon: Video, label: "Consultation", path: "/consultation" },
+  { icon: Brain, label: "Symptom Checker", path: "/symptom-checker" },
   { icon: FileText, label: "Health Records", path: "/healthRecords" },
   { icon: Pill, label: "Pharmacy", path: "/pharmacy" },
+  { icon: MessageSquare, label: "Messages", path: "/messages" },
   { icon: BookOpen, label: "Knowledge Base", path: "/knowledge" },
 ];
 
 const doctorNavItems = [
   { icon: LayoutDashboard, label: "Dashboard", path: "/doctor-dashboard" },
   { icon: Users, label: "Patient Queue", path: "/patient-queue" },
-  { icon: Video, label: "Consultation", path: "/consultation" },
   { icon: BarChart3, label: "Analytics", path: "/analytics" },
+  { icon: Video, label: "Consultation", path: "/consultation" },
   { icon: Activity, label: "Live Monitoring", path: "/live-monitoring" },
   { icon: FileText, label: "Patient Records", path: "/patient-records" },
   { icon: Pill, label: "Prescriptions", path: "/prescriptions" },
-  { icon: MessageSquare, label: "Messages", path: "/messages" },
+  { icon: MessageSquare, label: "Messages", path: "/doctor/messages" },
   { icon: BookOpen, label: "Knowledge Base", path: "/knowledge" },
 ];
 
@@ -177,7 +178,7 @@ export function Sidebar({ userRole, userName, userAvatar, onLogout, className }:
 
             {/* 🟢 2. If no photo, use initials (but ensure we don't print a URL string) */}
             <AvatarFallback className="bg-primary/10 text-primary text-sm font-medium">
-              {userAvatar && !userAvatar.includes('http') ? userAvatar : userName.substring(0, 2).toUpperCase()}
+              {(userName || "User").substring(0, 2).toUpperCase()}
             </AvatarFallback>
           </Avatar>
 

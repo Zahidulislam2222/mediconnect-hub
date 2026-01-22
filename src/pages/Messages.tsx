@@ -1,19 +1,20 @@
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { getCurrentUser, signOut } from 'aws-amplify/auth';
+import { getCurrentUser, signOut, fetchAuthSession } from 'aws-amplify/auth';
 import {
-    Search, Send, Phone, Video, MoreVertical,
-    Image as ImageIcon, Paperclip, Loader2, Calendar, ChevronLeft
+    Search, Send, Video, ChevronLeft, Calendar
 } from "lucide-react";
 
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 
-const API_URL = import.meta.env.VITE_API_BASE_URL || "";
+// 🔒 SECURITY: Env vars prevent hardcoding
+const API_URL = import.meta.env.VITE_API_BASE_URL;
+const WS_URL = import.meta.env.VITE_WEBSOCKET_API_URL;
 
 export default function Messages() {
     const navigate = useNavigate();
@@ -22,409 +23,353 @@ export default function Messages() {
 
     // --- STATE ---
     const [user, setUser] = useState<any>({ name: "", id: "", role: "" });
-    const [rawAppointments, setRawAppointments] = useState<any[]>([]);
+    const [contacts, setContacts] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(true);
+
+    // WebSocket State
+    const [socket, setSocket] = useState<WebSocket | null>(null);
+    const [isConnected, setIsConnected] = useState(false);
 
     // UI State
     const [activeContactId, setActiveContactId] = useState<string | null>(null);
     const [searchQuery, setSearchQuery] = useState("");
     const [inputText, setInputText] = useState("");
 
-    // Local Chat History (Simulates persistence since we lack a Chat DB)
+    // 💾 MEMORY: Stores messages by contactId { "user123": [msg1, msg2] }
     const [chatHistory, setChatHistory] = useState<Record<string, any[]>>({});
 
-    // --- 1. INITIAL LOAD ---
-    useEffect(() => {
-        loadData();
-    }, []);
-
-    // Scroll to bottom when messages change
+    // 📜 AUTO-SCROLL: Whenever history changes, scroll to bottom
     useEffect(() => {
         if (scrollRef.current) {
             scrollRef.current.scrollIntoView({ behavior: "smooth" });
         }
     }, [chatHistory, activeContactId]);
 
-    const loadData = async () => {
-        try {
-            const authUser = await getCurrentUser();
-            // Fetch User Profile to get Name/Role
-            // We use the register-doctor endpoint as it returns the comprehensive profile
-            const profileRes = await fetch(`${API_URL}/register-doctor?id=${authUser.userId}`);
-            let profile = { name: "User", role: "patient", avatar: null };
-
-            if (profileRes.ok) {
-                const data = await profileRes.json();
-                // Handle different lambda return structures
-                const pData = data.doctors?.find((d: any) => d.doctorId === authUser.userId) || data;
-                profile = {
-                    name: pData.name || "User",
-                    role: pData.role || "patient",
-                    avatar: pData.avatar || null
-                };
-            }
-
-            setUser({ ...profile, id: authUser.userId });
-
-            // Fetch Appointment History (To build Contact List)
-            // Logic: Doctor fetches by doctorId, Patient fetches by patientId
-            const isDoctor = ['doctor', 'provider'].includes((profile.role || '').toLowerCase());
-            const paramKey = isDoctor ? 'doctorId' : 'patientId';
-            const scheduleRes = await fetch(`${API_URL}/doctor-schedule?${paramKey}=${authUser.userId}`);
-
-            if (scheduleRes.ok) {
-                const items = await scheduleRes.json();
-                setRawAppointments(Array.isArray(items) ? items : []);
-            }
-
-        } catch (err) {
-            console.error("Load Error", err);
-            toast({ variant: "destructive", title: "Connection Error", description: "Could not load contacts." });
-        } finally {
-            setIsLoading(false);
-        }
-    };
-
-    // --- 2. CONTACT LIST BUILDER (The Logic Core) ---
-    const contacts = useMemo(() => {
-        if (!user.id || rawAppointments.length === 0) return [];
-
-        const uniqueMap = new Map();
-
-        rawAppointments.forEach((apt) => {
-            // Determine "The Other Person"
-            const isMeDoctor = user.role === 'doctor';
-            const contactId = isMeDoctor ? apt.patientId : apt.doctorId;
-            const contactName = isMeDoctor ? apt.patientName : apt.doctorName;
-
-            // Skip invalid records
-            if (!contactId || !contactName) return;
-
-            // Update only if this appointment is newer than what we have stored
-            // OR if we haven't seen this person yet
-            const existing = uniqueMap.get(contactId);
-            const aptDate = new Date(apt.timeSlot || apt.createdAt);
-
-            if (!existing || new Date(existing.lastInteraction) < aptDate) {
-                uniqueMap.set(contactId, {
-                    id: contactId,
-                    name: contactName, // Raw name from DB (e.g., "ZAPA" or "Dr. Smith")
-                    role: isMeDoctor ? "Patient" : "Doctor", // Static based on relationship
-                    lastInteraction: apt.timeSlot || apt.createdAt,
-                    avatar: null, // Appointments table doesn't have avatars, fallback to initials
-                    status: apt.status
-                });
-            }
-        });
-
-        // Convert Map to Array & Sort by Date (Newest first)
-        let list = Array.from(uniqueMap.values()).sort((a, b) =>
-            new Date(b.lastInteraction).getTime() - new Date(a.lastInteraction).getTime()
-        );
-
-        // Client-side Search Filter
-        if (searchQuery.trim()) {
-            const lowerQ = searchQuery.toLowerCase();
-            list = list.filter(c => c.name.toLowerCase().includes(lowerQ));
-        }
-
-        return list;
-    }, [rawAppointments, user.role, user.id, searchQuery]);
-
-    // Select first contact automatically if none selected
+    // --- 1. INITIALIZATION (Load User & Contacts) ---
     useEffect(() => {
-        if (!activeContactId && contacts.length > 0) {
-            setActiveContactId(contacts[0].id);
-        }
-    }, [contacts, activeContactId]);
+        const init = async () => {
+            try {
+                // A. Get User Identity
+                const authUser = await getCurrentUser();
+                const session = await fetchAuthSession();
+                const token = session.tokens?.idToken?.toString();
 
-    // --- 3. HELPER FUNCTIONS ---
+                // (Fallback to local storage for display name/role if DB fetch hasn't happened yet)
+                const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
+                const currentRole = storedUser.role || 'patient';
+                const isDoctor = currentRole === 'doctor';
 
-    // Smart Initials: "Dr. John Smith" -> "JS", "ZAPA" -> "ZA"
-    const getInitials = (name: string) => {
-        if (!name) return "??";
-        const clean = name.replace(/Dr\.\s?/i, "").trim();
-        const parts = clean.split(" ");
+                setUser({
+                    name: storedUser.name || "User",
+                    id: authUser.userId,
+                    role: currentRole,
+                    token: token,
+                    // 👇 Ensure this is here too
+                    avatar: storedUser.avatar || null
+                });
 
-        if (parts.length === 1) return clean.substring(0, 2).toUpperCase();
-        return (parts[0][0] + parts[1][0]).toUpperCase();
-    };
+                // B. Build Contact List from Appointments
+                // This replaces the "Mock Data" with real people you actually have business with.
+                const paramKey = isDoctor ? 'doctorId' : 'patientId';
+                const res = await fetch(`${API_URL}/doctor-appointments?${paramKey}=${authUser.userId}`, {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
 
-    const formatTime = (isoString: string) => {
-        if (!isoString) return "";
-        const date = new Date(isoString);
-        const now = new Date();
-        const isToday = date.toDateString() === now.toDateString();
+                if (res.ok) {
+                    const data = await res.json();
+                    const rawList = data.existingBookings || [];
 
-        return isToday
-            ? date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-            : date.toLocaleDateString([], { month: 'short', day: 'numeric' });
-    };
+                    // Deduplicate Contacts (A patient might have 5 appointments with the same doctor)
+                    const uniqueMap = new Map();
+                    rawList.forEach((apt: any) => {
+                        const contactId = isDoctor ? apt.patientId : apt.doctorId;
+                        const contactName = isDoctor ? apt.patientName : apt.doctorName;
 
-    // --- 4. CHAT ACTIONS ---
-    const handleSendMessage = () => {
-        if (!inputText.trim() || !activeContactId) return;
+                        // 👇 UPDATE THIS LINE
+                        if (!contactId || !contactName) return;
 
-        const newMessage = {
-            id: Date.now(),
-            senderId: user.id,
-            text: inputText,
-            time: new Date().toISOString()
+                        if (!uniqueMap.has(contactId)) {
+                            uniqueMap.set(contactId, {
+                                id: contactId,
+                                name: contactName,
+                                role: isDoctor ? "Patient" : "Doctor",
+                                lastInteraction: apt.timeSlot
+                            });
+                        }
+                    });
+                    setContacts(Array.from(uniqueMap.values()));
+                }
+
+            } catch (err) {
+                console.error("Init failed", err);
+                toast({ variant: "destructive", title: "Error", description: "Could not load contacts." });
+            } finally {
+                setIsLoading(false);
+            }
+        };
+        init();
+    }, []);
+
+    // --- 2. WEBSOCKET CONNECTION (The Live Line) ---
+    useEffect(() => {
+        if (!user.id || !WS_URL) return;
+
+        console.log("🔌 Connecting to WebSocket...");
+
+        // Phase 1: We pass userId in query params. 
+        // Phase 2 Preparation: We also pass the token (Lambda ignores it for now, but it's ready).
+        const ws = new WebSocket(`${WS_URL}?userId=${user.id}&token=${user.token}`);
+
+        ws.onopen = () => {
+            console.log("🟢 WS Connected");
+            setIsConnected(true);
         };
 
-        // Update Local State
+        ws.onmessage = (event) => {
+            try {
+                const msg = JSON.parse(event.data);
+                // Payload: { action, senderId, text, timestamp }
+
+                // Identify who sent this to us
+                const contactId = msg.senderId;
+
+                // Update Chat History
+                setChatHistory(prev => ({
+                    ...prev,
+                    [contactId]: [...(prev[contactId] || []), {
+                        id: Date.now(),
+                        senderId: msg.senderId,
+                        text: msg.text,
+                        time: msg.timestamp
+                    }]
+                }));
+            } catch (e) {
+                console.error("WS Parse Error", e);
+            }
+        };
+
+        ws.onclose = () => {
+            console.log("🔴 WS Disconnected");
+            setIsConnected(false);
+        };
+
+        setSocket(ws);
+
+        // CLEANUP: Close connection when user leaves the page
+        return () => {
+            ws.close();
+        };
+    }, [user.id]);
+
+    // --- 3. FETCH HISTORY (The Memory) ---
+    useEffect(() => {
+        if (!activeContactId || !user.id) return;
+
+        // If we already loaded history for this person, don't spam the API
+        if (chatHistory[activeContactId]?.length > 0) return;
+
+        const loadHistory = async () => {
+            try {
+                // 🔐 ALPHABETICAL SORT: This ensures Dr. Smith & Patient John always share the same ID.
+                // Example: "d-123#p-456"
+                const participants = [user.id, activeContactId].sort();
+                const conversationId = `${participants[0]}#${participants[1]}`;
+
+                // Call the NEW GET Endpoint
+                const res = await fetch(`${API_URL}/chat?conversationId=${conversationId}`);
+                if (res.ok) {
+                    const data = await res.json();
+
+                    // Format DynamoDB data for UI
+                    const formattedMessages = (data.messages || []).map((m: any) => ({
+                        id: m.timestamp,
+                        senderId: m.senderId,
+                        text: m.text,
+                        time: m.timestamp
+                    }));
+
+                    setChatHistory(prev => ({
+                        ...prev,
+                        [activeContactId]: formattedMessages
+                    }));
+                }
+            } catch (err) {
+                console.error("History load failed", err);
+            }
+        };
+
+        loadHistory();
+    }, [activeContactId, user.id]);
+
+    // --- 4. ACTION: SEND MESSAGE ---
+    const handleSendMessage = () => {
+        if (!inputText.trim() || !activeContactId || !socket) return;
+
+        const timestamp = new Date().toISOString();
+
+        const payload = {
+            action: "sendMessage", // Matches API Gateway Route
+            senderId: user.id,
+            recipientId: activeContactId,
+            text: inputText
+        };
+
+        // A. Send to AWS
+        socket.send(JSON.stringify(payload));
+
+        // B. Optimistic Update (Show it immediately!)
         setChatHistory(prev => ({
             ...prev,
-            [activeContactId]: [...(prev[activeContactId] || []), newMessage]
+            [activeContactId]: [...(prev[activeContactId] || []), {
+                id: Date.now(),
+                senderId: user.id,
+                text: inputText,
+                time: timestamp
+            }]
         }));
 
         setInputText("");
-
-        // Simulate "Read" status or simple confirmation
-        setTimeout(() => {
-            if (scrollRef.current) scrollRef.current.scrollIntoView({ behavior: "smooth" });
-        }, 100);
     };
 
-    const handleLogout = async () => {
-        await signOut();
-        navigate("/");
+    // --- HELPERS ---
+    const getInitials = (name: string) => {
+        if (!name) return "??";
+        return name.split(" ").map(n => n[0]).join("").substring(0, 2).toUpperCase();
     };
 
-    // Get Active Contact Object
-    const activeContact = contacts.find(c => c.id === activeContactId);
+    const formatTime = (iso: string) => {
+        if (!iso) return "";
+        return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    };
 
-    // Get Messages for Active Contact (Merge System Messages from Appointments)
-    const activeMessages = useMemo(() => {
-        if (!activeContactId) return [];
-
-        // 1. User Typed Messages
-        const userMsgs = chatHistory[activeContactId] || [];
-
-        // 2. System Messages derived from Appointments (Context)
-        // Find all appointments for this specific contact
-        const contactApts = rawAppointments.filter(a =>
-            a.patientId === activeContactId || a.doctorId === activeContactId
-        );
-
-        const systemMsgs = contactApts.map(a => ({
-            id: `sys-${a.appointmentId}`,
-            senderId: "system",
-            text: `Appointment ${a.status}: ${new Date(a.timeSlot).toLocaleString()}`,
-            time: a.createdAt || a.timeSlot,
-            isSystem: true
-        }));
-
-        // Merge and Sort
-        return [...systemMsgs, ...userMsgs].sort((a, b) =>
-            new Date(a.time).getTime() - new Date(b.time).getTime()
-        );
-
-    }, [activeContactId, chatHistory, rawAppointments]);
-
-    // --- SKELETON LOADERS ---
-    const SidebarSkeleton = () => (
-        <div className="p-4 flex items-center gap-3 border-l-4 border-transparent">
-            <div className="h-10 w-10 rounded-full bg-muted animate-pulse" />
-            <div className="space-y-2 flex-1">
-                <div className="h-3 w-24 bg-muted animate-pulse rounded" />
-                <div className="h-2 w-16 bg-muted animate-pulse rounded" />
-            </div>
-        </div>
-    );
+    const activeMessages = chatHistory[activeContactId] || [];
 
     return (
         <DashboardLayout
             title="Messages"
-            subtitle="Secure communication history"
+            subtitle={isConnected ? "Live Secure Connection" : "Connecting..."}
             userRole={user.role}
             userName={user.name}
             userAvatar={user.avatar}
-            onLogout={handleLogout}
+            onLogout={() => { signOut(); navigate('/'); }}
         >
-            <div className="h-[calc(100vh-12rem)] min-h-[500px] flex rounded-xl overflow-hidden border border-border/50 bg-card shadow-sm animate-fade-in">
+            <div className="h-[calc(100vh-12rem)] min-h-[500px] flex rounded-xl overflow-hidden border border-border/50 bg-card shadow-sm">
 
-                {/* 1. SIDEBAR (Contact List) */}
+                {/* SIDEBAR: CONTACT LIST */}
                 <div className={cn(
-                    "border-r border-border/50 bg-slate-50/50 flex flex-col transition-all",
-                    "w-full md:w-80",
+                    "border-r border-border/50 bg-slate-50/50 flex flex-col w-full md:w-80 transition-all",
                     activeContactId ? "hidden md:flex" : "flex"
                 )}>
-                    <div className="p-4 border-b border-border/50 bg-white">
+                    <div className="p-4 border-b bg-white">
                         <div className="relative">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                            <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
                             <Input
                                 placeholder="Search contacts..."
                                 className="pl-9 bg-slate-50"
                                 value={searchQuery}
-                                onChange={(e) => setSearchQuery(e.target.value)}
+                                onChange={e => setSearchQuery(e.target.value)}
                             />
                         </div>
                     </div>
-
                     <div className="flex-1 overflow-y-auto">
-                        {isLoading ? (
-                            <>
-                                <SidebarSkeleton /><SidebarSkeleton /><SidebarSkeleton />
-                            </>
-                        ) : contacts.length === 0 ? (
-                            <div className="p-8 text-center text-muted-foreground text-sm">
-                                <p>No contacts found.</p>
-                                <p className="text-xs mt-1">Book an appointment to start chatting.</p>
-                            </div>
-                        ) : (
-                            contacts.map((contact) => (
-                                <div
-                                    key={contact.id}
-                                    className={cn(
-                                        "p-4 flex items-center gap-3 cursor-pointer hover:bg-white transition-colors border-l-4 border-b border-b-slate-100",
-                                        activeContactId === contact.id
-                                            ? "bg-white border-l-primary shadow-sm"
-                                            : "border-l-transparent"
-                                    )}
-                                    onClick={() => setActiveContactId(contact.id)}
-                                >
-                                    <div className="relative">
-                                        <Avatar>
-                                            <AvatarImage src={contact.avatar} />
-                                            <AvatarFallback className="bg-indigo-100 text-indigo-700 font-semibold">
-                                                {getInitials(contact.name)}
-                                            </AvatarFallback>
-                                        </Avatar>
-                                        {/* Status Dot (Fake 'Online' for UI polish) */}
-                                        <span className="absolute bottom-0 right-0 h-3 w-3 rounded-full bg-green-500 border-2 border-white" />
-                                    </div>
-                                    <div className="flex-1 min-w-0">
-                                        <div className="flex justify-between items-start mb-0.5">
-                                            <span className="font-semibold text-sm truncate text-slate-900">{contact.name}</span>
-                                            <span className="text-[10px] text-muted-foreground whitespace-nowrap">
-                                                {formatTime(contact.lastInteraction)}
-                                            </span>
+                        {isLoading ? <div className="p-8 text-center text-sm text-muted-foreground">Loading Contacts...</div> :
+                            contacts.length === 0 ? <div className="p-8 text-center text-sm text-muted-foreground">No bookings found.</div> :
+                                contacts.map(c => (
+                                    <div
+                                        key={c.id}
+                                        onClick={() => setActiveContactId(c.id)}
+                                        className={cn(
+                                            "p-4 flex items-center gap-3 cursor-pointer hover:bg-white border-l-4 transition-colors",
+                                            activeContactId === c.id ? "bg-white border-primary shadow-sm" : "border-transparent"
+                                        )}
+                                    >
+                                        <Avatar><AvatarFallback className="bg-primary/10 text-primary">{getInitials(c.name)}</AvatarFallback></Avatar>
+                                        <div>
+                                            <p className="font-semibold text-sm text-slate-900">{c.name}</p>
+                                            <p className="text-xs text-muted-foreground">{c.role}</p>
                                         </div>
-                                        <p className="text-xs text-muted-foreground truncate flex items-center gap-1">
-                                            {contact.role}
-                                            {contact.status === 'COMPLETED' && <span className="text-green-600">• Completed</span>}
-                                        </p>
                                     </div>
-                                </div>
-                            ))
-                        )}
+                                ))}
                     </div>
                 </div>
 
-                {/* 2. CHAT AREA */}
-                <div className={cn(
-                    "flex-1 flex-col bg-white",
-                    !activeContactId ? "hidden md:flex" : "flex"
-                )}>
-                    {activeContact ? (
+                {/* CHAT AREA */}
+                <div className={cn("flex-1 flex-col bg-white", !activeContactId ? "hidden md:flex" : "flex")}>
+                    {activeContactId ? (
                         <>
                             {/* Header */}
-                            <div className="p-4 border-b border-border/50 flex items-center justify-between bg-white shadow-sm z-10">
+                            <div className="p-4 border-b flex justify-between items-center shadow-sm z-10">
                                 <div className="flex items-center gap-3">
-                                    {/* Mobile Back Button */}
-                                    <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        className="md:hidden -ml-2"
-                                        onClick={() => setActiveContactId(null)}
-                                    >
+                                    <Button variant="ghost" size="icon" className="md:hidden" onClick={() => setActiveContactId(null)}>
                                         <ChevronLeft className="h-5 w-5" />
                                     </Button>
-
-                                    <Avatar className="h-10 w-10">
-                                        <AvatarFallback className="bg-primary/10 text-primary font-bold">
-                                            {getInitials(activeContact.name)}
+                                    <Avatar className="h-8 w-8">
+                                        <AvatarFallback className="text-xs bg-primary/10">
+                                            {getInitials(contacts.find(c => c.id === activeContactId)?.name || "??")}
                                         </AvatarFallback>
                                     </Avatar>
                                     <div>
-                                        <h3 className="font-semibold text-sm">{activeContact.name}</h3>
-                                        <p className="text-xs text-green-600 flex items-center gap-1">
-                                            <span className="h-1.5 w-1.5 rounded-full bg-green-500"></span>
-                                            Available
-                                        </p>
+                                        <h3 className="font-semibold text-sm">
+                                            {contacts.find(c => c.id === activeContactId)?.name}
+                                        </h3>
+                                        <div className="flex items-center gap-1.5">
+                                            <span className={cn("h-1.5 w-1.5 rounded-full", isConnected ? "bg-green-500" : "bg-yellow-500")}></span>
+                                            <span className="text-[10px] text-muted-foreground">
+                                                {isConnected ? "Real-time" : "Connecting..."}
+                                            </span>
+                                        </div>
                                     </div>
                                 </div>
-                                <div className="flex gap-1">
-                                    <Button variant="ghost" size="icon" title="Audio Call">
-                                        <Phone className="h-4 w-4 text-muted-foreground" />
-                                    </Button>
-                                    <Button variant="ghost" size="icon" title="Video Call" onClick={() => navigate('/consultation')}>
-                                        <Video className="h-4 w-4 text-muted-foreground" />
-                                    </Button>
-                                    <Button variant="ghost" size="icon">
-                                        <MoreVertical className="h-4 w-4 text-muted-foreground" />
-                                    </Button>
-                                </div>
+                                <Button variant="outline" size="sm" onClick={() => navigate('/consultation')} className="gap-2">
+                                    <Video className="h-4 w-4" />
+                                    <span className="hidden sm:inline">Video Call</span>
+                                </Button>
                             </div>
 
-                            {/* Messages Body */}
-                            <div className="flex-1 p-4 overflow-y-auto space-y-4 bg-slate-50/30">
-                                {activeMessages.length === 0 ? (
+                            {/* Messages List */}
+                            <div className="flex-1 p-4 overflow-y-auto space-y-4 bg-slate-50/50">
+                                {activeMessages.length === 0 && (
                                     <div className="h-full flex flex-col items-center justify-center text-muted-foreground opacity-50">
-                                        <ImageIcon className="h-12 w-12 mb-2 stroke-1" />
-                                        <p>No messages yet</p>
+                                        <Calendar className="h-10 w-10 mb-2 stroke-1" />
+                                        <p className="text-sm">No messages yet. Say hello!</p>
                                     </div>
-                                ) : (
-                                    activeMessages.map((msg: any) => {
-                                        const isMe = msg.senderId === user.id;
-
-                                        if (msg.isSystem) {
-                                            return (
-                                                <div key={msg.id} className="flex justify-center my-4">
-                                                    <span className="text-[10px] bg-slate-100 text-slate-500 px-3 py-1 rounded-full border flex items-center gap-1">
-                                                        <Calendar className="h-3 w-3" />
-                                                        {msg.text}
-                                                    </span>
-                                                </div>
-                                            );
-                                        }
-
-                                        return (
-                                            <div
-                                                key={msg.id}
-                                                className={cn(
-                                                    "flex animate-in slide-in-from-bottom-2",
-                                                    isMe ? "justify-end" : "justify-start"
-                                                )}
-                                            >
-                                                <div
-                                                    className={cn(
-                                                        "max-w-[70%] rounded-2xl px-4 py-2 text-sm shadow-sm",
-                                                        isMe
-                                                            ? "bg-primary text-primary-foreground rounded-br-none"
-                                                            : "bg-white text-slate-800 border border-slate-100 rounded-bl-none"
-                                                    )}
-                                                >
-                                                    <p>{msg.text}</p>
-                                                    <span className={cn(
-                                                        "text-[10px] block text-right mt-1 opacity-70",
-                                                        isMe ? "text-primary-foreground" : "text-slate-400"
-                                                    )}>
-                                                        {formatTime(msg.time)}
-                                                    </span>
-                                                </div>
-                                            </div>
-                                        );
-                                    })
                                 )}
+                                {activeMessages.map((msg, i) => {
+                                    const isMe = msg.senderId === user.id;
+                                    return (
+                                        <div key={i} className={cn("flex animate-in slide-in-from-bottom-2", isMe ? "justify-end" : "justify-start")}>
+                                            <div className={cn(
+                                                "max-w-[75%] px-4 py-2 rounded-2xl text-sm shadow-sm",
+                                                isMe ? "bg-primary text-primary-foreground rounded-br-none" : "bg-white border border-slate-200 text-slate-800 rounded-bl-none"
+                                            )}>
+                                                <p>{msg.text}</p>
+                                                <span className={cn("text-[10px] block text-right mt-1 opacity-70", isMe ? "text-primary-foreground" : "text-muted-foreground")}>
+                                                    {formatTime(msg.time)}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    )
+                                })}
                                 <div ref={scrollRef} />
                             </div>
 
                             {/* Input Area */}
-                            <div className="p-4 border-t border-border/50 bg-white">
+                            <div className="p-4 border-t bg-white">
                                 <div className="flex items-center gap-2">
-                                    <Button variant="ghost" size="icon" className="shrink-0 text-muted-foreground hover:text-primary">
-                                        <Paperclip className="h-5 w-5" />
-                                    </Button>
                                     <Input
-                                        placeholder="Type a message..."
                                         value={inputText}
-                                        onChange={(e) => setInputText(e.target.value)}
-                                        onKeyDown={(e) => e.key === "Enter" && handleSendMessage()}
-                                        className="flex-1 bg-slate-50"
+                                        onChange={e => setInputText(e.target.value)}
+                                        onKeyDown={e => e.key === 'Enter' && handleSendMessage()}
+                                        placeholder="Type your message..."
+                                        className="bg-slate-50"
+                                        disabled={!isConnected}
                                     />
-                                    <Button size="icon" className="shrink-0 bg-primary shadow-sm" onClick={handleSendMessage}>
+                                    <Button
+                                        onClick={handleSendMessage}
+                                        size="icon"
+                                        disabled={!isConnected || !inputText.trim()}
+                                        className={cn("shrink-0", isConnected ? "bg-primary" : "bg-muted")}
+                                    >
                                         <Send className="h-4 w-4" />
                                     </Button>
                                 </div>
@@ -437,7 +382,7 @@ export default function Messages() {
                             </div>
                             <h3 className="font-semibold text-lg text-slate-700">Select a conversation</h3>
                             <p className="text-sm max-w-xs text-center mt-2">
-                                Choose a contact from the sidebar to start messaging or view history.
+                                Choose a contact from the sidebar to start messaging securely.
                             </p>
                         </div>
                     )}
