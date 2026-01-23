@@ -45,6 +45,8 @@ export default function DoctorDashboard() {
   const { toast } = useToast();
 
   const [appointments, setAppointments] = useState<any[]>([]);
+  // 🟢 NEW: Store real patient profiles here
+  const [patientDirectory, setPatientDirectory] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   const [doctorProfile, setDoctorProfile] = useState(() => {
@@ -74,7 +76,6 @@ export default function DoctorDashboard() {
       if (profileRes.ok) {
         const data = await profileRes.json();
         let myProfile = data.Item || (data.doctors ? data.doctors.find((d: any) => d.doctorId === userId) : data);
-
         if (myProfile && myProfile.name) {
           setDoctorProfile(prev => ({ ...prev, ...myProfile }));
           const currentLocal = JSON.parse(localStorage.getItem('user') || '{}');
@@ -88,7 +89,7 @@ export default function DoctorDashboard() {
         if (Array.isArray(data)) list = data;
         else if (data.existingBookings) list = data.existingBookings;
 
-        // 🟢 SMART FILTER: Filter for Today & Valid Data
+        // 1. FILTER APPOINTMENTS
         const startOfToday = new Date();
         startOfToday.setHours(0, 0, 0, 0);
         const endOfToday = new Date();
@@ -96,25 +97,39 @@ export default function DoctorDashboard() {
 
         const sorted = list
           .filter((a: any) => {
-            // 1. Strict Data Check
             if (!a.patientName || !a.timeSlot) return false;
             if (isNaN(new Date(a.timeSlot).getTime())) return false;
-
-            // 2. Status Check
             if (a.status === 'CANCELLED' || a.status === 'COMPLETED') return false;
-
-            // 3. Date Check (Today Only)
             const aptDate = new Date(a.timeSlot);
             return aptDate >= startOfToday && aptDate <= endOfToday;
           })
           .sort((a: any, b: any) => {
-            // Priority: Patient Arrived -> Time
             if (a.patientArrived && !b.patientArrived) return -1;
             if (!a.patientArrived && b.patientArrived) return 1;
             return new Date(a.timeSlot).getTime() - new Date(b.timeSlot).getTime();
           });
 
         setAppointments(sorted);
+
+        // 🟢 2. NEW: FETCH REAL PATIENT PROFILES (Source of Truth)
+        // We look at the appointments to find which patients we need to look up
+        const uniquePatientIds = [...new Set(sorted.map((a: any) => a.patientId))];
+
+        if (uniquePatientIds.length > 0) {
+          const profilePromises = uniquePatientIds.map(pid =>
+            fetch(`${API_URL}/register-patient?id=${pid}`, { headers: { 'Authorization': `Bearer ${token}` } })
+              .then(r => r.ok ? r.json() : null)
+          );
+
+          const profilesData = await Promise.all(profilePromises);
+
+          // Clean up the data structure (handle DynamoDB .Item or standard array)
+          const cleanProfiles = profilesData
+            .filter(p => p !== null)
+            .map((p: any) => p.Item || (p.patients ? p.patients[0] : p));
+
+          setPatientDirectory(cleanProfiles);
+        }
       }
 
     } catch (err) {
@@ -141,6 +156,17 @@ export default function DoctorDashboard() {
       <div className="h-8 w-16 bg-muted rounded"></div>
     </div>
   );
+
+  // 🟢 NEW: Helper to get Real Patient Data
+  const getPatientDetails = (apt: any) => {
+    // Try to find the patient in our fetched directory
+    const realProfile = patientDirectory.find((p: any) => p.userId === apt.patientId || p.id === apt.patientId);
+
+    return {
+      name: realProfile?.name || apt.patientName || "Unknown Patient",
+      avatar: realProfile?.avatar // This will now use the real uploaded photo!
+    };
+  };
 
   return (
     <DashboardLayout
@@ -224,62 +250,71 @@ export default function DoctorDashboard() {
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {appointments.map((apt: any) => (
-                    <div
-                      key={apt.appointmentId}
-                      className={cn(
-                        "flex items-center justify-between p-4 rounded-xl border transition-all bg-card group",
-                        apt.patientArrived ? "border-green-500/50 bg-green-50/10" : "border-border hover:shadow-md"
-                      )}
-                    >
-                      <div className="flex items-center gap-4">
-                        <div className="relative">
-                          <Avatar className="h-12 w-12 border-2 border-background shadow-sm">
-                            <AvatarFallback className="bg-primary/10 text-primary font-bold">
-                              {getInitials(apt.patientName)}
-                            </AvatarFallback>
-                          </Avatar>
-                          {/* 🟢 Patient Ready Indicator */}
-                          {apt.patientArrived && (
-                            <span className="absolute -bottom-1 -right-1 h-4 w-4 bg-green-500 border-2 border-white rounded-full animate-pulse shadow-sm" title="Patient Online" />
-                          )}
-                        </div>
-                        <div>
-                          <h4 className="font-semibold text-lg group-hover:text-primary transition-colors">{apt.patientName}</h4>
-                          <div className="flex items-center gap-3 text-sm text-muted-foreground mt-1">
-                            <span className="flex items-center gap-1 bg-muted px-2 py-0.5 rounded text-xs font-medium">
-                              <Clock className="h-3 w-3" />
-                              {new Date(apt.timeSlot).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                            </span>
-                            {apt.paymentStatus === 'paid' && (
-                              <span className="flex items-center gap-1 text-emerald-600 text-xs font-medium">
-                                <CreditCard className="h-3 w-3" /> Paid
-                              </span>
+                  {appointments.map((apt: any) => {
+                    // 🟢 Call the helper to get Real Name & Avatar
+                    const details = getPatientDetails(apt);
+
+                    return (
+                      <div
+                        key={apt.appointmentId}
+                        className={cn(
+                          "flex items-center justify-between p-4 rounded-xl border transition-all bg-card group",
+                          apt.patientArrived ? "border-green-500/50 bg-green-50/10" : "border-border hover:shadow-md"
+                        )}
+                      >
+                        <div className="flex items-center gap-4">
+                          <div className="relative">
+                            <Avatar className="h-12 w-12 border-2 border-background shadow-sm">
+                              {/* 🟢 Add the Image Component here */}
+                              <AvatarImage src={details.avatar} className="object-cover" />
+                              <AvatarFallback className="bg-primary/10 text-primary font-bold">
+                                {getInitials(details.name)}
+                              </AvatarFallback>
+                            </Avatar>
+
+                            {/* Patient Ready Indicator */}
+                            {apt.patientArrived && (
+                              <span className="absolute -bottom-1 -right-1 h-4 w-4 bg-green-500 border-2 border-white rounded-full animate-pulse shadow-sm" title="Patient Online" />
                             )}
-                            {apt.patientArrived && <span className="text-xs font-bold text-green-600">Online</span>}
+                          </div>
+                          <div>
+                            {/* 🟢 Use details.name instead of apt.patientName */}
+                            <h4 className="font-semibold text-lg group-hover:text-primary transition-colors">{details.name}</h4>
+                            <div className="flex items-center gap-3 text-sm text-muted-foreground mt-1">
+                              <span className="flex items-center gap-1 bg-muted px-2 py-0.5 rounded text-xs font-medium">
+                                <Clock className="h-3 w-3" />
+                                {new Date(apt.timeSlot).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                              </span>
+                              {apt.paymentStatus === 'paid' && (
+                                <span className="flex items-center gap-1 text-emerald-600 text-xs font-medium">
+                                  <CreditCard className="h-3 w-3" /> Paid
+                                </span>
+                              )}
+                              {apt.patientArrived && <span className="text-xs font-bold text-green-600">Online</span>}
+                            </div>
                           </div>
                         </div>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            size="sm"
+                            onClick={() => handleJoinConsultation(apt)}
+                            className={cn("shadow-sm", apt.patientArrived ? "bg-green-600 hover:bg-green-700 animate-pulse" : "bg-blue-600 hover:bg-blue-700")}
+                          >
+                            <Video className="h-4 w-4 mr-2" /> {apt.patientArrived ? "Join Now" : "Join"}
+                          </Button>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon"><MoreVertical className="h-4 w-4" /></Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem>View Patient Record</DropdownMenuItem>
+                              <DropdownMenuItem className="text-red-500">Cancel Appointment</DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <Button
-                          size="sm"
-                          onClick={() => handleJoinConsultation(apt)}
-                          className={cn("shadow-sm", apt.patientArrived ? "bg-green-600 hover:bg-green-700 animate-pulse" : "bg-blue-600 hover:bg-blue-700")}
-                        >
-                          <Video className="h-4 w-4 mr-2" /> {apt.patientArrived ? "Join Now" : "Join"}
-                        </Button>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon"><MoreVertical className="h-4 w-4" /></Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem>View Patient Record</DropdownMenuItem>
-                            <DropdownMenuItem className="text-red-500">Cancel Appointment</DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </CardContent>

@@ -21,7 +21,7 @@ export function PublicHeader() {
             if (profile && ['doctor', 'provider'].includes((profile.role || '').toLowerCase())) {
                 navigate('/doctor-dashboard'); // Go to Doctor Portal
             } else {
-                navigate('/dashboard'); // Default to Patient Portal
+                navigate('/patient-dashboard'); // Default to Patient Portal
             }
         } catch (error) {
             // This error means no user is signed in (Guest).

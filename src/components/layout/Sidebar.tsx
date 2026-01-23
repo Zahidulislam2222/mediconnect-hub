@@ -36,14 +36,14 @@ interface SidebarProps {
 }
 
 const patientNavItems = [
-  { icon: LayoutDashboard, label: "Dashboard", path: "/dashboard" },
+  { icon: LayoutDashboard, label: "Dashboard", path: "/patient-dashboard" },
   { icon: Calendar, label: "Appointments", path: "/appointments" },
   { icon: CreditCard, label: "Billing", path: "/billing" },
   { icon: Video, label: "Consultation", path: "/consultation" },
   { icon: Brain, label: "Symptom Checker", path: "/symptom-checker" },
   { icon: FileText, label: "Health Records", path: "/healthRecords" },
   { icon: Pill, label: "Pharmacy", path: "/pharmacy" },
-  { icon: MessageSquare, label: "Messages", path: "/messages" },
+  { icon: MessageSquare, label: "Messages", path: "/patient/messages" },
   { icon: BookOpen, label: "Knowledge Base", path: "/knowledge" },
 ];
 
@@ -150,7 +150,7 @@ export function Sidebar({ userRole, userName, userAvatar, onLogout, className }:
       {/* Settings & User */}
       <div className="p-3">
         <NavLink
-          to={userRole === 'doctor' ? "/doctor/settings" : "/settings"}
+          to={userRole === 'doctor' ? "/doctor/settings" : "/patient/settings"}
           className={cn(
             "nav-item",
             location.pathname === "/settings" ? "nav-item-active" : "nav-item-inactive",

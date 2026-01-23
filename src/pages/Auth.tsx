@@ -181,7 +181,7 @@ export default function Auth() {
       }));
 
       if (roleKey === 'doctor') navigate("/doctor-dashboard");
-      else navigate("/dashboard");
+      else navigate("/patient-dashboard");
 
       return true;
 
@@ -384,7 +384,7 @@ export default function Auth() {
           localStorage.setItem('user', JSON.stringify(currentUser));
           toast({ title: "Identity Verified", description: `Success!` });
           setTimeout(() => {
-            navigate("/dashboard");
+            navigate("/patient-dashboard");
           }, 1000);
         }
 
@@ -465,7 +465,7 @@ export default function Auth() {
     }));
 
     if (role === 'doctor') navigate("/doctor-dashboard");
-    else navigate("/dashboard");
+    else navigate("/patient-dashboard");
   };
 
   // 🟢 NEW: Full Screen Loading State

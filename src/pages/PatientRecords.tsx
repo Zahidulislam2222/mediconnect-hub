@@ -5,7 +5,7 @@ import {
     Search, FileText, Activity, Calendar, Clock,
     Save, Loader2, Brain, Thermometer, Heart,
     AlertTriangle, CheckCircle2, TrendingUp, User, ChevronLeft,
-    Image as ImageIcon, Plus, Server, Eye, Database, Upload
+    Image as ImageIcon, Plus, Server, Eye, Database, Upload, Lock
 } from "lucide-react";
 
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
@@ -298,6 +298,46 @@ export default function PatientRecords() {
         }
     };
 
+    // 🟢 NEW: Handle Secure File Viewing
+    const handleViewFile = async (s3Key: string) => {
+        if (!s3Key) return;
+
+        // 🟢 UX Check: Stop them before calling API if we already know they aren't approved
+        if (doctorProfile?.isOfficerApproved !== true) {
+            toast({ variant: "destructive", title: "Restricted", description: "You need Officer Approval to view scans." });
+            return;
+        }
+
+        toast({ title: "Opening File", description: "Verifying credentials..." });
+
+        try {
+            const res = await fetch(`${API_URL}/ehr`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    action: "get_view_url",
+                    s3Key: s3Key,
+                    doctorId: doctorProfile.doctorId // 🟢 SEND DOCTOR ID
+                })
+            });
+
+            const data = await res.json();
+
+            if (res.status === 403) {
+                throw new Error("Officer Approval Required");
+            }
+
+            if (data.viewUrl) {
+                window.open(data.viewUrl, '_blank');
+            } else {
+                throw new Error("No URL returned");
+            }
+        } catch (error) {
+            console.error("View Error:", error);
+            toast({ variant: "destructive", title: "Access Denied", description: error.message });
+        }
+    };
+
     return (
         <DashboardLayout
             title="Patient Records"
@@ -477,11 +517,22 @@ export default function PatientRecords() {
                                                                 <p className="text-xs font-semibold truncate">{doc.fileName}</p>
                                                                 <p className="text-[10px] text-muted-foreground">{new Date(doc.createdAt).toLocaleDateString()}</p>
                                                                 {/* Open Button */}
-                                                                {doc.s3Url && (
-                                                                    <a href={doc.s3Url} target="_blank" rel="noreferrer" className="absolute inset-0 bg-black/5 rounded-xl opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
-                                                                        <Button variant="secondary" size="icon" className="h-8 w-8 rounded-full shadow-sm"><Eye className="h-4 w-4" /></Button>
-                                                                    </a>
-                                                                )}
+                                                                <div
+                                                                    onClick={() => handleViewFile(doc.s3Key)}
+                                                                    className="absolute inset-0 bg-black/5 rounded-xl opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity cursor-pointer"
+                                                                >
+                                                                    {doctorProfile.isOfficerApproved === true ? (
+                                                                        /* ✅ APPROVED: Show Eye */
+                                                                        <Button variant="secondary" size="icon" className="h-8 w-8 rounded-full shadow-sm">
+                                                                            <Eye className="h-4 w-4" />
+                                                                        </Button>
+                                                                    ) : (
+                                                                        /* ❌ NOT APPROVED: Show Lock */
+                                                                        <Button variant="destructive" size="icon" className="h-8 w-8 rounded-full shadow-sm">
+                                                                            <Lock className="h-4 w-4" />
+                                                                        </Button>
+                                                                    )}
+                                                                </div>
                                                             </div>
                                                         ))}
                                                     </div>

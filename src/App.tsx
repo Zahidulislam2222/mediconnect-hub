@@ -61,15 +61,15 @@ const App = () => (
           {/* 🔒 PROTECTED ZONE - REQUIRES LOGIN + SIDEBAR            */}
           {/* ========================================================= */}
           {/* Patient Features */}
-          <Route path="/dashboard" element={<PatientDashboard />} />
+          <Route path="/patient-dashboard" element={<PatientDashboard />} />
           <Route path="/billing" element={<Billing />} />
           <Route path="/appointments" element={<Appointments />} />
           <Route path="/consultation" element={<ConsultationRoom />} />
           <Route path="/symptom-checker" element={<SymptomChecker />} />
           <Route path="/healthRecords" element={<HealthRecords />} />
           <Route path="/pharmacy" element={<Pharmacy />} />
-          <Route path="/messages" element={<Messages />} />
-          <Route path="/settings" element={<Settings />} />
+          <Route path="/patient/messages" element={<Messages />} />
+          <Route path="/patient/settings" element={<Settings />} />
 
           {/* Doctor Features */}
           <Route path="/doctor-dashboard" element={<DoctorDashboard />} />
