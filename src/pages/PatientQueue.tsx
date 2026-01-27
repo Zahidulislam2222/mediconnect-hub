@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { getCurrentUser, signOut } from 'aws-amplify/auth';
+import { getCurrentUser, signOut, fetchAuthSession } from 'aws-amplify/auth';
 import {
     Clock,
     CheckCircle2,
@@ -59,6 +59,7 @@ export default function PatientQueue() {
     const [isLoading, setIsLoading] = useState(true);
     const [processingId, setProcessingId] = useState<string | null>(null);
     const [showSummary, setShowSummary] = useState(false);
+    const [patientDirectory, setPatientDirectory] = useState<any[]>([]);
 
     const [doctorName, setDoctorName] = useState("Doctor");
     const [doctorAvatar, setDoctorAvatar] = useState<string | null>(null);
@@ -106,6 +107,22 @@ export default function PatientQueue() {
                 });
 
                 setFullHistory(validAppointments);
+
+                // 🟢 NEW: FETCH REAL PATIENT PROFILES
+                const uniquePatientIds = [...new Set(validAppointments.map((a: any) => a.patientId))];
+                if (uniquePatientIds.length > 0) {
+                    const session = await fetchAuthSession();
+                    const token = session.tokens?.idToken?.toString();
+
+                    const profilePromises = uniquePatientIds.map(pid =>
+                        fetch(`${API_URL}/register-patient?id=${pid}`, { headers: { 'Authorization': `Bearer ${token}` } })
+                            .then(r => r.ok ? r.json() : null)
+                    );
+
+                    const profilesData = await Promise.all(profilePromises);
+                    const cleanProfiles = profilesData.filter(p => p !== null).map((p: any) => p.Item || p);
+                    setPatientDirectory(cleanProfiles);
+                }
 
                 // 2. SPLIT QUEUES (Today vs Upcoming)
                 const today = new Date();
@@ -194,6 +211,7 @@ export default function PatientQueue() {
     };
 
     const renderCard = (patient: any, isUpcoming = false) => {
+        const realProfile = patientDirectory.find(p => p.patientId === patient.patientId);
         const aptDate = new Date(patient.timeSlot);
         const diffMs = Date.now() - aptDate.getTime();
         const diffMins = Math.floor(diffMs / 60000);
@@ -225,8 +243,7 @@ export default function PatientQueue() {
                             <HoverCardTrigger asChild>
                                 <div className="relative cursor-help">
                                     <Avatar className="h-14 w-14 border-2 border-background shadow-sm">
-                                        <AvatarImage src={patient.patientAvatar} alt={patient.patientName} />
-                                        <AvatarFallback className="bg-primary/10 text-primary font-bold text-lg">
+                                        <AvatarImage src={realProfile?.avatar} alt={patient.patientName} />                                        <AvatarFallback className="bg-primary/10 text-primary font-bold text-lg">
                                             {getInitials(patient.patientName)}
                                         </AvatarFallback>
                                     </Avatar>

@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 // --- STRIPE IMPORTS ---
 import { loadStripe } from '@stripe/stripe-js';
@@ -129,12 +130,30 @@ function AppointmentsContent() {
 
         async function getUser() {
             try {
+                const token = await getAuthToken(); // Use your helper
                 const attr = await fetchUserAttributes();
-                const u = {
+
+                // 1. Default User from Cognito
+                let u = {
                     id: attr.sub,
                     name: attr.name || attr.email,
                     avatar: ""
                 };
+
+                // 2. 🟢 TRY TO GET REAL PROFILE (With Signed Photo)
+                try {
+                    const res = await fetch(`${import.meta.env.VITE_API_BASE_URL}/register-patient?id=${attr.sub}`, {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                    if (res.ok) {
+                        const data = await res.json();
+                        // If backend returns item, use that avatar
+                        if (data.avatar) u.avatar = data.avatar;
+                    }
+                } catch (err) {
+                    console.log("Could not fetch profile photo");
+                }
+
                 setUser(u);
                 const currentLocal = JSON.parse(localStorage.getItem('user') || '{}');
                 localStorage.setItem('user', JSON.stringify({ ...currentLocal, ...u }));
@@ -491,6 +510,13 @@ function AppointmentsContent() {
                                     <Card key={i} className="hover:shadow-md transition-shadow">
                                         <CardContent className="p-6 flex flex-col md:flex-row justify-between items-center gap-4">
                                             <div className="flex gap-4 items-center">
+                                                {/* 🟢 NEW: DOCTOR AVATAR */}
+                                                <Avatar className="h-12 w-12 border shadow-sm">
+                                                    <AvatarImage src={docProfile?.avatar} className="object-cover" />
+                                                    <AvatarFallback>{docProfile?.name?.substring(0, 2).toUpperCase() || "DR"}</AvatarFallback>
+                                                </Avatar>
+
+                                                {/* Date Badge */}
                                                 <div className="bg-primary/10 p-3 rounded-lg text-primary text-center min-w-[60px]">
                                                     <div className="font-bold text-xl">{dateObj.getDate()}</div>
                                                     <div className="text-xs font-bold uppercase">{dateObj.toLocaleString('default', { month: 'short' })}</div>

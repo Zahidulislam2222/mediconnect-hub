@@ -455,15 +455,32 @@ export default function Auth() {
     }
   };
 
-  // Skip Dev Function
+  // --- SKIP / DEMO FUNCTION ---
   const handleSkip = () => {
     const role = userType === 'provider' ? 'doctor' : 'patient';
+
+    // 1. Mock the user in LocalStorage so the Dashboard doesn't kick you out
+    const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
     localStorage.setItem('user', JSON.stringify({
-      name: email.split('@')[0],
+      ...currentUser,
+      name: name || email.split('@')[0],
       email: email,
-      role: role
+      role: role,
+      // Add fake verification flags for the demo
+      isIdentityVerified: true,
+      identityStatus: 'VERIFIED',
+      diplomaUrl: 'demo-skip-url',
+      verificationStatus: 'PENDING'
     }));
 
+    // 2. LOGIC: If Doctor is on Identity Step -> Go to Diploma Step
+    if (role === 'doctor' && authStep === 'identity') {
+      setAuthStep("diploma-upload");
+      toast({ title: "Demo Step", description: "Identity skipped. Now on Diploma step." });
+      return;
+    }
+
+    // 3. LOGIC: If Patient OR (Doctor on Diploma Step) -> Go to Dashboard
     if (role === 'doctor') navigate("/doctor-dashboard");
     else navigate("/patient-dashboard");
   };

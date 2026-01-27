@@ -160,8 +160,7 @@ export default function DoctorDashboard() {
   // 🟢 NEW: Helper to get Real Patient Data
   const getPatientDetails = (apt: any) => {
     // Try to find the patient in our fetched directory
-    const realProfile = patientDirectory.find((p: any) => p.userId === apt.patientId || p.id === apt.patientId);
-
+    const realProfile = patientDirectory.find((p: any) => p.patientId === apt.patientId);
     return {
       name: realProfile?.name || apt.patientName || "Unknown Patient",
       avatar: realProfile?.avatar // This will now use the real uploaded photo!

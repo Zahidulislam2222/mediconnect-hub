@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
@@ -102,10 +102,31 @@ export default function Prescriptions() {
                         uniqueMap.set(apt.patientId, {
                             id: apt.patientId,
                             name: apt.patientName,
-                            lastVisit: apt.date
+                            lastVisit: apt.date,
+                            avatar: "" // Placeholder
                         });
                     }
                 });
+
+                // 🟢 NEW: Fetch real profiles to get the photos
+                const uniqueIds = Array.from(uniqueMap.keys());
+                if (uniqueIds.length > 0) {
+                    const profilePromises = uniqueIds.map(pid =>
+                        apiCall(`/register-patient?id=${pid}`).then(r => r.ok ? r.json() : null)
+                    );
+                    const profiles = await Promise.all(profilePromises);
+
+                    profiles.forEach(p => {
+                        if (p) {
+                            const profileData = p.Item || p;
+                            // Match by patientId or id depending on your DB structure
+                            const pid = profileData.patientId || profileData.id;
+                            if (uniqueMap.has(pid)) {
+                                uniqueMap.get(pid).avatar = profileData.avatar;
+                            }
+                        }
+                    });
+                }
                 setPatientList(Array.from(uniqueMap.values()));
             }
 
@@ -263,6 +284,8 @@ export default function Prescriptions() {
                                         >
                                             <CardContent className="p-4 flex items-center gap-4">
                                                 <Avatar className="h-12 w-12 border-2 border-white shadow-sm">
+                                                    {/* 🟢 NEW: Add AvatarImage here */}
+                                                    <AvatarImage src={patient.avatar} className="object-cover" />
                                                     <AvatarFallback className="bg-primary/10 text-primary font-bold">
                                                         {getInitials(patient.name)}
                                                     </AvatarFallback>
