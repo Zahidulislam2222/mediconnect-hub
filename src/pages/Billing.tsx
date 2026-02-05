@@ -23,7 +23,7 @@ import { Elements, CardElement, useStripe, useElements } from '@stripe/react-str
 
 // Initialize Stripe outside component to avoid recreation
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
+import { api } from "@/lib/api";
 
 export default function Billing() {
     return (
@@ -70,17 +70,13 @@ function BillingContent() {
 
             // Parallel Fetch for Speed
             const [profileRes, billingRes] = await Promise.allSettled([
-                fetch(`${API_BASE_URL}/register-patient?id=${userId}`, {
-                    headers: { 'Authorization': `Bearer ${token}` }
-                }),
-                fetch(`${API_BASE_URL}/billing?patientId=${userId}`, {
-                    headers: { 'Authorization': `Bearer ${token}` }
-                })
+                api.get(`/register-patient?id=${userId}`),
+                api.get(`/billing?patientId=${userId}`)
             ]);
 
             // 1. Update Profile (if needed)
-            if (profileRes.status === "fulfilled" && profileRes.value.ok) {
-                const profileJson = await profileRes.value.json();
+            if (profileRes.status === "fulfilled") {
+                const profileJson: any = profileRes.value;
                 const freshProfile = {
                     name: profileJson.name || attributes.name || "Patient",
                     avatar: profileJson.avatar || "",
@@ -92,8 +88,8 @@ function BillingContent() {
             }
 
             // 2. Update Billing Data
-            if (billingRes.status === "fulfilled" && billingRes.value.ok) {
-                const billingJson = await billingRes.value.json();
+            if (billingRes.status === "fulfilled") {
+                const billingJson: any = billingRes.value;
                 setBillingData(billingJson);
             } else {
                 console.error("Billing fetch failed");
@@ -146,21 +142,11 @@ function BillingContent() {
 
             // 2. Step 1: Create Payment Intent on Backend
             // We send the billId. The backend looks up the price securely.
-            const response = await fetch(`${API_BASE_URL}/pay-bill`, {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${token}`,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    billId: billToPay.billId, // Secure Reference
-                    patientId: userProfile.id
-                })
+            const paymentIntent: any = await api.post('/pay-bill', {
+                billId: billToPay.billId, // Secure Reference
+                patientId: userProfile.id
             });
 
-            if (!response.ok) throw new Error("Failed to initiate payment");
-
-            const paymentIntent = await response.json();
             const clientSecret = paymentIntent.client_secret;
 
             // 3. Step 2: Confirm Card Payment with Stripe

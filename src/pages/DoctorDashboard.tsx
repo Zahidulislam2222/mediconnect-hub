@@ -28,8 +28,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
-
-const API_URL = import.meta.env.VITE_API_BASE_URL || "";
+import { api } from "@/lib/api";
 
 // Helper: Smart Initials
 const getInitials = (name: string) => {
@@ -68,13 +67,13 @@ export default function DoctorDashboard() {
 
       if (!token) return;
 
-      const [profileRes, scheduleRes] = await Promise.all([
-        fetch(`${API_URL}/register-doctor?id=${userId}`, { headers: { 'Authorization': `Bearer ${token}` } }),
-        fetch(`${API_URL}/doctor-appointments?doctorId=${userId}`, { headers: { 'Authorization': `Bearer ${token}` } })
+      const [profileData, scheduleData] = await Promise.all([
+        api.get(`/register-doctor?id=${userId}`).catch(() => null),
+        api.get(`/doctor-appointments?doctorId=${userId}`).catch(() => null)
       ]);
 
-      if (profileRes.ok) {
-        const data = await profileRes.json();
+      if (profileData) {
+        const data: any = profileData;
         let myProfile = data.Item || (data.doctors ? data.doctors.find((d: any) => d.doctorId === userId) : data);
         if (myProfile && myProfile.name) {
           setDoctorProfile(prev => ({ ...prev, ...myProfile }));
@@ -83,8 +82,8 @@ export default function DoctorDashboard() {
         }
       }
 
-      if (scheduleRes.ok) {
-        const data = await scheduleRes.json();
+      if (scheduleData) {
+        const data: any = scheduleData;
         let list = [];
         if (Array.isArray(data)) list = data;
         else if (data.existingBookings) list = data.existingBookings;
@@ -117,8 +116,7 @@ export default function DoctorDashboard() {
 
         if (uniquePatientIds.length > 0) {
           const profilePromises = uniquePatientIds.map(pid =>
-            fetch(`${API_URL}/register-patient?id=${pid}`, { headers: { 'Authorization': `Bearer ${token}` } })
-              .then(r => r.ok ? r.json() : null)
+            api.get(`/register-patient?id=${pid}`).catch(() => null)
           );
 
           const profilesData = await Promise.all(profilePromises);

@@ -13,7 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 
 // 🔒 SECURITY: Env vars prevent hardcoding
-const API_URL = import.meta.env.VITE_API_BASE_URL;
+import { api } from "@/lib/api";
 const WS_URL = import.meta.env.VITE_WEBSOCKET_API_URL;
 
 export default function Messages() {
@@ -71,12 +71,8 @@ export default function Messages() {
                 // B. Build Contact List from Appointments
                 // This replaces the "Mock Data" with real people you actually have business with.
                 const paramKey = isDoctor ? 'doctorId' : 'patientId';
-                const res = await fetch(`${API_URL}/doctor-appointments?${paramKey}=${authUser.userId}`, {
-                    headers: { Authorization: `Bearer ${token}` }
-                });
-
-                if (res.ok) {
-                    const data = await res.json();
+                try {
+                    const data: any = await api.get(`/doctor-appointments?${paramKey}=${authUser.userId}`);
                     const rawList = data.existingBookings || [];
 
                     // Deduplicate Contacts (A patient might have 5 appointments with the same doctor)
@@ -98,6 +94,8 @@ export default function Messages() {
                         }
                     });
                     setContacts(Array.from(uniqueMap.values()));
+                } catch (e) {
+                    // ignore if appointments fail
                 }
 
             } catch (err) {
@@ -176,9 +174,8 @@ export default function Messages() {
                 const conversationId = `${participants[0]}#${participants[1]}`;
 
                 // Call the NEW GET Endpoint
-                const res = await fetch(`${API_URL}/chat?conversationId=${conversationId}`);
-                if (res.ok) {
-                    const data = await res.json();
+                try {
+                    const data: any = await api.get(`/chat?conversationId=${conversationId}`);
 
                     // Format DynamoDB data for UI
                     const formattedMessages = (data.messages || []).map((m: any) => ({
@@ -192,7 +189,7 @@ export default function Messages() {
                         ...prev,
                         [activeContactId]: formattedMessages
                     }));
-                }
+                } catch (e) { console.warn("Chat load failed", e); }
             } catch (err) {
                 console.error("History load failed", err);
             }

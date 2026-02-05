@@ -19,8 +19,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
-
-const API_URL = import.meta.env.VITE_API_BASE_URL || "";
+import { api } from "@/lib/api";
 
 export default function PatientRecords() {
     const navigate = useNavigate();
@@ -70,22 +69,20 @@ export default function PatientRecords() {
 
             // A. Fetch Doctor Profile
             // (We add headers here just in case, though public endpoints might not need it)
-            const profileRes = await fetch(`${API_URL}/register-doctor?id=${user.userId}`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-            if (profileRes.ok) {
-                const data = await profileRes.json();
+            // A. Fetch Doctor Profile
+            // (We add headers here just in case, though public endpoints might not need it)
+            const profileRes: any = await api.get(`/register-doctor?id=${user.userId}`);
+            if (profileRes) {
+                const data = profileRes;
                 const profile = data.doctors?.find((d: any) => d.doctorId === user.userId) || data;
                 setDoctorProfile(profile);
             }
 
             // B. Fetch Appointments (WITH HEADERS & CORRECT PARSING)
-            const scheduleRes = await fetch(`${API_URL}/doctor-appointments?doctorId=${user.userId}`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
+            const scheduleRes: any = await api.get(`/doctor-appointments?doctorId=${user.userId}`);
 
-            if (scheduleRes.ok) {
-                const data = await scheduleRes.json();
+            if (scheduleRes) {
+                const data = scheduleRes;
 
                 // 🟢 2. HANDLE DATA STRUCTURE CORRECTLY
                 // The API might return { existingBookings: [...] } or just [...]
@@ -128,9 +125,9 @@ export default function PatientRecords() {
     const loadPatientDetails = async (pid: string) => {
         try {
             // 1. Fetch Profile (Existing Logic)
-            const res = await fetch(`${API_URL}/register-patient?id=${pid}`);
-            if (res.ok) {
-                const profile = await res.json();
+            const res: any = await api.get(`/register-patient?id=${pid}`);
+            if (res) {
+                const profile = res;
                 setSelectedPatientProfile(profile);
                 if (profile.dob) {
                     const dobYear = new Date(profile.dob).getFullYear();
@@ -140,13 +137,12 @@ export default function PatientRecords() {
             }
 
             // 🟢 2. ADDED: Fetch Document Vault Records
-            const ehrRes = await fetch(`${API_URL}/ehr`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ action: "list_records", patientId: pid })
+            const ehrRes: any = await api.post('/ehr', {
+                action: "list_records",
+                patientId: pid
             });
-            if (ehrRes.ok) {
-                const data = await ehrRes.json();
+            if (ehrRes) {
+                const data = ehrRes;
                 const sorted = Array.isArray(data) ? data.sort((a: any, b: any) =>
                     new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
                 ) : [];
@@ -179,19 +175,15 @@ export default function PatientRecords() {
         if (!noteText.trim() || !selectedPatientId) return;
         setIsSaving(true);
         try {
-            const res = await fetch(`${API_URL}/ehr`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    action: "add_clinical_note",
-                    patientId: selectedPatientId,
-                    doctorId: doctorProfile.doctorId,
-                    note: noteText,
-                    authorName: doctorProfile.name
-                })
+            const res = await api.post('/ehr', {
+                action: "add_clinical_note",
+                patientId: selectedPatientId,
+                doctorId: doctorProfile.doctorId,
+                note: noteText,
+                authorName: doctorProfile.name
             });
 
-            if (res.ok) {
+            if (res) {
                 toast({ title: "Note Saved", description: "Added to patient history via MongoDB." });
                 setNoteText("");
             } else { throw new Error("Save Failed"); }
@@ -225,14 +217,10 @@ export default function PatientRecords() {
                 }
             };
 
-            const res = await fetch(`${API_URL}/predict-health`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(payload)
-            });
+            const res: any = await api.post('/predict-health', payload);
 
-            if (res.ok) {
-                const data = await res.json();
+            if (res) {
+                const data = res;
                 setPredictionResult(data);
                 toast({ title: "Analysis Complete", description: `Ran ${modelType} model successfully.` });
             } else { throw new Error("Prediction API Failed"); }
@@ -260,21 +248,17 @@ export default function PatientRecords() {
 
         try {
             // 1. Get Presigned URL
-            const initRes = await fetch(`${API_URL}/ehr`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    action: "request_upload",
-                    patientId: selectedPatientId, // 🔒 Linked to specific patient
-                    fileName: file.name,
-                    fileType: file.type,
-                    doctorId: doctorProfile.doctorId, // 🔒 Tracked by you
-                    description: "Uploaded by Doctor"
-                })
+            const initRes: any = await api.post('/ehr', {
+                action: "request_upload",
+                patientId: selectedPatientId, // 🔒 Linked to specific patient
+                fileName: file.name,
+                fileType: file.type,
+                doctorId: doctorProfile.doctorId, // 🔒 Tracked by you
+                description: "Uploaded by Doctor"
             });
 
-            if (!initRes.ok) throw new Error("Init Failed");
-            const { uploadUrl } = await initRes.json();
+            if (!initRes) throw new Error("Init Failed");
+            const { uploadUrl } = initRes;
 
             // 2. Upload to S3
             const uploadRes = await fetch(uploadUrl, {
@@ -311,21 +295,17 @@ export default function PatientRecords() {
         toast({ title: "Opening File", description: "Verifying credentials..." });
 
         try {
-            const res = await fetch(`${API_URL}/ehr`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    action: "get_view_url",
-                    s3Key: s3Key,
-                    doctorId: doctorProfile.doctorId // 🟢 SEND DOCTOR ID
-                })
+            const data: any = await api.post('/ehr', {
+                action: "get_view_url",
+                s3Key: s3Key,
+                doctorId: doctorProfile.doctorId // 🟢 SEND DOCTOR ID
             });
 
-            const data = await res.json();
+            // const data = await res.json();
 
-            if (res.status === 403) {
-                throw new Error("Officer Approval Required");
-            }
+            // if (res.status === 403) {
+            //     throw new Error("Officer Approval Required");
+            // }
 
             if (data.viewUrl) {
                 window.open(data.viewUrl, '_blank');

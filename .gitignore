@@ -22,3 +22,14 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+
+# Add these to your existing frontend .gitignore
+.env
+.env.production
+.env.local
+.env.*.local
+
+# Also ignore the build output if not already there
+dist/
+dist-ssr/

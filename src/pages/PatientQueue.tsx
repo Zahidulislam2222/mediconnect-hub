@@ -35,8 +35,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-
-const API_URL = import.meta.env.VITE_API_BASE_URL || "";
+import { api } from "@/lib/api";
 
 // Helper: Smart Initials
 const getInitials = (name: string) => {
@@ -78,9 +77,8 @@ export default function PatientQueue() {
             const user = await getCurrentUser();
 
             // Fetch Profile
-            fetch(`${API_URL}/register-doctor?id=${user.userId}`)
-                .then(res => res.json())
-                .then(data => {
+            api.get(`/register-doctor?id=${user.userId}`)
+                .then((data: any) => {
                     const profile = Array.isArray(data.doctors) ? data.doctors.find((d: any) => d.doctorId === user.userId) : data;
                     if (profile) {
                         setDoctorName(profile.name || "Doctor");
@@ -89,9 +87,8 @@ export default function PatientQueue() {
                 }).catch(console.error);
 
             // Fetch Appointments
-            const response = await fetch(`${API_URL}/doctor-appointments?doctorId=${user.userId}`);
-            if (response.ok) {
-                const data = await response.json();
+            const data: any = await api.get(`/doctor-appointments?doctorId=${user.userId}`);
+            if (data) {
                 let allAppointments = [];
 
                 if (Array.isArray(data)) allAppointments = data;
@@ -115,8 +112,9 @@ export default function PatientQueue() {
                     const token = session.tokens?.idToken?.toString();
 
                     const profilePromises = uniquePatientIds.map(pid =>
-                        fetch(`${API_URL}/register-patient?id=${pid}`, { headers: { 'Authorization': `Bearer ${token}` } })
-                            .then(r => r.ok ? r.json() : null)
+                        api.get(`/register-patient?id=${pid}`)
+                            .then(r => r || null)
+                            .catch(() => null)
                     );
 
                     const profilesData = await Promise.all(profilePromises);
@@ -189,13 +187,9 @@ export default function PatientQueue() {
         setProcessingId(appointmentId);
         try {
             const user = await getCurrentUser();
-            const res = await fetch(`${API_URL}/book-appointment`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ appointmentId, doctorId: user.userId, status: newStatus })
-            });
+            const res = await api.put('/book-appointment', { appointmentId, doctorId: user.userId, status: newStatus });
 
-            if (res.ok) {
+            if (res) {
                 toast({ title: "Status Updated", description: `Patient marked as ${newStatus}` });
                 if (newStatus === 'IN_PROGRESS') {
                     setTimeout(() => navigate(`/consultation?appointmentId=${appointmentId}&patientName=${patientName}`), 500);

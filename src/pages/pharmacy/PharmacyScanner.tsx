@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 
-const API_URL = import.meta.env.VITE_API_BASE_URL || "";
+import { api } from "@/lib/api";
 
 // Mock user for Pharmacy View
 const pharmacistUser = {
@@ -35,18 +35,11 @@ export default function PharmacyScanner() {
 
         try {
             // Phase 2/3: Real API Call
-            const res = await fetch(`${API_URL}/pharmacy/fulfill`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ token: rxToken })
-            });
+            // Phase 2/3: Real API Call
+            const data: any = await api.post('/pharmacy/fulfill', { token: rxToken });
 
-            if (!res.ok) {
-                const err = await res.json();
-                throw new Error(err.message || "Invalid Token");
-            }
+            if (!data) throw new Error("Invalid Token");
 
-            const data = await res.json();
             setScanResult(data);
             toast({ title: "Success", description: "Prescription retrieved successfully." });
 

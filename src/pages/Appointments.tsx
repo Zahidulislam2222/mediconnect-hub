@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { api } from "@/lib/api";
 
 // --- STRIPE IMPORTS ---
 import { loadStripe } from '@stripe/stripe-js';
@@ -83,12 +84,9 @@ function AppointmentsContent() {
     const fetchAppointments = async (patientId: string) => {
         try {
             setLoadingAppointments(true);
-            const token = await getAuthToken();
-            const res = await fetch(`${import.meta.env.VITE_API_BASE_URL}/doctor-appointments?patientId=${patientId}`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-            if (!res.ok) throw new Error("Failed to fetch");
-            const data = await res.json();
+            setLoadingAppointments(true);
+            const data: any = await api.get(`/doctor-appointments?patientId=${patientId}`);
+
             // 🟢 THIS IS THE FIX: Check for the 'existingBookings' key inside the object
             let list = [];
             if (Array.isArray(data)) {
@@ -115,11 +113,7 @@ function AppointmentsContent() {
                 const token = await getAuthToken();
 
                 // 🟢 PROFESSIONAL FIX: Use the new resource you just created
-                const res = await fetch(`${import.meta.env.VITE_API_BASE_URL}/doctors`, {
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
-
-                const json = await res.json();
+                const json: any = await api.get('/doctors');
 
                 // The Python Lambda returns { "doctors": [...] }
                 if (json.doctors) setDoctors(json.doctors);
@@ -142,14 +136,9 @@ function AppointmentsContent() {
 
                 // 2. 🟢 TRY TO GET REAL PROFILE (With Signed Photo)
                 try {
-                    const res = await fetch(`${import.meta.env.VITE_API_BASE_URL}/register-patient?id=${attr.sub}`, {
-                        headers: { 'Authorization': `Bearer ${token}` }
-                    });
-                    if (res.ok) {
-                        const data = await res.json();
-                        // If backend returns item, use that avatar
-                        if (data.avatar) u.avatar = data.avatar;
-                    }
+                    const data: any = await api.get(`/register-patient?id=${attr.sub}`);
+                    // If backend returns item, use that avatar
+                    if (data.avatar) u.avatar = data.avatar;
                 } catch (err) {
                     console.log("Could not fetch profile photo");
                 }
@@ -172,11 +161,7 @@ function AppointmentsContent() {
             setLoadingSlots(true);
             setAvailableSlots([]);
             try {
-                const token = await getAuthToken();
-                const res = await fetch(`${import.meta.env.VITE_API_BASE_URL}/doctor-appointments?doctorId=${formData.doctorId}`, {
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
-                const data = await res.json();
+                const data: any = await api.get(`/doctor-appointments?doctorId=${formData.doctorId}`);
 
                 const bookings = data.existingBookings || [];
                 const weeklySchedule = data.weeklySchedule || {};
@@ -262,16 +247,7 @@ function AppointmentsContent() {
                 policyId: formData.policyId
             };
 
-            const res = await fetch(`${import.meta.env.VITE_API_BASE_URL}/book-appointment`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
-                body: JSON.stringify(payload)
-            });
-
-            if (!res.ok) {
-                if (res.status === 409) throw new Error("Slot just taken. Please pick another.");
-                throw new Error("Booking failed");
-            }
+            await api.post('/book-appointment', payload);
 
             await fetchAppointments(user.id);
             setIsBooking(false);
@@ -290,14 +266,7 @@ function AppointmentsContent() {
         if (!confirm("Are you sure? This will refund your payment.")) return;
 
         try {
-            const token = await getAuthToken();
-            const res = await fetch(`${import.meta.env.VITE_API_BASE_URL}/cancel-appointment`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
-                body: JSON.stringify({ appointmentId, patientId: user.id })
-            });
-
-            if (!res.ok) throw new Error("Cancel failed");
+            await api.post('/cancel-appointment', { appointmentId, patientId: user.id });
 
             toast({ title: "Cancelled", description: "Appointment cancelled and refunded." });
             fetchAppointments(user.id);
@@ -309,20 +278,12 @@ function AppointmentsContent() {
     const handleJoin = async (apt: any) => {
         // 1. Notify Backend: "I am here"
         try {
-            const token = await getAuthToken();
             console.log("📍 Check-in signal sending...");
 
-            await fetch(`${import.meta.env.VITE_API_BASE_URL}/book-appointment`, {
-                method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
-                body: JSON.stringify({
-                    appointmentId: apt.appointmentId,
-                    status: "CONFIRMED", // Keep status as is
-                    patientArrived: true // 🟢 SIGNAL: Patient is ready
-                })
+            await api.put('/book-appointment', {
+                appointmentId: apt.appointmentId,
+                status: "CONFIRMED", // Keep status as is
+                patientArrived: true // 🟢 SIGNAL: Patient is ready
             });
             console.log("✅ Check-in successful");
         } catch (e) {

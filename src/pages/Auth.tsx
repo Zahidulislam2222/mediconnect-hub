@@ -29,9 +29,9 @@ import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { PublicHeader } from "@/components/PublicHeader";
+import { api } from "@/lib/api";
 
 // Env Variables
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 const CREDENTIALS_BUCKET = import.meta.env.VITE_S3_CREDENTIALS_BUCKET;
 
 type AuthStep = "login" | "signup" | "confirm-signup" | "mfa" | "identity" | "diploma-upload";
@@ -101,29 +101,29 @@ export default function Auth() {
       let roleKey = "";
 
       if (currentTab === 'patient') {
-        const res = await fetch(`${API_BASE_URL}/register-patient?id=${userId}`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-        if (res.ok) {
-          const data = await res.json();
+        try {
+          const data = await api.get(`/patients/${userId}`);
           const p = data.Item || data;
           if (p && (p.patientId === userId || p.userId === userId || p.id === userId)) {
             profile = p;
             roleKey = "patient";
           }
+        } catch (e: any) {
+          // Allow 404 (Not Found) but re-throw 401 (Auth Failed)
+          if (e.message.includes('401')) throw e;
+          // Ignore other errors (assume not found)
         }
       } else {
-        const res = await fetch(`${API_BASE_URL}/register-doctor?id=${userId}`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-        if (res.ok) {
-          const data = await res.json();
+        try {
+          const data = await api.get(`/doctors/${userId}`);
           if (data.doctors && Array.isArray(data.doctors)) {
             profile = data.doctors.find((d: any) => d.doctorId === userId);
           } else if (data.doctorId === userId) {
             profile = data;
           }
           if (profile) roleKey = "doctor";
+        } catch (e: any) {
+          if (e.message.includes('401')) throw e;
         }
       }
 
@@ -133,15 +133,9 @@ export default function Auth() {
       }
 
       if (profile.isEmailVerified === false) {
-        const endpoint = currentTab === 'patient' ? 'register-patient' : 'register-doctor';
-        fetch(`${API_BASE_URL}/${endpoint}`, {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-          body: JSON.stringify({ userId: userId, isEmailVerified: true })
-        });
+        const endpoint = currentTab === 'patient' ? `/patients/${userId}` : `/doctors/${userId}`;
+        // Fire and forget
+        api.put(endpoint, { isEmailVerified: true }).catch(console.error);
       }
 
       // 3. LOGIC FLOW CONTROL
@@ -281,31 +275,23 @@ export default function Auth() {
 
       if (userId) {
         if (userType === 'patient') {
-          await fetch(`${API_BASE_URL}/register-patient`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              userId: userId,
-              name: name,
-              email: email,
-              role: 'patient',
-              identityStatus: 'UNVERIFIED'
-            })
+          await api.post('/patients', {
+            userId: userId,
+            name: name,
+            email: email,
+            role: 'patient',
+            identityStatus: 'UNVERIFIED'
           });
         } else {
-          await fetch(`${API_BASE_URL}/register-doctor`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              doctorId: userId,
-              name: name,
-              email: email,
-              role: 'doctor',
-              specialization: 'General Practice',
-              licenseNumber: 'PENDING-VERIFICATION',
-              verificationStatus: 'PENDING',
-              isIdentityVerified: false
-            })
+          await api.post('/doctors', {
+            doctorId: userId,
+            name: name,
+            email: email,
+            role: 'doctor',
+            specialization: 'General Practice',
+            licenseNumber: 'PENDING-VERIFICATION',
+            verificationStatus: 'PENDING',
+            isIdentityVerified: false
           });
         }
       }
@@ -351,18 +337,9 @@ export default function Auth() {
         idImage: idImage
       };
 
-      const res = await fetch(`${API_BASE_URL}/verify-identity`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`
-        },
-        body: JSON.stringify(payload)
-      });
+      const data = await api.post('/verify-identity', payload);
 
-      const data = await res.json();
-
-      if (res.ok && data.verified) {
+      if (data.verified) {
         setVerificationStatus("success");
         const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
         if (data.photoUrl) currentUser.avatar = data.photoUrl;

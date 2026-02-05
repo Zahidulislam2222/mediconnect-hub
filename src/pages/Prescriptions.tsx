@@ -19,19 +19,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 
-const API_URL = import.meta.env.VITE_API_BASE_URL || "";
-
-// Authenticated API Wrapper
-const apiCall = async (endpoint: string, options: RequestInit = {}) => {
-    const session = await fetchAuthSession();
-    const token = session.tokens?.accessToken?.toString();
-    const headers = {
-        "Content-Type": "application/json",
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        ...options.headers,
-    };
-    return fetch(`${API_URL}${endpoint}`, { ...options, headers });
-};
+import { api } from "@/lib/api";
 
 export default function Prescriptions() {
     const navigate = useNavigate();
@@ -72,28 +60,28 @@ export default function Prescriptions() {
             const authUser = await getCurrentUser();
             const userId = authUser.userId;
 
-            const [profileRes, appointmentsRes, rxRes] = await Promise.all([
-                apiCall(`/register-doctor?id=${userId}`),
-                apiCall(`/doctor-appointments?doctorId=${userId}`),
-                apiCall(`/prescription?doctorId=${userId}`)
+            const [profileData, appointmentsData, rxData] = await Promise.all([
+                api.get(`/register-doctor?id=${userId}`).catch(() => null),
+                api.get(`/doctor-appointments?doctorId=${userId}`).catch(() => null),
+                api.get(`/prescription?doctorId=${userId}`).catch(() => null)
             ]);
 
             // Set Profile
-            if (profileRes.ok) {
-                const data = await profileRes.json();
+            if (profileData) {
+                const data: any = profileData;
                 const profile = data.doctors?.find((d: any) => d.doctorId === userId) || data;
                 setUser({ name: profile.name, id: userId, avatar: profile.avatar });
             }
 
             // Set Prescriptions
-            if (rxRes.ok) {
-                const data = await rxRes.json();
+            if (rxData) {
+                const data: any = rxData;
                 setPrescriptions(data.prescriptions || []);
             }
 
             // Build Unique Patient List
-            if (appointmentsRes.ok) {
-                const data = await appointmentsRes.json();
+            if (appointmentsData) {
+                const data: any = appointmentsData;
                 const rawList = data.existingBookings || [];
                 const uniqueMap = new Map();
 
@@ -112,7 +100,7 @@ export default function Prescriptions() {
                 const uniqueIds = Array.from(uniqueMap.keys());
                 if (uniqueIds.length > 0) {
                     const profilePromises = uniqueIds.map(pid =>
-                        apiCall(`/register-patient?id=${pid}`).then(r => r.ok ? r.json() : null)
+                        api.get(`/register-patient?id=${pid}`).catch(() => null)
                     );
                     const profiles = await Promise.all(profilePromises);
 
@@ -157,40 +145,30 @@ export default function Prescriptions() {
                 instructions: formData.instructions
             };
 
-            const res = await apiCall(`/prescription`, {
-                method: "POST",
-                body: JSON.stringify(payload)
+            const data: any = await api.post(`/prescription`, payload);
+
+            /* Handle 409 handled by try/catch in api.ts? No, api.ts throws. Need to catch specific or check response? */
+            /* api utility throws on error. */
+
+            toast({
+                title: "Prescription Issued",
+                description: "Digitally signed and sent to patient."
             });
 
-            if (res.status === 409) {
-                const errorData = await res.json();
-                setInteractionError(errorData.message);
-                setIsSubmitting(false);
-                return;
-            }
+            const newRx = {
+                prescriptionId: data.prescriptionId,
+                patientId: selectedPatient.id,
+                medication: formData.medication,
+                dosage: formData.dosage,
+                instructions: formData.instructions,
+                status: "ISSUED",
+                timestamp: new Date().toISOString(),
+                digitalSignature: data.digitalSignature
+            };
 
-            if (res.ok) {
-                const data = await res.json();
-                toast({
-                    title: "Prescription Issued",
-                    description: "Digitally signed and sent to patient."
-                });
-
-                const newRx = {
-                    prescriptionId: data.prescriptionId,
-                    patientId: selectedPatient.id,
-                    medication: formData.medication,
-                    dosage: formData.dosage,
-                    instructions: formData.instructions,
-                    status: "ISSUED",
-                    timestamp: new Date().toISOString(),
-                    digitalSignature: data.digitalSignature
-                };
-
-                setPrescriptions([newRx, ...prescriptions]);
-                setIsModalOpen(false);
-                setFormData({ medication: "", dosage: "", instructions: "" });
-            }
+            setPrescriptions([newRx, ...prescriptions]);
+            setIsModalOpen(false);
+            setFormData({ medication: "", dosage: "", instructions: "" });
         } catch (err) {
             toast({ variant: "destructive", title: "Error", description: "Failed to issue." });
         } finally {
@@ -209,10 +187,7 @@ export default function Prescriptions() {
             setPrescriptions(updatedList);
             toast({ title: "Refill Approved", description: `Sent to pharmacy for ${rx.medication}` });
 
-            await apiCall(`/prescription`, {
-                method: "PUT",
-                body: JSON.stringify({ prescriptionId: rx.prescriptionId, status: "ISSUED" })
-            });
+            await api.put(`/prescription`, { prescriptionId: rx.prescriptionId, status: "ISSUED" });
         } catch (e) {
             toast({ variant: "destructive", title: "Error", description: "Update failed." });
         }

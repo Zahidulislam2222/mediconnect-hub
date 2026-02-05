@@ -12,8 +12,8 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
+import { api } from "@/lib/api";
 
-const API_URL = import.meta.env.VITE_API_BASE_URL;
 const COLORS = ['#8884d8', '#00C49F', '#FFBB28', '#FF8042'];
 
 export default function Analytics() {
@@ -64,18 +64,14 @@ export default function Analytics() {
 
             // 1. Fetch Profile & Analytics in Parallel
             const [profileRes, analyticsRes] = await Promise.allSettled([
-                fetch(`${API_URL}/register-doctor?id=${userId}`, {
-                    headers: { 'Authorization': `Bearer ${token}` }
-                }),
+                api.get(`/register-doctor?id=${userId}`),
                 // 🟢 THIS CALLS YOUR NEW LAMBDA LOGIC
-                fetch(`${API_URL}/billing?type=analytics&doctorId=${userId}`, {
-                    headers: { 'Authorization': `Bearer ${token}` }
-                })
+                api.get(`/billing?type=analytics&doctorId=${userId}`)
             ]);
 
             // 2. Handle Profile
-            if (profileRes.status === "fulfilled" && profileRes.value.ok) {
-                const data = await profileRes.value.json();
+            if (profileRes.status === "fulfilled") {
+                const data: any = profileRes.value;
                 // API might return array or single object depending on your setup
                 let myProfile = Array.isArray(data.doctors)
                     ? data.doctors.find((d: any) => d.doctorId === userId)
@@ -92,8 +88,8 @@ export default function Analytics() {
             }
 
             // 3. Handle Analytics (The New Data)
-            if (analyticsRes.status === "fulfilled" && analyticsRes.value.ok) {
-                const data = await analyticsRes.value.json();
+            if (analyticsRes.status === "fulfilled") {
+                const data: any = analyticsRes.value;
 
                 setMetrics({
                     revenue: data.totalRevenue || 0,

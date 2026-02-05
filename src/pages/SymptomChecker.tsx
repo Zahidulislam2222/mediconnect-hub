@@ -24,8 +24,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
-
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
+import { api } from "@/lib/api";
 
 // --- DEMO FALLBACK DATA (For when AWS Limit is Reached) ---
 const DEMO_TEXT_RESPONSE = {
@@ -71,20 +70,18 @@ export default function SymptomChecker() {
     async function fetchProfile() {
       try {
         const authUser = await getCurrentUser();
-        const res = await fetch(`${API_BASE_URL}/register-patient?id=${authUser.userId}`);
-        if (res.ok) {
-          const profile = await res.json();
-          const userData = {
-            name: profile.name || "Patient",
-            id: authUser.userId,
-            avatar: profile.avatar
-          };
-          setUser(userData);
+        const profile: any = await api.get(`/register-patient?id=${authUser.userId}`);
 
-          // 🟢 FIX: Update Storage Safely
-          const currentLocal = JSON.parse(localStorage.getItem('user') || '{}');
-          localStorage.setItem('user', JSON.stringify({ ...currentLocal, ...userData }));
-        }
+        const userData = {
+          name: profile.name || "Patient",
+          id: authUser.userId,
+          avatar: profile.avatar
+        };
+        setUser(userData);
+
+        // 🟢 FIX: Update Storage Safely
+        const currentLocal = JSON.parse(localStorage.getItem('user') || '{}');
+        localStorage.setItem('user', JSON.stringify({ ...currentLocal, ...userData }));
       } catch (err) {
         console.warn("Auth load failed, using guest mode");
       }
@@ -130,37 +127,26 @@ export default function SymptomChecker() {
 
     try {
       // API CALL
-      const response = await fetch(`${API_BASE_URL}/symptom-checker`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          text: userText,        // Matches Backend Expectation
-          userId: user.id        // Matches Backend Expectation
-        })
+      const data: any = await api.post('/symptom-checker', {
+        text: userText,        // Matches Backend Expectation
+        userId: user.id        // Matches Backend Expectation
       });
 
       let aiContent = "";
       let riskLevel = "Unknown";
 
-      if (response.ok) {
-        const data = await response.json();
+      // 1. FIX: Check for 'risk_analysis' (from Lambda) OR 'assessment' (old way)
+      const result = data.risk_analysis || data.assessment;
 
-        // 1. FIX: Check for 'risk_analysis' (from Lambda) OR 'assessment' (old way)
-        const result = data.risk_analysis || data.assessment;
+      if (result && result.risk !== "Error") {
+        riskLevel = result.risk;
 
-        if (result && result.risk !== "Error") {
-          riskLevel = result.risk;
+        // 2. VIDEO FEATURE: Show which Cloud provided the answer
+        const providerName = data.provider || "AWS Bedrock";
+        aiContent = `[System: ${providerName}]\n\nRisk: ${riskLevel}\n${result.reason}`;
 
-          // 2. VIDEO FEATURE: Show which Cloud provided the answer
-          const providerName = data.provider || "AWS Bedrock";
-          aiContent = `[System: ${providerName}]\n\nRisk: ${riskLevel}\n${result.reason}`;
-
-        } else {
-          throw new Error("AI Service Limit");
-        }
       } else {
-        // Network or 500 Error
-        throw new Error("Network Error");
+        throw new Error("AI Service Limit");
       }
 
       // Add AI Response
@@ -218,18 +204,10 @@ export default function SymptomChecker() {
     const base64Clean = base64Full.split(",")[1];
 
     try {
-      const response = await fetch(`${API_BASE_URL}/analyze-image`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          imageBase64: base64Clean, // Matches Backend Expectation
-          patientId: user.id
-        })
+      const data: any = await api.post('/analyze-image', {
+        imageBase64: base64Clean, // Matches Backend Expectation
+        patientId: user.id
       });
-
-      if (!response.ok) throw new Error("Upload Failed");
-
-      const data = await response.json();
 
       // Backend returns { report: { diagnosis: "...", visionTags: [...] } }
       if (data.report && !data.report.diagnosis.includes("Analysis Failed")) {

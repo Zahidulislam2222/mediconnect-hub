@@ -28,8 +28,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
+import { api } from "@/lib/api";
 
 const SettingsSkeleton = () => (
     <div className="max-w-4xl mx-auto space-y-6 pb-10">
@@ -148,44 +147,40 @@ export default function Settings() {
 
             // 1. Load Basic Profile
             const endpoint = userRole === 'doctor'
-                ? `${API_BASE_URL}/register-doctor?id=${authUser.userId}`
-                : `${API_BASE_URL}/register-patient?id=${authUser.userId}`;
+                ? `/register-doctor?id=${authUser.userId}`
+                : `/register-patient?id=${authUser.userId}`;
 
-            const response = await fetch(endpoint, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-
-            if (response.ok) {
-                const rawData = await response.json();
-                const data = rawData.Item || rawData;
+            const data: any = await api.get(endpoint);
+            if (data) {
+                // Remove rawData wrapper logic as api returns data directly
+                // But check if data structure matches "Item" or direct
+                // based on previous usage: const data = rawData.Item || rawData;
+                const profileData = data.Item || data;
 
                 if (isMounted.current) {
                     setFormData(prev => ({
                         ...prev,
-                        name: data.name || prev.name,
-                        email: data.email || authUser.signInDetails?.loginId || "",
-                        phone: data.phone || cognitoPhone || "",
-                        address: data.address || "",
-                        avatar: data.avatar || prev.avatar,
-                        specialization: data.specialization || "General Practice",
-                        licenseNumber: data.licenseNumber || "",
-                        consultationFee: data.consultationFee || "",
-                        bio: data.bio || ""
+                        name: profileData.name || prev.name,
+                        email: profileData.email || authUser.signInDetails?.loginId || "",
+                        phone: profileData.phone || cognitoPhone || "",
+                        address: profileData.address || "",
+                        avatar: profileData.avatar || prev.avatar,
+                        specialization: profileData.specialization || "General Practice",
+                        licenseNumber: profileData.licenseNumber || "",
+                        consultationFee: profileData.consultationFee || "",
+                        bio: profileData.bio || ""
                     }));
 
-                    if (data.preferences) setPreferences(data.preferences);
+                    if (profileData.preferences) setPreferences(profileData.preferences);
                 }
             }
 
             // 🟢 2. Load Doctor Schedule (Separate standard standard fetch)
             if (userRole === 'doctor') {
                 try {
-                    const scheduleRes = await fetch(`${API_BASE_URL}/doctor-schedule?doctorId=${authUser.userId}`, {
-                        headers: { 'Authorization': `Bearer ${token}` }
-                    });
+                    const scheduleData: any = await api.get(`/doctor-schedule?doctorId=${authUser.userId}`);
 
-                    if (scheduleRes.ok) {
-                        const scheduleData = await scheduleRes.json();
+                    if (scheduleData) {
                         // Parse DB format ({"Mon": "09:00-17:00"}) to UI format
                         const schedule = scheduleData.schedule || {};
                         const parsedSchedule: any = {};
@@ -199,7 +194,6 @@ export default function Settings() {
                                 parsedSchedule[day] = { active: false, start: "09:00", end: "17:00" };
                             }
                         });
-                        setWeeklySchedule(parsedSchedule);
                     }
                 } catch (e) {
                     console.error("Schedule load error", e);
@@ -266,7 +260,7 @@ export default function Settings() {
             let profilePayload;
 
             if (userRole === 'doctor') {
-                profileEndpoint = `${API_BASE_URL}/register-doctor`;
+                profileEndpoint = `/register-doctor`;
                 profilePayload = {
                     ...basePayload,
                     doctorId: userId,
@@ -275,15 +269,11 @@ export default function Settings() {
                     bio: formData.bio,
                 };
             } else {
-                profileEndpoint = `${API_BASE_URL}/register-patient`;
+                profileEndpoint = `/register-patient`;
                 profilePayload = { ...basePayload, userId: userId };
             }
 
-            const profileReq = fetch(profileEndpoint, {
-                method: "PUT",
-                headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
-                body: JSON.stringify(profilePayload)
-            });
+            const profileReq = api.put(profileEndpoint, profilePayload);
 
             // 🟢 2. Save Schedule (If Doctor)
             const promises = [profileReq];
@@ -300,13 +290,9 @@ export default function Settings() {
                     }
                 });
 
-                const scheduleReq = fetch(`${API_BASE_URL}/doctor-schedule`, {
-                    method: "POST", // Python Lambda expects POST
-                    headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
-                    body: JSON.stringify({
-                        doctorId: userId,
-                        schedule: finalSchedule
-                    })
+                const scheduleReq = api.post(`/doctor-schedule`, {
+                    doctorId: userId,
+                    schedule: finalSchedule
                 });
                 promises.push(scheduleReq);
             }

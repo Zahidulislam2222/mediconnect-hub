@@ -56,7 +56,8 @@ export default function KnowledgeBasePost({ role = "patient" }: KnowledgeBasePos
             try {
                 // Try fetching by Document ID (Strapi v5) or ID (Strapi v4)
                 console.log("Fetching article:", slug);
-                const response = await fetch(`http://localhost:1337/api/articles/${slug}?populate=*`);
+                const STRAPI_URL = import.meta.env.VITE_STRAPI_API_URL || 'http://localhost:1337';
+                const response = await fetch(`${STRAPI_URL}/api/articles/${slug}?populate=*`);
 
                 if (!response.ok) {
                     throw new Error(`Article not found (Status: ${response.status})`);
@@ -80,7 +81,7 @@ export default function KnowledgeBasePost({ role = "patient" }: KnowledgeBasePos
                                 // If it starts with "/", it's local -> Add localhost.
                                 imageUrl = rawUrl.startsWith('http')
                                     ? rawUrl
-                                    : `http://localhost:1337${rawUrl}`;
+                                    : `${import.meta.env.VITE_STRAPI_API_URL || 'http://localhost:1337'}${rawUrl}`;
                             }
                         }
                     }
@@ -309,7 +310,7 @@ export default function KnowledgeBasePost({ role = "patient" }: KnowledgeBasePos
                     </Card>
 
                     {/* Specialty Info */}
-                    <Card className="border-0 shadow-soft bg-white rounded-[32px] border border-slate-100">
+                    <Card className="shadow-soft bg-white rounded-[32px] border border-slate-100">
                         <CardContent className="p-8 space-y-6">
                             <div className="space-y-1">
                                 <h5 className="font-bold text-slate-900">Topic Specialty</h5>

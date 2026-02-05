@@ -29,9 +29,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
-
-
-const API_URL = import.meta.env.VITE_API_BASE_URL || "";
+import { api } from "@/lib/api";
 
 export default function ConsultationRoom() {
   const navigate = useNavigate();
@@ -137,18 +135,13 @@ export default function ConsultationRoom() {
       const userId = currentUser.userId;
 
       // A. CALL BACKEND
-      const res = await fetch(`${API_URL}/video-service`, {
-        method: 'POST',
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          appointmentId: appointmentId,
-          userId: userId,
-          userName: patientName || "Patient"
-        })
+      const data: any = await api.post('/video-service', {
+        appointmentId: appointmentId,
+        userId: userId,
+        userName: patientName || "Patient"
       });
 
-      if (!res.ok) throw new Error("Failed to join");
-      const { Meeting, Attendee } = await res.json();
+      const { Meeting, Attendee } = data;
 
       // B. INITIALIZE CHIME SDK
       const logger = new ConsoleLogger('MediConnectLogger', LogLevel.INFO);

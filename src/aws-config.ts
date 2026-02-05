@@ -14,14 +14,10 @@ const awsConfig: ResourcesConfig = {
             // allowGuestAccess: true,  <-- REMOVED. Strictly enforce login.
         },
     },
-    API: {
-        REST: {
-            MediconnectAPI: {
-                endpoint: import.meta.env.VITE_API_BASE_URL,
-                region: import.meta.env.VITE_AWS_REGION,
-            },
-        },
-    },
+    /*
+     * API: { REST: { ... } } REMOVED
+     * migrated to src/lib/api.ts with Multi-Cloud support
+     */
 };
 
 Amplify.configure(awsConfig);

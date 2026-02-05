@@ -16,8 +16,7 @@ import { useToast } from "@/hooks/use-toast";
 // 🟢 Imports for Avatar Fix
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
+import { api } from "@/lib/api";
 
 // --- AUTH HELPER ---
 const getAuthToken = async () => {
@@ -70,26 +69,24 @@ export default function PatientDashboard() {
 
       // 1. Fetch Doctor Directory (Essential for Avatars)
       try {
-        const docRes = await fetch(`${API_BASE_URL}/doctors`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-        const docData = await docRes.json();
+        const docData: any = await api.get('/doctors');
         if (docData.doctors) setDoctors(docData.doctors);
       } catch (e) { console.warn("Doc Dir Error", e); }
 
       // 2. Fetch Patient Data Parallel
+      // Note: api.get() returns the data directly.
       const results = await Promise.allSettled([
-        fetch(`${API_BASE_URL}/register-patient?id=${userId}`, { headers: { 'Authorization': `Bearer ${token}` } }),
-        fetch(`${API_BASE_URL}/doctor-appointments?patientId=${userId}`, { headers: { 'Authorization': `Bearer ${token}` } }),
-        fetch(`${API_BASE_URL}/billing?patientId=${userId}`, { headers: { 'Authorization': `Bearer ${token}` } }),
-        fetch(`${API_BASE_URL}/vitals?patientId=${userId}&limit=1`, { headers: { 'Authorization': `Bearer ${token}` } })
+        api.get(`/register-patient?id=${userId}`),
+        api.get(`/doctor-appointments?patientId=${userId}`),
+        api.get(`/billing?patientId=${userId}`),
+        api.get(`/vitals?patientId=${userId}&limit=1`)
       ]);
 
       const [profileRes, apptRes, billRes, vitalRes] = results;
 
       // A. Profile Logic
-      if (profileRes.status === 'fulfilled' && profileRes.value.ok) {
-        const data = await profileRes.value.json();
+      if (profileRes.status === 'fulfilled') {
+        const data: any = profileRes.value;
         const userData = (data.patients || []).find((p: any) => p.userId === userId) || data.Item;
 
         if (userData) {
@@ -99,8 +96,8 @@ export default function PatientDashboard() {
       }
 
       // B. Appointments (STRICT FILTER & DEDUPING APPLIED)
-      if (apptRes.status === 'fulfilled' && apptRes.value.ok) {
-        const data = await apptRes.value.json();
+      if (apptRes.status === 'fulfilled') {
+        const data: any = apptRes.value;
         let list = [];
         if (Array.isArray(data)) {
           list = data;
@@ -139,13 +136,14 @@ export default function PatientDashboard() {
       }
 
       // C. Billing
-      if (billRes.status === 'fulfilled' && billRes.value.ok) {
-        setBilling(await billRes.value.json());
+      if (billRes.status === 'fulfilled') {
+        const data: any = billRes.value;
+        setBilling(data);
       }
 
       // D. Vitals
-      if (vitalRes.status === 'fulfilled' && vitalRes.value.ok) {
-        const vData = await vitalRes.value.json();
+      if (vitalRes.status === 'fulfilled') {
+        const vData: any = vitalRes.value;
         if (Array.isArray(vData) && vData.length > 0) setRealVitals(vData[0]);
       }
 
@@ -161,18 +159,10 @@ export default function PatientDashboard() {
   // 🟢 Handle Join Logic
   const handleJoin = async (apt: any) => {
     try {
-      const token = await getAuthToken();
-      await fetch(`${API_BASE_URL}/book-appointment`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          appointmentId: apt.appointmentId,
-          status: "CONFIRMED",
-          patientArrived: true // Critical Signal
-        })
+      await api.put('/book-appointment', {
+        appointmentId: apt.appointmentId,
+        status: "CONFIRMED",
+        patientArrived: true // Critical Signal
       });
     } catch (e) { console.error("Check-in error", e); }
 

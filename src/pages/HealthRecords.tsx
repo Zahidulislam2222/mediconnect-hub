@@ -31,8 +31,7 @@ import { Progress } from "@/components/ui/progress";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
-
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
+import { api } from "@/lib/api";
 
 // --- DEMO FALLBACK FOR AI QUOTA LIMITS ---
 const DEMO_RADIOLOGY_REPORT = {
@@ -76,9 +75,8 @@ export default function HealthRecords() {
         const userId = authUser.userId;
 
         // Fetch Profile for Avatar/Name
-        const profileRes = await fetch(`${API_BASE_URL}/register-patient?id=${userId}`);
-        if (profileRes.ok) {
-          const profile = await profileRes.json();
+        try {
+          const profile: any = await api.get(`/register-patient?id=${userId}`);
           const userData = { name: profile.name || "Patient", id: userId, avatar: profile.avatar };
 
           setUser(userData);
@@ -86,34 +84,27 @@ export default function HealthRecords() {
           // 🟢 FIX: Update Storage Safely
           const currentLocal = JSON.parse(localStorage.getItem('user') || '{}');
           localStorage.setItem('user', JSON.stringify({ ...currentLocal, ...userData }));
-        }
+        } catch (e) { /* ignore profile load error */ }
 
         // B. Fetch Document Vault (Using POST-RPC Pattern)
-        const ehrRes = await fetch(`${API_BASE_URL}/ehr`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
+        try {
+          const data: any = await api.post('/ehr', {
             action: "list_records",
             patientId: userId
-          })
-        });
-
-        if (ehrRes.ok) {
-          const data = await ehrRes.json();
+          });
           // Sort by newest first
           const sorted = Array.isArray(data) ? data.sort((a: any, b: any) =>
             new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
           ) : [];
           setRecords(sorted);
-        }
+        } catch (e) { console.warn("EHR List Failed", e); }
 
         // C. Fetch Relationship Graph (Using GET Pattern)
         // Note: We append "PATIENT#" because DynamoDB stores keys like "PATIENT#123"
-        const graphRes = await fetch(`${API_BASE_URL}/relationships?entityId=PATIENT#${userId}`);
-        if (graphRes.ok) {
-          const gData = await graphRes.json();
+        try {
+          const gData: any = await api.get(`/relationships?entityId=PATIENT#${userId}`);
           setGraphConnections(gData.connections || []);
-        }
+        } catch (e) { console.warn("Graph load failed"); }
 
       } catch (error) {
         console.error("Data Load Error:", error);
@@ -144,18 +135,10 @@ export default function HealthRecords() {
     const base64Clean = base64Full.split(",")[1];
 
     try {
-      const response = await fetch(`${API_BASE_URL}/analyze-image`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          imageBase64: base64Clean,
-          patientId: user.id
-        })
+      const data: any = await api.post('/analyze-image', {
+        imageBase64: base64Clean,
+        patientId: user.id
       });
-
-      if (!response.ok) throw new Error("Upload Failed");
-
-      const data = await response.json();
 
       if (data.report && !data.report.diagnosis.includes("Analysis Failed")) {
         setAiResult(data.report);
@@ -204,21 +187,15 @@ export default function HealthRecords() {
       // Step 1: Request Presigned URL from Lambda
       const token = (await getCurrentUser()).userId; // Or fetch session token if needed
 
-      const initRes = await fetch(`${API_BASE_URL}/ehr`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "request_upload",
-          patientId: user.id,
-          fileName: file.name,
-          fileType: file.type,
-          description: "Uploaded by Patient via Portal"
-        })
+      const initRes: any = await api.post('/ehr', {
+        action: "request_upload",
+        patientId: user.id,
+        fileName: file.name,
+        fileType: file.type,
+        description: "Uploaded by Patient via Portal"
       });
 
-      if (!initRes.ok) throw new Error("Failed to initialize upload");
-
-      const { uploadUrl } = await initRes.json();
+      const { uploadUrl } = initRes;
 
       // Step 2: Upload directly to S3
       const uploadRes = await fetch(uploadUrl, {
@@ -233,14 +210,10 @@ export default function HealthRecords() {
 
       // Step 3: Refresh List
       // We essentially re-run the "list_records" logic here
-      const listRes = await fetch(`${API_BASE_URL}/ehr`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "list_records", patientId: user.id })
-      });
+      const listRes: any = await api.post('/ehr', { action: "list_records", patientId: user.id });
 
-      if (listRes.ok) {
-        const data = await listRes.json();
+      if (listRes) {
+        const data = listRes;
         const sorted = Array.isArray(data) ? data.sort((a: any, b: any) =>
           new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
         ) : [];

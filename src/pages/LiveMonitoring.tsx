@@ -31,8 +31,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { getCurrentUser, signOut, fetchAuthSession } from 'aws-amplify/auth'; // 🟢 Added fetchAuthSession
-
-const API_URL = import.meta.env.VITE_API_BASE_URL || "";
+import { api } from "@/lib/api";
 
 // --- TYPES ---
 interface VitalReading {
@@ -106,16 +105,9 @@ export default function LiveMonitoring() {
                 console.log("🔍 Fetching list for Doctor:", doctorId);
 
                 // 3. Fetch with Headers (The Fix)
-                const response = await fetch(`${API_URL}/doctor-appointments?doctorId=${doctorId}`, {
-                    method: 'GET',
-                    headers: {
-                        'Authorization': `Bearer ${token}`, // 🟢 REQUIRED for API Gateway
-                        'Content-Type': 'application/json'
-                    }
-                });
+                const data: any = await api.get(`/doctor-appointments?doctorId=${doctorId}`);
 
-                if (response.ok) {
-                    const data = await response.json();
+                if (data) {
                     console.log("📦 API Data:", data);
 
                     // 4. Extract 'existingBookings' (Confirmed by your Lambda Code)
@@ -138,7 +130,7 @@ export default function LiveMonitoring() {
 
                     setMyPatients(Array.from(uniquePatientsMap.values()));
                 } else {
-                    console.error("❌ API Error:", response.status);
+                    console.error("❌ API Error: Data is null");
                 }
             } catch (e) {
                 console.error("❌ Network Error:", e);
@@ -236,13 +228,13 @@ export default function LiveMonitoring() {
             await getCurrentUser();
 
             const [profileRes, vitalsRes] = await Promise.allSettled([
-                fetch(`${API_URL}/register-patient?id=${patientId}`),
-                fetch(`${API_URL}/vitals?patientId=${patientId}&limit=20`)
+                api.get(`/register-patient?id=${patientId}`),
+                api.get(`/vitals?patientId=${patientId}&limit=20`)
             ]);
 
             // Profile Logic
-            if (profileRes.status === 'fulfilled' && profileRes.value.ok) {
-                const pData = await profileRes.value.json();
+            if (profileRes.status === 'fulfilled') {
+                const pData: any = profileRes.value;
                 const pInfo = pData.Item || pData;
                 setPatient({
                     name: pInfo.name || "Unknown Patient",
@@ -255,8 +247,8 @@ export default function LiveMonitoring() {
             }
 
             // Vitals Logic
-            if (vitalsRes.status === 'fulfilled' && vitalsRes.value.ok) {
-                const vData = await vitalsRes.value.json();
+            if (vitalsRes.status === 'fulfilled') {
+                const vData: any = vitalsRes.value;
                 processVitalsData(vData);
             } else {
                 console.warn("⚠️ API Unavailable - Starting Demo Mode");
@@ -287,9 +279,8 @@ export default function LiveMonitoring() {
 
         try {
             setConnectionStatus('POLLING');
-            const res = await fetch(`${API_URL}/vitals?patientId=${patientId}&limit=5`);
-            if (res.ok) {
-                const data = await res.json();
+            const data: any = await api.get(`/vitals?patientId=${patientId}&limit=5`);
+            if (data) {
                 processVitalsData(data);
             } else {
                 setConnectionStatus('DISCONNECTED');
@@ -330,19 +321,18 @@ export default function LiveMonitoring() {
     const handleEmergencyDispatch = async () => {
         if (!patientId) return;
         setEmergencyLoading(true);
+
+        // Recalculate latest vital for safety
+        const currentVital = vitals.length > 0 ? vitals[vitals.length - 1] : null;
+
         try {
-            const response = await fetch(`${API_URL}/emergency`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    patientId: patientId,
-                    type: 'MANUAL_OVERRIDE',
-                    heartRate: latestVital?.heartRate || 0
-                })
+            const data: any = await api.post('/emergency', {
+                patientId: patientId,
+                type: 'MANUAL_OVERRIDE',
+                heartRate: currentVital?.heartRate || 0
             });
 
-            if (!response.ok) throw new Error("Dispatch failed");
-            const data = await response.json();
+            if (!data) throw new Error("Dispatch failed");
 
             toast({
                 title: "🚑 EMERGENCY DISPATCHED",

@@ -30,21 +30,7 @@ import {
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
-
-// Authenticated API Wrapper
-const apiCall = async (endpoint: string, options: RequestInit = {}) => {
-  const session = await fetchAuthSession();
-  const token = session.tokens?.accessToken?.toString();
-
-  const headers = {
-    "Content-Type": "application/json",
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    ...options.headers,
-  };
-
-  return fetch(`${API_BASE_URL}${endpoint}`, { ...options, headers });
-};
+import { api } from "@/lib/api";
 
 export default function Pharmacy() {
   const navigate = useNavigate();
@@ -73,20 +59,20 @@ export default function Pharmacy() {
       setLoading(true);
       const authUser = await getCurrentUser();
 
-      const [profileRes, rxRes] = await Promise.all([
-        apiCall(`/register-patient?id=${authUser.userId}`),
-        apiCall(`/prescription?patientId=${authUser.userId}`)
+      const [profileData, rxData] = await Promise.all([
+        api.get(`/register-patient?id=${authUser.userId}`).catch(() => null),
+        api.get(`/prescription?patientId=${authUser.userId}`).catch(() => null)
       ]);
 
-      if (profileRes.ok) {
-        const profile = await profileRes.json();
+      if (profileData) {
+        const profile: any = profileData;
         const userData = { name: profile.name || "Patient", id: authUser.userId, avatar: profile.avatar };
         setUser(userData);
         localStorage.setItem('user', JSON.stringify({ ...user, ...userData }));
       }
 
-      if (rxRes.ok) {
-        const data = await rxRes.json();
+      if (rxData) {
+        const data: any = rxData;
         setPrescriptions(data.prescriptions || []);
       }
     } catch (error) {
@@ -114,14 +100,8 @@ export default function Pharmacy() {
   const handleGenerateQR = async (rx: any) => {
     setProcessingId(rx.prescriptionId);
     try {
-      const response = await apiCall(`/pharmacy/generate-qr`, {
-        method: "POST",
-        body: JSON.stringify({ prescriptionId: rx.prescriptionId })
-      });
+      const data: any = await api.post(`/pharmacy/generate-qr`, { prescriptionId: rx.prescriptionId });
 
-      if (!response.ok) throw new Error("Failed to generate code");
-
-      const data = await response.json();
       setGeneratedQR(data.qrPayload || `PICKUP-${rx.prescriptionId.substring(0, 8)}`);
       setSelectedRx(rx);
       setShowQRModal(true);
@@ -141,12 +121,7 @@ export default function Pharmacy() {
     setShowRefillModal(false);
 
     try {
-      const response = await apiCall(`/pharmacy/request-refill`, {
-        method: "POST",
-        body: JSON.stringify({ prescriptionId: selectedRx.prescriptionId })
-      });
-
-      if (!response.ok) throw new Error("Refill request failed");
+      await api.post(`/pharmacy/request-refill`, { prescriptionId: selectedRx.prescriptionId });
 
       toast({
         title: "Refill Requested",
