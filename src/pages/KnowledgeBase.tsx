@@ -8,6 +8,7 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { PublicHeader } from "@/components/PublicHeader";
+import { api } from "../lib/api";
 
 // 1. CONFIG: Map Category Names to Icons & Colors (Styling Logic)
 // If you add a new category in Strapi (e.g. "Skin Care"), it will use the "Default" style.
@@ -43,61 +44,59 @@ export default function KnowledgeBase({ role = "patient" }: KnowledgeBaseProps) 
   const [articles, setArticles] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
+  // src/pages/KnowledgeBase.tsx
+
   useEffect(() => {
     async function fetchData() {
       try {
-        // Fetch Articles
-        const response = await fetch(`${import.meta.env.VITE_STRAPI_API_URL}/api/articles?populate=*`);
-        const json = await response.json();
+        setIsLoading(true);
+        const response: any = await api.get('/public/knowledge');
 
-        if (json.data && json.data.length > 0) {
-          // A. Process Articles
-          const mappedArticles = json.data.map((item: any) => {
-            let imageUrl = null;
-            const img = item.coverImage || item.attributes?.coverImage;
-            if (img) {
-              const imgData = img.data || img;
-              if (imgData) {
-                const rawUrl = imgData.attributes?.url || imgData.url || (Array.isArray(imgData) ? imgData[0].url : null);
-                if (rawUrl) {
-                  imageUrl = rawUrl.startsWith('http') ? rawUrl : `${import.meta.env.VITE_STRAPI_API_URL}${rawUrl}`;
-                }
-              }
-            }
+        // 1. DEBUG: Look at your Browser Console (F12) to see this!
+        console.log("RAW API DATA:", response);
 
-            return {
-              id: item.documentId || item.id,
-              title: item.title || item.attributes?.title,
-              category: item.category || item.attributes?.category || "General",
-              readTime: "5 min",
-              image: imageUrl
-            };
-          });
+        // 2. ROBUST EXTRACTION: Handle direct array, .articles, or DynamoDB .Items
+        const rawList = Array.isArray(response)
+          ? response
+          : (response.Items || response.articles || response.data || []);
+
+        if (rawList.length > 0) {
+          const mappedArticles = rawList.map((item: any) => ({ // 👈 Change 'data' to 'rawList'
+            id: item.id,
+            title: item.description || "Untitled Article",
+            // Backend sends art.category inside 'legacyData'
+            category: item.legacyData?.category || "General",
+            // Backend sends art.coverImage inside 'content' array
+            image: item.content?.[0]?.attachment?.url || null,
+            content: item.legacyData?.content || "",
+            readTime: "5 min"
+          }));
+
           setArticles(mappedArticles);
 
-          // B. EXTRACT UNIQUE CATEGORIES DYNAMICALLY
-          // This looks at all downloaded articles, finds the unique category names,
-          // and builds the category buttons automatically.
-          const uniqueCategories = [...new Set(mappedArticles.map((a: any) => a.category))];
+          // 3. DYNAMIC CATEGORIES
+          const uniqueFromDB = [...new Set(mappedArticles.map((a: any) => a.category))];
+          const mainCategories = [
+            "Heart Health", "Diabetes", "Wellness",
+            "Nutrition", "Pharmacy", "Sleep & Mental Health"
+          ];
 
-          if (uniqueCategories.length > 0) {
-            const dynamicCats = uniqueCategories.map((catName: any) => {
-              // Find style in map, or use Default style if new
-              const style = STYLE_MAP[catName] || STYLE_MAP["Default"];
-              return {
-                name: catName,
-                icon: style.icon,
-                color: style.color,
-                bg: style.bg,
-                description: style.desc
-              };
-            });
-            setCategories(dynamicCats); // <--- OVERWRITE MOCK WITH REAL
-          }
+          const allCategoryNames = [...new Set([...mainCategories, ...uniqueFromDB])];
+          const finalCategories = allCategoryNames.map((catName: any) => {
+            const style = STYLE_MAP[catName] || STYLE_MAP["Default"];
+            return {
+              name: catName,
+              icon: style.icon,
+              color: style.color,
+              bg: style.bg,
+              description: style.desc
+            };
+          });
+
+          setCategories(finalCategories);
         }
       } catch (error) {
-        console.error("Failed to fetch data, using mock fallback", error);
-        // If error, we just keep the MOCK_CATEGORIES we started with
+        console.error("Failed to fetch articles:", error);
       } finally {
         setIsLoading(false);
       }
@@ -105,10 +104,14 @@ export default function KnowledgeBase({ role = "patient" }: KnowledgeBaseProps) 
     fetchData();
   }, []);
 
-  const filteredArticles = articles.filter(article =>
-    article.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    article.category.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredArticles = articles.filter(article => {
+    const title = article.title || "";
+    const category = article.category || "";
+    const query = searchQuery.toLowerCase();
+
+    return title.toLowerCase().includes(query) ||
+      category.toLowerCase().includes(query);
+  });
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -189,7 +192,10 @@ export default function KnowledgeBase({ role = "patient" }: KnowledgeBaseProps) 
                 <Card
                   key={article.id}
                   className="group border-0 shadow-sm hover:shadow-xl transition-all duration-300 rounded-[32px] overflow-hidden cursor-pointer bg-white"
-                  onClick={() => navigate(role === 'doctor' ? `/doctor/knowledge/${article.id}` : `/knowledge/${article.id}`)}
+                  onClick={() => navigate(role === 'doctor'
+                    ? `/doctor/knowledge/${encodeURIComponent(article.id)}`
+                    : `/knowledge/${encodeURIComponent(article.id)}`
+                  )}
                 >
                   <div className="h-48 overflow-hidden relative">
                     {article.image ? (

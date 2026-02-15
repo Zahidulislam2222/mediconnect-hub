@@ -42,6 +42,7 @@ export default function PatientDashboard() {
   const { toast } = useToast();
 
   // --- STATE ---
+  const [hasToday, setHasToday] = useState(true);
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState<any>(() => {
     try {
@@ -95,44 +96,50 @@ export default function PatientDashboard() {
         }
       }
 
-      // B. Appointments (STRICT FILTER & DEDUPING APPLIED)
+      // B. Appointments (STRICT FILTER & SMART CONTEXT)
       if (apptRes.status === 'fulfilled') {
         const data: any = apptRes.value;
-        let list = [];
-        if (Array.isArray(data)) {
-          list = data;
-        } else if (data.existingBookings) {
-          list = data.existingBookings;
-        }
+        let list = Array.isArray(data) ? data : (data.existingBookings || []);
 
-        // --- THIS IS THE NEW LOGIC FROM THE DOCTOR'S DASHBOARD ---
-        const startOfToday = new Date();
-        startOfToday.setHours(0, 0, 0, 0);
+        const now = new Date();
         const endOfToday = new Date();
         endOfToday.setHours(23, 59, 59, 999);
-        // --- END OF NEW LOGIC ---
 
         const seenIds = new Set();
-        const active = list
+        const allValid = list
           .filter((a: any) => {
-            // Standard data integrity checks
-            if (!a.timeSlot || !a.patientName) return false;
-            if (isNaN(new Date(a.timeSlot).getTime())) return false;
+            // HYBRID READ
+            const timeSlot = a.resource?.start || a.timeSlot;
+            const patientName = a.resource?.participant?.find((p: any) => p.actor?.reference?.includes('Patient'))?.actor?.display || a.patientName;
+
+            if (!timeSlot || !patientName) return false;
             if (seenIds.has(a.appointmentId)) return false;
-            if (['CANCELLED', 'COMPLETED', 'REJECTED'].includes(a.status)) return false;
+            // Also check resource status if available
+            const status = a.resource?.status || a.status;
+            if (['CANCELLED', 'COMPLETED', 'REJECTED', 'cancelled', 'fulfilled'].includes(status)) return false;
 
-            // --- APPLY THE "TODAY ONLY" FILTER ---
-            const aptDate = new Date(a.timeSlot);
-            if (aptDate < startOfToday || aptDate > endOfToday) {
-              return false; // Filter out appointments not scheduled for today
-            }
-
-            seenIds.add(a.appointmentId);
-            return true;
+            const aptDate = new Date(timeSlot);
+            // Show if it hasn't happened yet, or started in the last 30 mins
+            return aptDate >= new Date(now.getTime() - 30 * 60000);
           })
-          .sort((a: any, b: any) => new Date(a.timeSlot).getTime() - new Date(b.timeSlot).getTime());
+          .sort((a: any, b: any) => {
+            const tA = a.resource?.start || a.timeSlot;
+            const tB = b.resource?.start || b.timeSlot;
+            return new Date(tA).getTime() - new Date(tB).getTime();
+          });
 
-        setAppointments(active);
+        // Check if anything in the list is actually for TODAY
+        const todayOnly = allValid.filter((a: any) => {
+          const timeSlot = a.resource?.start || a.timeSlot;
+          return new Date(timeSlot) <= endOfToday;
+        });
+
+        // 🟢 SET THE STATE HERE TO FIX THE ERROR
+        setHasToday(todayOnly.length > 0);
+
+        // If nothing today, show the next 3 upcoming ones. Otherwise, show today's list.
+        const displayList = todayOnly.length > 0 ? todayOnly : allValid.slice(0, 3);
+        setAppointments(displayList);
       }
 
       // C. Billing
@@ -242,12 +249,6 @@ export default function PatientDashboard() {
                   </div>
                   <p className="text-xs text-muted-foreground mb-4">Outstanding Balance</p>
 
-                  <div className={`flex items-center gap-2 p-2 rounded-md text-xs font-medium mb-4 ${billing?.insuranceStatus === 'Active' ? 'bg-blue-50 text-blue-700' : 'bg-amber-50 text-amber-700'
-                    }`}>
-                    <ShieldCheck className="h-3 w-3" />
-                    {billing?.insuranceProvider || "No Insurance"} ({billing?.insuranceStatus || "Inactive"})
-                  </div>
-
                   <button
                     onClick={() => navigate("/billing")}
                     className="w-full text-xs bg-primary text-primary-foreground py-2.5 rounded-md hover:bg-primary/90 transition-colors font-medium"
@@ -267,22 +268,27 @@ export default function PatientDashboard() {
             <CardHeader className="pb-3 border-b mb-3">
               <div className="flex items-center justify-between">
                 <CardTitle className="text-lg flex items-center gap-2">
-                  <Calendar className="h-5 w-5 text-primary" /> Today's Appointments
+                  <Calendar className="h-5 w-5 text-primary" />
+                  {/* 🟢 DYNAMIC TITLE */}
+                  {appointments.length > 0 && hasToday ? "Today's Appointments" : "Next Upcoming Appointments"}
                 </CardTitle>
                 <button onClick={() => navigate("/appointments")} className="text-sm text-primary hover:underline font-medium">
-                  View all
+                  View full schedule
                 </button>
               </div>
             </CardHeader>
+
             <CardContent className="space-y-4 pt-1">
               {loading ? (
                 <div className="flex justify-center py-6"><Loader2 className="h-6 w-6 animate-spin" /></div>
               ) : appointments.length === 0 ? (
                 <div className="text-center py-10 text-muted-foreground bg-muted/10 rounded-lg border border-dashed">
                   <Calendar className="h-10 w-10 mx-auto mb-3 opacity-20" />
-                  <p className="font-medium">No upcoming appointments.</p>
+                  {/* 🟢 CLEARER EMPTY STATE */}
+                  <p className="font-medium">Your schedule is currently clear.</p>
+                  <p className="text-xs">No upcoming appointments found.</p>
                   <button onClick={() => navigate("/appointments")} className="text-primary text-sm font-semibold hover:underline mt-2">
-                    Book Now &rarr;
+                    Book a New Session &rarr;
                   </button>
                 </div>
               ) : (

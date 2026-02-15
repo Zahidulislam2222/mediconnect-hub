@@ -12,6 +12,7 @@ import {
   MapPin,
   Loader2,
   FileWarning,
+  CreditCard,
   History
 } from "lucide-react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
@@ -31,10 +32,12 @@ import {
 import { useToast } from "@/hooks/use-toast";
 
 import { api } from "@/lib/api";
+import { useCheckout } from "@/context/CheckoutContext";
 
 export default function Pharmacy() {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { requestPayment } = useCheckout();
 
   // --- STATE ---
   const [user, setUser] = useState<any>(() => {
@@ -46,6 +49,8 @@ export default function Pharmacy() {
   const [prescriptions, setPrescriptions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [processingId, setProcessingId] = useState<string | null>(null);
+
+  const [justPaidIds, setJustPaidIds] = useState<string[]>([]);
 
   // Modals
   const [showQRModal, setShowQRModal] = useState(false);
@@ -94,6 +99,53 @@ export default function Pharmacy() {
   const handleLogout = async () => {
     await signOut();
     navigate("/");
+  };
+
+  // --- NEW: Pharmacy Payment Handler ---
+  const handlePayMedication = async (rx: any) => {
+    setProcessingId(rx.prescriptionId);
+    try {
+      // 1. Fetch user's billing to find the exact Bill ID for this medicine
+      // Note: In our backend, referenceId = prescriptionId
+      const billing: any = await api.get(`/billing?patientId=${user.id}`);
+      const transaction = billing.transactions?.find(
+        (t: any) => t.referenceId === rx.prescriptionId
+      );
+
+      if (!transaction || !transaction.billId) {
+        throw new Error("Billing record not found. Please sync or contact support.");
+      }
+
+      // 2. Open the Professional Modal
+      const paymentMethod = await requestPayment({
+        amount: Number(rx.price), // 🟢 Use exact price from DB
+        title: "Pharmacy Payment",
+        description: `Medication: ${rx.medication}`
+      });
+
+      // 3. Execute Payment on Backend
+      // We pass the billId and the paymentMethod.id
+      await api.post('/pay-bill', {
+        billId: transaction.billId,
+        patientId: user.id,
+        paymentMethodId: paymentMethod.id
+      });
+      setJustPaidIds(prev => [...prev, rx.prescriptionId]);
+      toast({
+        title: "Verifying Payment...",
+        description: "Finalizing with your pharmacy. Please wait a moment."
+      });
+      setTimeout(async () => {
+        await fetchPrescriptions();
+        setProcessingId(null);
+      }, 3000);
+
+    } catch (error: any) {
+      setProcessingId(null);
+      if (error.message !== "User cancelled payment") {
+        toast({ variant: "destructive", title: "Payment Error", description: error.message });
+      }
+    }
   };
 
   // --- 2. ACTIONS ---
@@ -235,6 +287,17 @@ export default function Pharmacy() {
                           {getStatusBadge(rx.status)}
                         </div>
                         <p className="text-sm text-slate-500 mt-0.5">{rx.dosage} • {rx.instructions || "Follow label instructions"}</p>
+                        {/* 🟢 NEW: PRICE & STOCK INFO */}
+                        <div className="flex items-center gap-4 mt-1">
+                          <span className="text-sm font-bold text-slate-700">
+                            Price: ${rx.livePrice}
+                          </span>
+                          {rx.liveStock === 0 ? (
+                            <Badge variant="outline" className="text-red-600 border-red-600 bg-red-50">Out of Stock</Badge>
+                          ) : (
+                            <span className="text-xs text-slate-400">{rx.liveStock} in stock</span>
+                          )}
+                        </div>
                         <div className="flex items-center gap-3 mt-1 text-xs text-slate-400">
                           <span className="flex items-center gap-1"><Clock className="h-3 w-3" /> Issued: {new Date(rx.timestamp).toLocaleDateString()}</span>
                           <span>ID: #{rx.prescriptionId.substring(0, 6)}</span>
@@ -244,26 +307,55 @@ export default function Pharmacy() {
 
                     {/* Action Buttons */}
                     <div className="flex items-center gap-2">
-                      {(rx.status === "ISSUED" || rx.status === "READY_FOR_PICKUP") && (
+
+                      {/* 1. THE PAYMENT DOOR (Shows if NOT paid) */}
+                      {rx.status === "ISSUED" && rx.paymentStatus !== "PAID" && (
+                        <Button
+                          size="sm"
+                          className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                          disabled={rx.liveStock === 0 || processingId === rx.prescriptionId}
+                          onClick={() => handlePayMedication(rx)} // Call our new function
+                        >
+                          {processingId === rx.prescriptionId ? (
+                            <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                          ) : (
+                            <CreditCard className="h-4 w-4 mr-2" />
+                          )}
+                          Pay ${rx.livePrice}
+                        </Button>
+                      )}
+
+                      {/* 2. THE PICKUP GATE (Shows ONLY if paid or already ready) */}
+                      {((rx.status === "ISSUED" && rx.paymentStatus === "PAID") || rx.status === "READY_FOR_PICKUP") && (
                         <Button
                           variant="outline"
                           size="sm"
                           onClick={() => handleGenerateQR(rx)}
                           disabled={processingId === rx.prescriptionId}
                         >
-                          {processingId === rx.prescriptionId ? <Loader2 className="h-4 w-4 animate-spin" /> : <QrCode className="h-4 w-4 mr-2" />}
+                          {processingId === rx.prescriptionId ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <QrCode className="h-4 w-4 mr-2" />
+                          )}
                           Pickup Code
                         </Button>
                       )}
 
+                      {/* 3. THE REFILL BUTTON (Always visible for active/ready meds) */}
                       <Button
                         size="sm"
                         className="bg-primary"
-                        onClick={() => { setSelectedRx(rx); setShowRefillModal(true); }}
-                        disabled={rx.status === "REFILL_REQUESTED" || rx.status === "READY_FOR_PICKUP"}
+                        onClick={() => { setSelectedRx(rx); handleRefillRequest(); }} // Update this
+                        disabled={
+                          rx.status === "REFILL_REQUESTED" ||
+                          rx.status === "READY_FOR_PICKUP" ||
+                          rx.status === "ISSUED" ||   // 🟢 ADD: Cannot refill if just issued
+                          rx.status === "PENDING"     // 🟢 ADD: Cannot refill if not yet paid
+                        }
                       >
                         <RefreshCw className="h-3.5 w-3.5 mr-2" />
-                        {rx.status === "REFILL_REQUESTED" ? "Pending" : "Refill"}
+                        {rx.refillsRemaining > 0 ? `Refill (${rx.refillsRemaining} left)` : "Request Refill"}
                       </Button>
                     </div>
 

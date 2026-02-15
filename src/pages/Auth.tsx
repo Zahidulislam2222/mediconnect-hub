@@ -116,11 +116,14 @@ export default function Auth() {
       } else {
         try {
           const data = await api.get(`/doctors/${userId}`);
+
+          // 🟢 PROFESSIONAL FIX: Check for both 'doctorId' and 'id'
           if (data.doctors && Array.isArray(data.doctors)) {
-            profile = data.doctors.find((d: any) => d.doctorId === userId);
-          } else if (data.doctorId === userId) {
+            profile = data.doctors.find((d: any) => (d.doctorId === userId || d.id === userId));
+          } else if (data.doctorId === userId || data.id === userId) {
             profile = data;
           }
+
           if (profile) roleKey = "doctor";
         } catch (e: any) {
           if (e.message.includes('401')) throw e;
@@ -273,27 +276,25 @@ export default function Auth() {
         options: { userAttributes: { email, name } }
       });
 
-      if (userId) {
-        if (userType === 'patient') {
-          await api.post('/patients', {
-            userId: userId,
-            name: name,
-            email: email,
-            role: 'patient',
-            identityStatus: 'UNVERIFIED'
-          });
-        } else {
-          await api.post('/doctors', {
-            doctorId: userId,
-            name: name,
-            email: email,
-            role: 'doctor',
-            specialization: 'General Practice',
-            licenseNumber: 'PENDING-VERIFICATION',
-            verificationStatus: 'PENDING',
-            isIdentityVerified: false
-          });
-        }
+      if (userType === 'provider') {
+        // 1. Create ONLY in GCP PostgreSQL
+        await api.post('/doctors', {
+          doctorId: userId,
+          name: name,
+          email: email,
+          role: 'doctor',
+          specialization: 'General Practice',
+          licenseNumber: 'PENDING-VERIFICATION'
+        });
+        // DO NOT call api.post('/patients', ...) for doctors here anymore.
+      } else {
+        // 2. Patients ONLY in AWS DynamoDB
+        await api.post('/patients', {
+          userId: userId,
+          name: name,
+          email: email,
+          role: 'patient'
+        });
       }
       setAuthStep("confirm-signup");
       toast({ title: "Account Created", description: "Check email for code." });
@@ -337,7 +338,7 @@ export default function Auth() {
         idImage: idImage
       };
 
-      const data = await api.post('/verify-identity', payload);
+      const data = await api.post('/patients/identity/verify', payload);
 
       if (data.verified) {
         setVerificationStatus("success");
@@ -387,45 +388,58 @@ export default function Auth() {
     try {
       const user = await getCurrentUser();
       const session = await fetchAuthSession();
+      const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+      const registeredName = currentUser.name || "Doctor";
 
-      if (!session.credentials) {
-        throw new Error("No AWS credentials found.");
-      }
+      if (!session.credentials) throw new Error("No AWS credentials found.");
 
       const s3Client = new S3Client({
         region: "us-east-1",
-        credentials: session.credentials,
-        requestChecksumCalculation: "WHEN_REQUIRED",
-        responseChecksumValidation: "WHEN_REQUIRED"
+        credentials: session.credentials
       });
 
       const fileExt = diplomaFile.name.split('.').pop();
       const fileName = `doctors/${user.userId}/diploma.${fileExt}`;
 
-      const command = new PutObjectCommand({
+      // 🟢 PROFESSIONAL FIX: Convert File to ArrayBuffer to prevent "readableStream" error
+      const arrayBuffer = await diplomaFile.arrayBuffer();
+      const fileBuffer = new Uint8Array(arrayBuffer);
+
+      // 1. Upload to S3
+      await s3Client.send(new PutObjectCommand({
         Bucket: CREDENTIALS_BUCKET,
         Key: fileName,
-        Body: diplomaFile,
+        Body: fileBuffer, // Use the converted buffer here
         ContentType: diplomaFile.type
-      });
-
-      await s3Client.send(command);
+      }));
 
       console.log('Upload success to:', CREDENTIALS_BUCKET);
+      toast({ title: "Scanning", description: "AI is checking your name on the document..." });
 
-      toast({
-        title: "Credential Uploaded",
-        description: "Your document is being processed by our AI."
+      // 2. Trigger the Strict AI Scan on the Backend
+      const response = await api.post(`/doctors/${user.userId}/verify-diploma`, {
+        s3Key: fileName,
+        bucketName: CREDENTIALS_BUCKET,
+        expectedName: registeredName
       });
 
-      navigate("/doctor-dashboard");
+      if (response.verified) {
+        toast({ title: "AI Verified", description: "Identity and Credentials match! Welcome." });
+        navigate("/doctor-dashboard");
+      } else {
+        toast({
+          variant: "destructive",
+          title: "AI Match Failed",
+          description: "The name on the diploma does not match your account name."
+        });
+      }
 
     } catch (error: any) {
-      console.error("Upload failed", error);
+      console.error("Upload/Verify failed", error);
       toast({
         variant: "destructive",
-        title: "Upload Failed",
-        description: error.message || "Check your network or permissions."
+        title: "Verification Error",
+        description: error.message || "Could not complete verification."
       });
     } finally {
       setLoading(false);

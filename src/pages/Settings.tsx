@@ -15,6 +15,8 @@ import {
     BadgeCheck,
     DollarSign,
     FileText,
+    Calendar, // 🟢 ADD THIS
+    CheckCircle,
     Clock // 🟢 Added Icon
 } from "lucide-react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
@@ -102,6 +104,7 @@ export default function Settings() {
     );
 
     const [userId, setUserId] = useState("");
+    const [calendarConnected, setCalendarConnected] = useState(false);
 
     const [formData, setFormData] = useState({
         name: localUser.name || "",
@@ -178,10 +181,9 @@ export default function Settings() {
             // 🟢 2. Load Doctor Schedule (Separate standard standard fetch)
             if (userRole === 'doctor') {
                 try {
-                    const scheduleData: any = await api.get(`/doctor-schedule?doctorId=${authUser.userId}`);
+                    const scheduleData: any = await api.get(`/doctors/${authUser.userId}/schedule`);
 
                     if (scheduleData) {
-                        // Parse DB format ({"Mon": "09:00-17:00"}) to UI format
                         const schedule = scheduleData.schedule || {};
                         const parsedSchedule: any = {};
 
@@ -194,11 +196,66 @@ export default function Settings() {
                                 parsedSchedule[day] = { active: false, start: "09:00", end: "17:00" };
                             }
                         });
+
+                        // 🟢 CRITICAL FIX: Add this line to update the UI
+                        setWeeklySchedule(parsedSchedule);
                     }
                 } catch (e) {
                     console.error("Schedule load error", e);
                 }
             }
+
+            // --- Inside handleSave() ---
+            const handleSave = async () => {
+                setIsSaving(true);
+                try {
+                    // ... setup ...
+
+                    // 1. Save Profile
+                    let profileReq;
+                    if (userRole === 'doctor') {
+                        // 🟢 FIX: Use standard /doctors/:id path
+                        profileReq = api.put(`/doctors/${userId}`, {
+                            ...formData,
+                            doctorId: userId
+                        });
+                    } else {
+                        // 🟢 FIX: Use standard /patients/:id path
+                        profileReq = api.put(`/patients/${userId}`, {
+                            ...formData,
+                            userId: userId
+                        });
+                    }
+
+                    // 2. Save Schedule (If Doctor)
+                    const promises = [profileReq];
+                    if (userRole === 'doctor') {
+                        const finalSchedule: any = {};
+                        DAYS.forEach(day => {
+                            const dayData = weeklySchedule[day] || { active: false, start: "09:00", end: "17:00" };
+                            finalSchedule[day] = dayData.active ? `${dayData.start}-${dayData.end}` : "OFF";
+                        });
+
+                        // 🟢 FIX: Use standard /doctors/:id/schedule path
+                        const scheduleReq = api.post(`/doctors/${userId}/schedule`, {
+                            schedule: finalSchedule
+                        });
+                        promises.push(scheduleReq);
+                    }
+
+                    // 🟢 3. Check Calendar Status (If Doctor)
+                    if (userRole === 'doctor') {
+                        try {
+                            // Check if connected
+                            const calStatus: any = await api.get(`/doctors/${authUser.userId}/calendar/status`);
+                            if (isMounted.current) setCalendarConnected(calStatus.connected);
+                        } catch (e) { console.error("Calendar status error", e); }
+                    }
+
+                    await Promise.all(promises);
+                    // ... success toast ...
+                } catch (error) { /* error toast */ }
+            };
 
         } catch (error) {
             console.error("Profile load failed:", error);
@@ -255,47 +312,47 @@ export default function Settings() {
                 address: formData.address
             };
 
-            // 1. Save Profile
-            let profileEndpoint;
-            let profilePayload;
+            // --- 1. Save Profile ---
+            let profileReq;
 
             if (userRole === 'doctor') {
-                profileEndpoint = `/register-doctor`;
-                profilePayload = {
+                // 🟢 FIX: Use the specific ID path to match: router.put('/doctors/:id', ...)
+                profileReq = api.put(`/doctors/${userId}`, {
                     ...basePayload,
                     doctorId: userId,
                     specialization: formData.specialization,
                     consultationFee: formData.consultationFee,
                     bio: formData.bio,
-                };
+                });
             } else {
-                profileEndpoint = `/register-patient`;
-                profilePayload = { ...basePayload, userId: userId };
+                // 🟢 FIX: Use the specific ID path to match: router.put('/patients/:id', ...)
+                profileReq = api.put(`/patients/${userId}`, {
+                    ...basePayload,
+                    userId: userId
+                });
             }
 
-            const profileReq = api.put(profileEndpoint, profilePayload);
-
-            // 🟢 2. Save Schedule (If Doctor)
+            // --- 2. Save Schedule (If Doctor) ---
             const promises = [profileReq];
 
             if (userRole === 'doctor') {
-                // Convert UI Format back to DB Format (e.g., "09:00-17:00" or "OFF")
+                // Convert UI Format back to DB Format
                 const finalSchedule: any = {};
                 DAYS.forEach(day => {
                     const dayData = weeklySchedule[day] || { active: false, start: "09:00", end: "17:00" };
-                    if (dayData.active) {
-                        finalSchedule[day] = `${dayData.start}-${dayData.end}`;
-                    } else {
-                        finalSchedule[day] = "OFF";
-                    }
+                    finalSchedule[day] = dayData.active ? `${dayData.start}-${dayData.end}` : "OFF";
                 });
 
-                const scheduleReq = api.post(`/doctor-schedule`, {
-                    doctorId: userId,
+                // 🟢 FIX: Use the specific ID path to match: router.post('/doctors/:id/schedule', ...)
+                // This removes the "CRITICAL: Unknown Route" and the "404"
+                const scheduleReq = api.post(`/doctors/${userId}/schedule`, {
                     schedule: finalSchedule
                 });
                 promises.push(scheduleReq);
             }
+
+            await Promise.all(promises);
+
 
             await Promise.all(promises);
 
@@ -347,6 +404,26 @@ export default function Settings() {
         setIsLoading(true);
         loadProfile();
         toast({ title: "Changes Discarded", description: "Form reset to saved values." });
+    };
+
+    // 🟢 HANDLERS: Google Calendar
+    const handleConnectCalendar = async () => {
+        try {
+            const res: any = await api.get(`/doctors/auth/google?id=${userId}`);
+            if (res.url) window.location.href = res.url; // Redirect to Google
+        } catch (e) {
+            toast({ variant: "destructive", title: "Connection Failed", description: "Could not initiate Google Login." });
+        }
+    };
+
+    const handleDisconnectCalendar = async () => {
+        try {
+            await api.delete(`/doctors/${userId}/calendar`);
+            setCalendarConnected(false);
+            toast({ title: "Disconnected", description: "Google Calendar sync stopped." });
+        } catch (e) {
+            toast({ variant: "destructive", title: "Error", description: "Could not disconnect." });
+        }
     };
 
     return (
@@ -600,6 +677,47 @@ export default function Settings() {
                             </div>
                         </CardContent>
                     </Card>
+
+                    {/* 🟢 4. GOOGLE CALENDAR INTEGRATION (Doctor Only) */}
+                    {userRole === 'doctor' && (
+                        <Card className="shadow-card border-border/50">
+                            <CardHeader>
+                                <CardTitle className="flex items-center gap-2">
+                                    <Calendar className="h-5 w-5 text-primary" />
+                                    Google Calendar Sync
+                                </CardTitle>
+                                <CardDescription>Sync appointments to your personal calendar</CardDescription>
+                            </CardHeader>
+                            <CardContent className="space-y-4">
+                                <div className="flex items-center justify-between p-4 border border-border/40 rounded-lg bg-muted/20">
+                                    <div className="flex items-center gap-4">
+                                        <div className={`p-3 rounded-full ${calendarConnected ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+                                            {calendarConnected ? <CheckCircle className="h-6 w-6" /> : <Calendar className="h-6 w-6" />}
+                                        </div>
+                                        <div>
+                                            <h4 className="font-medium">
+                                                {calendarConnected ? "Calendar Connected" : "Not Connected"}
+                                            </h4>
+                                            <p className="text-sm text-muted-foreground">
+                                                {calendarConnected
+                                                    ? "Appointments are syncing automatically."
+                                                    : "Connect to see appointments on your phone."}
+                                            </p>
+                                        </div>
+                                    </div>
+                                    {calendarConnected ? (
+                                        <Button variant="outline" onClick={handleDisconnectCalendar} className="border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700">
+                                            Disconnect
+                                        </Button>
+                                    ) : (
+                                        <Button onClick={handleConnectCalendar} className="bg-blue-600 hover:bg-blue-700 text-white">
+                                            Connect Google
+                                        </Button>
+                                    )}
+                                </div>
+                            </CardContent>
+                        </Card>
+                    )}
 
                     {/* ACTION BAR */}
                     <div className="flex justify-end gap-4 sticky bottom-6 z-10">

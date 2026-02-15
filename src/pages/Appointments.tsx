@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { fetchUserAttributes, fetchAuthSession } from 'aws-amplify/auth';
-import { Clock, Video, Plus, Loader2, CreditCard, ShieldCheck, Stethoscope } from "lucide-react";
+import { Clock, Video, Plus, Loader2, CreditCard, Stethoscope, FileText } from "lucide-react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -14,24 +14,16 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { api } from "@/lib/api";
 
 // --- STRIPE IMPORTS ---
-import { loadStripe } from '@stripe/stripe-js';
-import { Elements, CardElement, useStripe, useElements } from '@stripe/react-stripe-js';
-
-const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
+import { useCheckout } from "@/context/CheckoutContext";
 
 export default function Appointments() {
-    return (
-        <Elements stripe={stripePromise}>
-            <AppointmentsContent />
-        </Elements>
-    );
+    return <AppointmentsContent />;
 }
 
 function AppointmentsContent() {
     const navigate = useNavigate();
     const { toast } = useToast();
-    const stripe = useStripe();
-    const elements = useElements();
+    const { requestPayment } = useCheckout();
 
     // User State
     const [user, setUser] = useState<any>(() => {
@@ -56,8 +48,7 @@ function AppointmentsContent() {
         doctorId: "",
         date: "",
         time: "09:00",
-        insuranceProvider: "",
-        policyId: ""
+
     });
 
     // Dynamic Slot State
@@ -65,9 +56,6 @@ function AppointmentsContent() {
     const [loadingSlots, setLoadingSlots] = useState(false);
     // 🟢 NEW: Store the Doctor's Timezone
     const [doctorTimezone, setDoctorTimezone] = useState("UTC");
-
-    // Price
-    const price = (formData.insuranceProvider && formData.policyId) ? 20 : 50;
 
     // --- AUTH HELPER ---
     const getAuthToken = async () => {
@@ -161,21 +149,23 @@ function AppointmentsContent() {
             setLoadingSlots(true);
             setAvailableSlots([]);
             try {
-                const data: any = await api.get(`/doctor-appointments?doctorId=${formData.doctorId}`);
+                // 1. Parallel calls to both Microservices
+                const [bookingRes, scheduleRes]: any = await Promise.all([
+                    api.get(`/doctor-appointments?doctorId=${formData.doctorId}`), // Booking Service (Azure/DynamoDB)
+                    api.get(`/doctors/${formData.doctorId}/schedule`)             // Doctor Service (Azure/GCP Postgres)
+                ]);
 
-                const bookings = data.existingBookings || [];
-                const weeklySchedule = data.weeklySchedule || {};
+                const bookings = bookingRes.existingBookings || [];
+                const weeklySchedule = scheduleRes.schedule || {};
+                const tz = scheduleRes.timezone || "UTC";
 
-                // 🟢 NEW: Capture Timezone from Backend
-                const tz = data.timezone || "UTC";
                 setDoctorTimezone(tz);
 
-                // 1. Determine Day
+                // 2. Determine Day Name
                 const dateObj = new Date(formData.date);
-                // Fix: Ensure we get the weekday name correctly even if date is picked in different timezone
                 const dayName = dateObj.toLocaleDateString('en-US', { weekday: 'long', timeZone: 'UTC' });
 
-                // 2. Get Shift
+                // 3. Get Shift for that day
                 const shift = weeklySchedule[dayName];
 
                 if (!shift || shift === "OFF") {
@@ -183,7 +173,7 @@ function AppointmentsContent() {
                     return;
                 }
 
-                // 3. Generate Slots
+                // 4. Generate Slots Logic (remains same)
                 const [startStr, endStr] = shift.split('-');
                 const startHour = parseInt(startStr.split(':')[0]);
                 const endHour = parseInt(endStr.split(':')[0]);
@@ -192,25 +182,33 @@ function AppointmentsContent() {
                 for (let h = startHour; h < endHour; h++) {
                     const timeStr = `${h.toString().padStart(2, '0')}:00`;
 
-                    // 🟢 CRITICAL FIX: FORCE UTC CONSTRUCTION
-                    // We treat the Doctor's "09:00" as a specific ID. 
-                    // We append 'Z' to force it to be Universal Time in the database.
-                    // This prevents "Browser Timezone" from shifting the slot by +/- 5 hours.
-                    const slotISO = `${formData.date}T${timeStr}:00Z`;
+                    // 🟢 LOGIC: Compare by actual Date objects, not strings
+                    // This handles the "15:00" vs "15:01:30" mismatch
+                    const isTaken = bookings.some((b: any) => {
+                        // 1. Ignore cancelled appointments
+                        if (b.status === 'CANCELLED') return false;
 
-                    // Check if this specific ISO string exists in bookings
-                    // We strictly compare the first 19 chars (YYYY-MM-DDTHH:mm:00) to avoid millisecond mismatches
-                    const isTaken = bookings.some((b: any) =>
-                        b.timeSlot.substring(0, 19) === slotISO.substring(0, 19) &&
-                        b.status !== 'CANCELLED'
-                    );
+                        // 2. Get the time from either FHIR or Legacy field
+                        const bookedTime = b.resource?.start || b.timeSlot;
+                        if (!bookedTime) return false;
 
-                    if (!isTaken) slots.push(timeStr);
+                        // 3. Format BOTH to the same standard: YYYY-MM-DDT09:00:00Z
+                        // This removes the milliseconds that DynamoDB sometimes adds
+                        const dbTimeStr = bookedTime.split('.')[0].split('Z')[0] + "Z";
+                        const dropdownTimeStr = `${formData.date}T${timeStr}:00Z`;
+
+                        return dbTimeStr === dropdownTimeStr;
+                    });
+
+                    if (!isTaken) {
+                        slots.push(timeStr);
+                    }
                 }
                 setAvailableSlots(slots);
 
             } catch (e) {
-                console.error("Slot error", e);
+                console.error("Fetch Slots Error", e);
+                toast({ variant: "destructive", title: "Schedule Error", description: "Could not load doctor availability." });
             } finally {
                 setLoadingSlots(false);
             }
@@ -221,19 +219,23 @@ function AppointmentsContent() {
     // --- HANDLING BOOKING ---
     const handleBook = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!stripe || !elements) return;
         setLoading(true);
 
         try {
             const token = await getAuthToken();
             const selectedDoc = doctors.find(d => d.doctorId === formData.doctorId);
+            
+            // 🟢 DYNAMIC PRICE: Get from doctor object, default to 50
+            const currentPrice = selectedDoc?.consultationFee || 50;
+
             const timeSlotISO = `${formData.date}T${formData.time}:00`;
 
-            // 1. Get Stripe Token
-            const cardElement = elements.getElement(CardElement);
-            if (!cardElement) throw new Error("Card input not found");
-            const { error, paymentMethod } = await stripe.createPaymentMethod({ type: 'card', card: cardElement });
-            if (error) throw new Error(error.message);
+            // 1. Request Payment via Modal (Pass the dynamic price)
+            const paymentMethod = await requestPayment({
+                amount: currentPrice, // <--- UPDATED
+                title: "Confirm Appointment",
+                description: `Consultation with ${selectedDoc?.name || "Doctor"}`
+            });
 
             // 2. Send Payload
             const payload = {
@@ -242,20 +244,21 @@ function AppointmentsContent() {
                 doctorId: formData.doctorId,
                 doctorName: selectedDoc?.name || "Doctor",
                 timeSlot: timeSlotISO,
-                paymentToken: paymentMethod.id,
-                insuranceProvider: formData.insuranceProvider,
-                policyId: formData.policyId
+                paymentToken: paymentMethod.id
             };
 
             await api.post('/book-appointment', payload);
 
             await fetchAppointments(user.id);
             setIsBooking(false);
-            setFormData({ doctorId: "", date: "", time: "", insuranceProvider: "", policyId: "" });
-            toast({ title: "Success!", description: `Booked for $${price}.00` });
+            setFormData({ doctorId: "", date: "", time: "09:00" }); // Reset time default
+            toast({ title: "Success!", description: `Booked for $${selectedDoc?.consultationFee || 50}.00` });
 
         } catch (error: any) {
-            toast({ variant: "destructive", title: "Error", description: error.message });
+            // If user cancelled or payment failed
+            if (error.message !== "User cancelled payment") {
+                toast({ variant: "destructive", title: "Error", description: error.message });
+            }
         } finally {
             setLoading(false);
         }
@@ -379,48 +382,21 @@ function AppointmentsContent() {
                                     </div>
                                 </div>
 
-                                {/* INSURANCE SECTION */}
-                                <div className="p-4 bg-white rounded-md border mt-2">
-                                    <div className="flex items-center gap-2 mb-3 text-blue-800 font-semibold">
-                                        <ShieldCheck className="h-4 w-4" /> Insurance (Optional)
-                                    </div>
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div className="space-y-2">
-                                            <Label>Provider</Label>
-                                            <Input
-                                                placeholder="e.g. BlueCross"
-                                                value={formData.insuranceProvider}
-                                                onChange={(e) => setFormData({ ...formData, insuranceProvider: e.target.value })}
-                                            />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <Label>Policy ID</Label>
-                                            <Input
-                                                placeholder="e.g. POL-12345"
-                                                value={formData.policyId}
-                                                onChange={(e) => setFormData({ ...formData, policyId: e.target.value })}
-                                            />
-                                        </div>
-                                    </div>
-                                </div>
 
-                                {/* PAYMENT SECTION */}
-                                <div className="p-4 bg-white rounded-md border mt-2">
-                                    <Label className="mb-2 flex items-center justify-between">
-                                        <span className="flex items-center gap-2"><CreditCard className="w-4 h-4" /> Credit Card</span>
-                                        <span className={price === 20 ? "text-green-600 font-bold" : "text-gray-900 font-bold"}>
-                                            Total: ${price}.00 {price === 20 && "(Insurance Applied)"}
-                                        </span>
-                                    </Label>
-                                    <div className="p-3 border rounded-md">
-                                        <CardElement options={{ style: { base: { fontSize: '16px' } } }} />
-                                    </div>
+
+                                {/* PAYMENT NOTE */}
+                                 <div className="p-4 bg-slate-50 rounded-md border mt-2 flex justify-between items-center">
+                                    <span className="text-sm text-slate-500">Consultation Fee</span>
+                                    <span className="font-bold text-slate-900">
+                                        {/* 🟢 DYNAMIC DISPLAY */}
+                                        ${doctors.find(d => d.doctorId === formData.doctorId)?.consultationFee || 50}.00
+                                    </span>
                                 </div>
 
                                 <div className="flex gap-3 justify-end mt-4">
                                     <Button type="button" variant="outline" onClick={() => setIsBooking(false)}>Cancel</Button>
-                                    <Button type="submit" disabled={loading || !stripe}>
-                                        {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Pay & Confirm"}
+                                    <Button type="submit" disabled={loading}>
+                                        {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Proceed to Payment"}
                                     </Button>
                                 </div>
                             </form>
@@ -439,13 +415,11 @@ function AppointmentsContent() {
                         {(() => {
                             // 🟢 STEP 1: Filter the list ONE time and save it.
                             const upcomingAppointments = appointments.filter(apt => {
-                                // Standard data integrity checks
+                                // 🟢 FIX: Ensure 'CANCELLED' items are removed from 'Upcoming' immediately
                                 if (apt.status === 'CANCELLED' || apt.status === 'COMPLETED') return false;
+
                                 if (!apt.timeSlot) return false;
                                 const aptDate = new Date(apt.timeSlot);
-                                if (isNaN(aptDate.getTime())) return false;
-
-                                // The critical date check
                                 const startOfToday = new Date();
                                 startOfToday.setHours(0, 0, 0, 0);
                                 return aptDate >= startOfToday;
@@ -462,10 +436,14 @@ function AppointmentsContent() {
 
                             // 🟢 STEP 3: Map over the SAME filtered list to render the cards.
                             return upcomingAppointments.map((apt, i) => {
+                                // HYBRID READ: FHIR Fallback
+                                const timeSlot = apt.resource?.start || apt.timeSlot;
+                                const doctorNameOverride = apt.resource?.participant?.find((p: any) => p.actor?.reference?.includes('Practitioner'))?.actor?.display;
+
                                 const docProfile = doctors.find(d => d.doctorId === apt.doctorId);
-                                const docName = docProfile?.name || apt.doctorName || "Doctor";
+                                const docName = docProfile?.name || doctorNameOverride || apt.doctorName || "Doctor";
                                 const docSpecialty = docProfile?.specialization || "General Practice";
-                                const dateObj = new Date(apt.timeSlot);
+                                const dateObj = new Date(timeSlot);
 
                                 return (
                                     <Card key={i} className="hover:shadow-md transition-shadow">
@@ -485,7 +463,7 @@ function AppointmentsContent() {
                                                 <div>
                                                     <div className="flex items-center gap-2">
                                                         <h3 className="font-semibold text-lg">{docName}</h3>
-                                                        {apt.coverageType?.includes('INSURANCE') && <Badge variant="secondary">Insured</Badge>}
+
                                                     </div>
                                                     <div className="flex gap-4 text-sm text-muted-foreground mt-1 items-center">
                                                         <span className="flex items-center gap-1 text-primary/80 font-medium">
@@ -498,12 +476,29 @@ function AppointmentsContent() {
                                                     </div>
                                                 </div>
                                             </div>
-                                            <div className="flex gap-2">
-                                                <Button variant="outline" className="text-red-600 hover:text-red-700" onClick={() => handleCancel(apt.appointmentId)}>
+                                            <div className="flex gap-2 items-center">
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    className="h-9 border-slate-200 text-slate-600"
+                                                    onClick={async () => {
+                                                        try {
+                                                            const res: any = await api.get(`/receipt/${apt.appointmentId}`);
+                                                            if (res.downloadUrl) window.open(res.downloadUrl, '_blank');
+                                                        } catch (e) {
+                                                            toast({ variant: "destructive", title: "Error", description: "Receipt not ready." });
+                                                        }
+                                                    }}
+                                                >
+                                                    <FileText className="h-4 w-4 mr-1" /> Receipt
+                                                </Button>
+
+                                                <Button variant="outline" size="sm" className="h-9 text-red-600 border-red-100 hover:bg-red-50" onClick={() => handleCancel(apt.appointmentId)}>
                                                     Cancel
                                                 </Button>
-                                                <Button onClick={() => handleJoin(apt)}>
-                                                    <Video className="h-4 w-4 mr-2" /> Join
+
+                                                <Button size="sm" className="h-9" onClick={() => handleJoin(apt)}>
+                                                    <Video className="h-4 w-4 mr-1" /> Join
                                                 </Button>
                                             </div>
                                         </CardContent>
@@ -516,15 +511,10 @@ function AppointmentsContent() {
                     <TabsContent value="past" className="mt-6">
                         {appointments
                             .filter(apt => {
-                                // Logic: Show ONLY Cancelled/Completed/Past items
-                                // AND ensure they have valid data
                                 const isPast = new Date(apt.timeSlot) < new Date();
                                 const isDone = apt.status === 'CANCELLED' || apt.status === 'COMPLETED';
-                                const hasData = apt.timeSlot && apt.doctorId; // Block bad data
-
-                                // Check if doctor exists in directory
+                                const hasData = apt.timeSlot && apt.doctorId;
                                 const realDoctor = doctors.find(d => d.doctorId === apt.doctorId);
-
                                 return (isPast || isDone) && hasData && realDoctor;
                             })
                             .map((apt, i) => {
@@ -533,7 +523,7 @@ function AppointmentsContent() {
 
                                 return (
                                     <Card key={i} className="mb-4 opacity-75 bg-gray-50 hover:opacity-100 transition-opacity">
-                                        <CardContent className="p-4 flex justify-between items-center">
+                                        <CardContent className="p-4 flex flex-col md:flex-row justify-between items-center gap-4">
                                             <div className="flex items-center gap-4">
                                                 <div className="bg-gray-200 p-2 rounded text-center min-w-[50px]">
                                                     <div className="font-bold text-gray-600">{dateObj.getDate()}</div>
@@ -548,15 +538,35 @@ function AppointmentsContent() {
                                                     </div>
                                                 </div>
                                             </div>
-                                            <Badge variant={apt.status === 'CANCELLED' ? 'destructive' : 'outline'}>
-                                                {apt.status || 'COMPLETED'}
-                                            </Badge>
+
+                                            {/* 🟢 Action Area: Receipt + Status */}
+                                            <div className="flex items-center gap-3">
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    className="h-8"
+                                                    onClick={async () => {
+                                                        try {
+                                                            const res: any = await api.get(`/receipt/${apt.appointmentId}`);
+                                                            if (res.downloadUrl) window.open(res.downloadUrl, '_blank');
+                                                        } catch (e) {
+                                                            toast({ variant: "destructive", title: "Error", description: "Receipt not available." });
+                                                        }
+                                                    }}
+                                                >
+                                                    <FileText className="h-4 w-4 mr-2" /> Receipt
+                                                </Button>
+
+                                                <Badge variant={apt.status === 'CANCELLED' ? 'destructive' : 'outline'}>
+                                                    {apt.status || 'COMPLETED'}
+                                                </Badge>
+                                            </div>
                                         </CardContent>
                                     </Card>
                                 );
                             })}
 
-                        {/* Empty State for Past */}
+                        {/* Empty State */}
                         {appointments.filter(a => a.status === 'CANCELLED' || a.status === 'COMPLETED' || new Date(a.timeSlot) < new Date()).length === 0 && (
                             <div className="text-center text-muted-foreground py-10">No past appointments.</div>
                         )}

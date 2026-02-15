@@ -3,7 +3,6 @@ import { useNavigate } from "react-router-dom";
 import { fetchUserAttributes, fetchAuthSession, signOut } from 'aws-amplify/auth';
 import {
     CreditCard,
-    ShieldCheck,
     Clock,
     FileText,
     CheckCircle2,
@@ -16,28 +15,19 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
 
-// --- STRIPE IMPORTS ---
-import { loadStripe } from '@stripe/stripe-js';
-import { Elements, CardElement, useStripe, useElements } from '@stripe/react-stripe-js';
-
-// Initialize Stripe outside component to avoid recreation
-const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
+import { useCheckout } from "@/context/CheckoutContext";
 import { api } from "@/lib/api";
 
 export default function Billing() {
-    return (
-        <Elements stripe={stripePromise}>
-            <BillingContent />
-        </Elements>
-    );
+    return <BillingContent />;
 }
 
 function BillingContent() {
     const navigate = useNavigate();
     const { toast } = useToast();
-    const stripe = useStripe();
-    const elements = useElements();
+    const { requestPayment, stripe } = useCheckout();
 
     // --- STATE ---
     const [userProfile, setUserProfile] = useState(() => {
@@ -121,11 +111,10 @@ function BillingContent() {
 
     // 🟢 PROFESSIONAL PAYMENT HANDLER
     const handlePayBill = async () => {
-        if (!stripe || !elements) return;
+        if (!stripe) return;
         if (!billingData?.transactions) return;
 
         // 1. Find the Oldest Unpaid Bill (FIFO Strategy)
-        // We look for status 'PENDING' or 'DUE'
         const billToPay = [...billingData.transactions]
             .reverse() // Oldest first
             .find((tx: any) => tx.status === 'PENDING' || tx.status === 'DUE');
@@ -138,32 +127,29 @@ function BillingContent() {
         setProcessingPayment(true);
 
         try {
-            const token = await getAuthToken();
+            // STEP A: Get Payment Method via Modal
+            const paymentMethod = await requestPayment({
+                amount: billToPay.amount || billToPay.totalAmount || 0,
+                title: "Pay Bill",
+                description: `Invoice #${billToPay.billId.slice(0, 8)}`
+            });
 
-            // 2. Step 1: Create Payment Intent on Backend
-            // We send the billId. The backend looks up the price securely.
+            // STEP B: Create Payment Intent on Backend
             const paymentIntent: any = await api.post('/pay-bill', {
-                billId: billToPay.billId, // Secure Reference
+                billId: billToPay.billId,
                 patientId: userProfile.id
             });
 
             const clientSecret = paymentIntent.client_secret;
 
-            // 3. Step 2: Confirm Card Payment with Stripe
+            // STEP C: Confirm Payment
             const result = await stripe.confirmCardPayment(clientSecret, {
-                payment_method: {
-                    card: elements.getElement(CardElement)!,
-                    billing_details: {
-                        name: userProfile.name,
-                    },
-                },
+                payment_method: paymentMethod.id,
             });
 
             if (result.error) {
-                // Show error to your customer (e.g., insufficient funds)
                 throw new Error(result.error.message);
             } else {
-                // 4. Step 3: Success!
                 if (result.paymentIntent.status === 'succeeded') {
                     toast({
                         title: "Payment Successful",
@@ -177,12 +163,14 @@ function BillingContent() {
             }
 
         } catch (e: any) {
-            console.error("Payment Error:", e);
-            toast({
-                variant: "destructive",
-                title: "Payment Failed",
-                description: e.message || "Please check your card details and try again."
-            });
+            if (e.message !== "User cancelled payment") {
+                console.error("Payment Error:", e);
+                toast({
+                    variant: "destructive",
+                    title: "Payment Failed",
+                    description: e.message || "Please check your card details and try again."
+                });
+            }
         } finally {
             setProcessingPayment(false);
         }
@@ -201,7 +189,7 @@ function BillingContent() {
             <div className="space-y-6 animate-fade-in pb-10">
 
                 {/* SUMMARY CARDS */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 gap-6">
 
                     {/* BALANCE CARD */}
                     <Card className="shadow-card border-border/50">
@@ -227,25 +215,7 @@ function BillingContent() {
                                             : "You are all caught up! No payment due."}
                                     </p>
 
-                                    {/* STRIPE ELEMENT */}
-                                    {billingData?.outstandingBalance > 0 && (
-                                        <div className="mb-4 p-3 border rounded-md bg-slate-50">
-                                            <CardElement options={{
-                                                style: {
-                                                    base: {
-                                                        fontSize: '16px',
-                                                        color: '#424770',
-                                                        '::placeholder': {
-                                                            color: '#aab7c4',
-                                                        },
-                                                    },
-                                                    invalid: {
-                                                        color: '#9e2146',
-                                                    },
-                                                },
-                                            }} />
-                                        </div>
-                                    )}
+                                    {/* STRIPE ELEMENT REMOVED (Now using Modal) */}
 
                                     <Button
                                         className="w-full bg-primary hover:bg-primary/90 transition-all"
@@ -267,52 +237,9 @@ function BillingContent() {
                             )}
                         </CardContent>
                     </Card>
-
-                    {/* INSURANCE CARD */}
-                    <Card className="shadow-card border-border/50">
-                        <CardHeader>
-                            <CardTitle className="flex items-center gap-2">
-                                <ShieldCheck className="h-5 w-5 text-green-600" />
-                                Insurance Coverage
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            {loadingBilling ? (
-                                <div className="h-32 flex items-center justify-center">
-                                    <Loader2 className="h-8 w-8 animate-spin text-muted-foreground/30" />
-                                </div>
-                            ) : (
-                                <>
-                                    <div className="flex items-center justify-between mb-4 p-3 bg-green-50 rounded-lg border border-green-100">
-                                        <div>
-                                            <p className="font-semibold text-green-900">
-                                                {billingData?.insuranceProvider || "No Provider"}
-                                            </p>
-                                            <Badge variant="outline" className="mt-1 border-green-200 text-green-700 bg-green-100">
-                                                {billingData?.insuranceStatus || "Active"}
-                                            </Badge>
-                                        </div>
-                                        <CheckCircle2 className="h-6 w-6 text-green-600" />
-                                    </div>
-                                    <div className="space-y-2 text-sm text-muted-foreground">
-                                        <div className="flex justify-between">
-                                            <span>Standard Copay:</span>
-                                            <span className="font-medium text-foreground">$20.00</span>
-                                        </div>
-                                        <div className="flex justify-between">
-                                            <span>Policy Renewal:</span>
-                                            <span className="font-medium text-foreground">Dec 31, 2026</span>
-                                        </div>
-                                        <div className="flex justify-between">
-                                            <span>Deductible Met:</span>
-                                            <span className="font-medium text-foreground">85%</span>
-                                        </div>
-                                    </div>
-                                </>
-                            )}
-                        </CardContent>
-                    </Card>
                 </div>
+
+
 
                 {/* TRANSACTION HISTORY */}
                 <Card className="shadow-card border-border/50">
@@ -329,51 +256,93 @@ function BillingContent() {
                             </div>
                         ) : billingData?.transactions && billingData.transactions.length > 0 ? (
                             <div className="space-y-3">
-                                {billingData.transactions.map((tx: any, i: number) => {
-                                    const isPaid = tx.status === 'PAID' || tx.type === 'PAYMENT';
-                                    const isPending = tx.status === 'PENDING' || tx.status === 'DUE';
+                                {billingData.transactions
+                                    .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+                                    .map((tx: any, i: number) => {
+                                        // 🟢 NEW LOGIC: Define transaction categories clearly
+                                        const isRefund = tx.type === 'REFUND' || tx.status === 'REFUNDED' || tx.amount < 0;
+                                        const isUnpaid = tx.status === 'PENDING' || tx.status === 'DUE';
+                                        const isPaidCharge = (tx.status === 'PAID' || tx.status === 'PROCESSED') && !isRefund;
 
-                                    return (
-                                        <div key={i} className="p-4 border rounded-lg flex items-center justify-between bg-white hover:bg-slate-50 transition-colors">
-                                            <div className="flex items-center gap-4">
-                                                <div className={`h-10 w-10 rounded-full flex items-center justify-center ${isPaid ? 'bg-green-100 text-green-600' : 'bg-orange-100 text-orange-600'
-                                                    }`}>
-                                                    {isPaid ? <CheckCircle2 className="h-5 w-5" /> : <FileText className="h-5 w-5" />}
-                                                </div>
-                                                <div>
-                                                    <div className="flex items-center gap-2">
-                                                        <p className="font-medium">
-                                                            {tx.description || (isPaid ? 'Payment Received' : 'Consultation Fee')}
-                                                        </p>
-                                                        {isPending && (
-                                                            <Badge variant="outline" className="text-[10px] h-5 px-1.5 border-orange-200 text-orange-700 bg-orange-50">
-                                                                Unpaid
-                                                            </Badge>
-                                                        )}
+                                        return (
+                                            <div key={i} className="p-4 border rounded-lg flex items-center justify-between bg-white hover:bg-slate-50 transition-colors">
+                                                <div className="flex items-center gap-4">
+                                                    {/* 🟢 ICON LOGIC: Green for refunds, Slate for charges, Orange for unpaid */}
+                                                    <div className={cn(
+                                                        "h-10 w-10 rounded-full flex items-center justify-center",
+                                                        isRefund ? "bg-green-100 text-green-600" :
+                                                            isUnpaid ? "bg-orange-100 text-orange-600" : "bg-slate-100 text-slate-600"
+                                                    )}>
+                                                        {isRefund ? <ArrowUpRight className="h-5 w-5" /> :
+                                                            isUnpaid ? <AlertCircle className="h-5 w-5" /> : <FileText className="h-5 w-5" />}
                                                     </div>
-                                                    <p className="text-xs text-muted-foreground">
-                                                        {tx.createdAt ? new Date(tx.createdAt).toLocaleDateString() : new Date().toLocaleDateString()}
-                                                        {' • '}
-                                                        <span className="font-mono">{tx.billId ? `#${tx.billId.slice(0, 8)}` : ''}</span>
-                                                    </p>
+
+                                                    <div>
+                                                        <div className="flex items-center gap-2">
+                                                            <p className="font-medium text-slate-900">
+                                                                {(() => {
+                                                                    const desc = tx.description || "";
+
+                                                                    // 🟢 THE FIX: If this is a refund, find the name by matching the doctorId
+                                                                    if (desc.includes("User requested cancellation") || tx.amount < 0) {
+                                                                        // Search the whole transaction list for a row with the same doctorId 
+                                                                        // that contains the doctor's name in the description
+                                                                        const match = billingData.transactions.find((t: any) =>
+                                                                            t.doctorId === tx.doctorId &&
+                                                                            t.description?.includes("Consultation with")
+                                                                        );
+
+                                                                        // Extract "Dr M" from "Consultation with Dr M"
+                                                                        const name = match?.description?.split("with ")[1];
+
+                                                                        return name ? `Cancelled Consultation: ${name}` : 'Cancelled Consultation';
+                                                                    }
+
+                                                                    // Keep existing professional mapping for pharmacy
+                                                                    if (desc.startsWith("Medication:")) {
+                                                                        return desc.replace("Medication:", "Prescription Pharmacy:");
+                                                                    }
+
+                                                                    return desc; // Returns "Consultation with Dr M" as is
+                                                                })()}
+                                                            </p>
+                                                            {isUnpaid && (
+                                                                <Badge variant="outline" className="text-[10px] h-5 px-1.5 border-orange-200 text-orange-700 bg-orange-50">
+                                                                    Unpaid
+                                                                </Badge>
+                                                            )}
+                                                            {isRefund && (
+                                                                <Badge variant="outline" className="text-[10px] h-5 px-1.5 border-green-200 text-green-700 bg-green-50">
+                                                                    Refunded
+                                                                </Badge>
+                                                            )}
+                                                        </div>
+                                                        <p className="text-xs text-muted-foreground">
+                                                            {tx.createdAt ? new Date(tx.createdAt).toLocaleDateString() : new Date().toLocaleDateString()}
+                                                            {' • '}
+                                                            <span className="font-mono">{tx.billId ? `#${tx.billId.slice(0, 8)}` : ''}</span>
+                                                        </p>
+                                                    </div>
+                                                </div>
+
+                                                <div className="text-right">
+                                                    {/* 🟢 AMOUNT LOGIC: Green (+) for refunds, Neutral/Black (-) for charges */}
+                                                    <span className={cn(
+                                                        "font-bold block text-lg",
+                                                        isRefund ? "text-green-600" : "text-slate-900"
+                                                    )}>
+                                                        {isRefund ? '+' : '-'}${Math.abs(tx.amount || tx.totalAmount || 0).toFixed(2)}
+                                                    </span>
+
+                                                    {isUnpaid && processingPayment && (
+                                                        <span className="text-[10px] text-muted-foreground flex items-center justify-end gap-1">
+                                                            <Loader2 className="h-3 w-3 animate-spin" /> Processing
+                                                        </span>
+                                                    )}
                                                 </div>
                                             </div>
-
-                                            <div className="text-right">
-                                                <span className={`font-bold block ${isPaid ? 'text-green-600' : 'text-foreground'
-                                                    }`}>
-                                                    {isPaid ? '-' : ''}${Math.abs(tx.amount || tx.totalAmount || 0).toFixed(2)}
-                                                </span>
-                                                {/* If it's the specific unpaid bill being processed, show spinner */}
-                                                {isPending && processingPayment && (
-                                                    <span className="text-[10px] text-muted-foreground flex items-center justify-end gap-1">
-                                                        <Loader2 className="h-3 w-3 animate-spin" /> Processing
-                                                    </span>
-                                                )}
-                                            </div>
-                                        </div>
-                                    );
-                                })}
+                                        );
+                                    })}
                             </div>
                         ) : billingData?.outstandingBalance > 0 ? (
                             // Fallback if balance exists but no transaction records (legacy data)

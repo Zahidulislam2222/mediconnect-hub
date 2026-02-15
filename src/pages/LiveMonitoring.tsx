@@ -32,6 +32,7 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { getCurrentUser, signOut, fetchAuthSession } from 'aws-amplify/auth'; // 🟢 Added fetchAuthSession
 import { api } from "@/lib/api";
+import { io } from "socket.io-client";
 
 // --- TYPES ---
 interface VitalReading {
@@ -117,21 +118,50 @@ export default function LiveMonitoring() {
                     const uniquePatientsMap = new Map();
 
                     bookingList.forEach((appt: any) => {
-                        // Ensure we rely on the correct field 'patientId'
                         if (appt.patientId && !uniquePatientsMap.has(appt.patientId)) {
                             uniquePatientsMap.set(appt.patientId, {
                                 id: appt.patientId,
                                 name: appt.patientName || "Unknown Patient",
+                                avatar: appt.patientAvatar || null, // 🟢 Capture the avatar key
                                 status: "Offline",
                                 lastVitals: "Waiting..."
+
                             });
                         }
                     });
 
                     setMyPatients(Array.from(uniquePatientsMap.values()));
+
+                    // 🟢 NEW: Fetch real profiles for the sidebar photos (Logic from PatientRecords.tsx)
+                    const uniqueIds = Array.from(uniquePatientsMap.keys());
+                    if (uniqueIds.length > 0) {
+                        const profilePromises = uniqueIds.map(pid =>
+                            api.get(`/register-patient?id=${pid}`).catch(() => null)
+                        );
+                        const profiles = await Promise.all(profilePromises);
+
+                        profiles.forEach((p: any) => {
+                            if (p) {
+                                const profileData = p.Item || p;
+                                const pid = profileData.patientId || profileData.id;
+                                if (uniquePatientsMap.has(pid)) {
+                                    const existing = uniquePatientsMap.get(pid);
+                                    // 🟢 Map Name and Avatar from real Profile
+                                    const realName = profileData.resource?.name?.[0]?.text || profileData.name || existing.name;
+                                    existing.name = realName;
+                                    existing.avatar = profileData.avatar;
+                                    uniquePatientsMap.set(pid, existing);
+                                }
+                            }
+                        });
+                    }
+                    setMyPatients(Array.from(uniquePatientsMap.values()));
+
                 } else {
                     console.error("❌ API Error: Data is null");
                 }
+
+
             } catch (e) {
                 console.error("❌ Network Error:", e);
             } finally {
@@ -153,36 +183,7 @@ export default function LiveMonitoring() {
     const [loading, setLoading] = useState(true);
     const [connectionStatus, setConnectionStatus] = useState<'CONNECTED' | 'STALE' | 'DISCONNECTED' | 'POLLING'>('CONNECTED');
     const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
-    const [useSimulation, setUseSimulation] = useState(false);
     const [emergencyLoading, setEmergencyLoading] = useState(false);
-
-    // --- MOCK GENERATORS ---
-    const generateMockReading = (): VitalReading => {
-        const now = new Date();
-        const baseHr = 75;
-        const randomVar = Math.floor(Math.random() * 30) - 10;
-        const hr = baseHr + randomVar;
-        return {
-            timestamp: now.toISOString(),
-            heartRate: hr,
-            status: (hr > 100 ? 'CRITICAL' : hr > 90 ? 'WARNING' : 'NORMAL') as 'NORMAL' | 'WARNING' | 'CRITICAL'
-        };
-    };
-
-    const generateMockHistory = (): VitalReading[] => {
-        const history: VitalReading[] = [];
-        for (let i = 19; i >= 0; i--) {
-            const time = new Date();
-            time.setSeconds(time.getSeconds() - (i * 5));
-            const hr = 70 + Math.floor(Math.random() * 20);
-            history.push({
-                timestamp: time.toISOString(),
-                heartRate: hr,
-                status: (hr > 100 ? 'CRITICAL' : hr > 90 ? 'WARNING' : 'NORMAL') as 'NORMAL' | 'WARNING' | 'CRITICAL'
-            });
-        }
-        return history;
-    };
 
     // --- 1. VISIBILITY LISTENER ---
     useEffect(() => {
@@ -197,21 +198,35 @@ export default function LiveMonitoring() {
     }, [patientId]);
 
     // --- 2. INITIAL LOAD ---
+    // 🟢 NEW: WebSocket Listener
     useEffect(() => {
-        // Only fetch if an ID is selected
-        if (patientId) {
-            fetchInitialData();
-            pollingRef.current = setInterval(() => {
-                if (isPageVisible.current) fetchLatestVitals();
-            }, 5000);
-        } else {
-            setLoading(false); // Stop loading if showing list
-        }
+        if (!patientId) return;
+
+        // Connect to your Patient Service Port
+        const socket = io(import.meta.env.VITE_PATIENT_SERVICE_URL || "http://localhost:8081");
+
+        socket.emit('join_monitoring', patientId);
+
+        socket.on('vital_update', (newReading) => {
+            setVitals(prev => {
+                const updated = [...prev, newReading];
+                return updated.slice(-30); // Keep only last 30 points for smooth scrolling
+            });
+            setConnectionStatus('CONNECTED');
+            setLastUpdated(new Date());
+        });
 
         return () => {
-            if (pollingRef.current) clearInterval(pollingRef.current);
+            socket.disconnect();
         };
     }, [patientId]);
+
+    // 🟢 PROFESSIONAL TRIGGER: Wakes up the data fetcher on page load or patient change
+useEffect(() => {
+    if (patientId) {
+        fetchInitialData();
+    }
+}, [patientId]);
 
     const handleLogout = async () => {
         await signOut();
@@ -222,7 +237,6 @@ export default function LiveMonitoring() {
     // --- 3. DATA FETCHING ---
     const fetchInitialData = async () => {
         if (!patientId) return;
-
         try {
             setLoading(true);
             await getCurrentUser();
@@ -232,33 +246,31 @@ export default function LiveMonitoring() {
                 api.get(`/vitals?patientId=${patientId}&limit=20`)
             ]);
 
-            // Profile Logic
+            // Profile logic
             if (profileRes.status === 'fulfilled') {
                 const pData: any = profileRes.value;
                 const pInfo = pData.Item || pData;
                 setPatient({
-                    name: pInfo.name || "Unknown Patient",
+                    // 🟢 Prioritize FHIR path for clinical professional standard
+                    name: pInfo.resource?.name?.[0]?.text || pInfo.name || "Unknown Patient",
                     id: patientId,
                     avatar: pInfo.avatar || null,
-                    age: pInfo.age || "Unknown"
+                    age: pInfo.resource?.birthDate ?
+                        (new Date().getFullYear() - new Date(pInfo.resource.birthDate).getFullYear()).toString() :
+                        (pInfo.age || "Unknown")
                 });
-            } else {
-                setPatient({ name: "Patient " + patientId, id: patientId, avatar: null });
             }
 
-            // Vitals Logic
+            // Vitals logic
             if (vitalsRes.status === 'fulfilled') {
                 const vData: any = vitalsRes.value;
-                processVitalsData(vData);
+                // 🟢 Pass only the history array to the processor
+                processVitalsData(vData.history || []);
             } else {
-                console.warn("⚠️ API Unavailable - Starting Demo Mode");
-                setUseSimulation(true);
-                setVitals(generateMockHistory());
+                toast({ title: "No Data", description: "No telemetry records found for this patient.", variant: "destructive" });
             }
-
         } catch (error) {
             console.error("Init Error:", error);
-            setUseSimulation(true);
         } finally {
             setLoading(false);
         }
@@ -267,34 +279,28 @@ export default function LiveMonitoring() {
     const fetchLatestVitals = useCallback(async () => {
         if (!patientId) return;
 
-        if (useSimulation) {
-            setVitals(prev => {
-                const newPoint = generateMockReading();
-                const newHistory = [...prev, newPoint].slice(-20);
-                return newHistory;
-            });
-            setLastUpdated(new Date());
-            return;
-        }
-
         try {
             setConnectionStatus('POLLING');
-            const data: any = await api.get(`/vitals?patientId=${patientId}&limit=5`);
-            if (data) {
-                processVitalsData(data);
+            const response: any = await api.get(`/vitals?patientId=${patientId}&limit=5`);
+
+            if (response && response.history) {
+                processVitalsData(response.history);
+                setConnectionStatus('CONNECTED');
             } else {
                 setConnectionStatus('DISCONNECTED');
             }
+            setLastUpdated(new Date());
         } catch (err) {
             setConnectionStatus('DISCONNECTED');
         }
-    }, [useSimulation, patientId]);
+    }, [patientId]); // 🟢 Added missing dependency array
 
     // --- 4. PROCESSING LOGIC ---
-    const processVitalsData = (rawData: any[]) => {
-        if (!rawData || rawData.length === 0) return;
+    const processVitalsData = (data: any[]) => {
+        const historyArray = Array.isArray(data) ? data : [];
+        if (historyArray.length === 0) return;
 
-        const formatted: VitalReading[] = rawData.map((item: any) => {
+        const formatted: VitalReading[] = historyArray.map((item: any) => {
             const hr = Number(item.heartRate);
             return {
                 timestamp: item.timestamp,
@@ -336,7 +342,8 @@ export default function LiveMonitoring() {
 
             toast({
                 title: "🚑 EMERGENCY DISPATCHED",
-                description: `Alert ID: ${data.id}. The ER Team has been notified.`,
+                // 🟢 Change data.id to data.appointmentId
+                description: `Alert ID: ${data.appointmentId || 'SUCCESS'}. The ER Team has been notified.`,
                 variant: "destructive",
             });
         } catch (e) {
@@ -385,13 +392,14 @@ export default function LiveMonitoring() {
 
                             <CardContent>
                                 <div className="flex items-center gap-4 mt-2">
-                                    <Avatar className="h-12 w-12 border-2 border-blue-50">
+                                    <Avatar className="h-12 w-12 border-2 border-blue-50 shadow-sm">
+                                        {/* 🟢 Display real photo from enrichment loop */}
+                                        <AvatarImage src={pt.avatar} alt={pt.name} />
                                         <AvatarFallback className="bg-blue-100 text-blue-700 font-bold text-lg">
                                             {getInitials(pt.name)}
                                         </AvatarFallback>
                                     </Avatar>
                                     <div>
-                                        {/* 2. Content: Only show Name (Removed the ID line below) */}
                                         <div className="text-xl font-bold capitalize">{pt.name}</div>
                                         <p className="text-xs text-green-600 font-medium mt-1">
                                             Click to Monitor
@@ -425,25 +433,36 @@ export default function LiveMonitoring() {
     const isCritical = latestVital && latestVital.status === 'CRITICAL';
 
     if (loading) {
-        return (
-            <DashboardLayout
-                title="Live Monitoring"
-                subtitle="Initializing telemetry..."
-                userRole="doctor"
-                userName={doctorProfile.name}
-                userAvatar={doctorProfile.avatar}
-                onLogout={handleLogout}
-            >
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-6 animate-pulse">
-                    <div className="md:col-span-3 h-96 bg-muted/20 rounded-xl"></div>
+    return (
+        <DashboardLayout
+            title="Live Monitoring"
+            subtitle="Connecting to secure telemetry..."
+            userRole="doctor"
+            userName={doctorProfile.name}
+            userAvatar={doctorProfile.avatar}
+            onLogout={handleLogout}
+        >
+            <div className="space-y-6">
+                {/* Skeleton Header */}
+                <div className="h-20 w-full bg-muted/30 animate-pulse rounded-xl" />
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                    {/* Skeleton Chart */}
+                    <div className="md:col-span-3 h-[400px] bg-muted/20 animate-pulse rounded-xl border border-dashed border-muted-foreground/20 flex items-center justify-center">
+                        <div className="text-center">
+                            <Loader2 className="h-8 w-8 animate-spin mx-auto mb-2 text-primary/40" />
+                            <p className="text-sm text-muted-foreground">Syncing HIPAA Tunnel...</p>
+                        </div>
+                    </div>
+                    {/* Skeleton Stats */}
                     <div className="space-y-4">
-                        <div className="h-32 bg-muted/20 rounded-xl"></div>
-                        <div className="h-32 bg-muted/20 rounded-xl"></div>
+                        <div className="h-32 bg-muted/20 animate-pulse rounded-xl" />
+                        <div className="h-32 bg-muted/20 animate-pulse rounded-xl" />
                     </div>
                 </div>
-            </DashboardLayout>
-        );
-    }
+            </div>
+        </DashboardLayout>
+    );
+}
 
     return (
         <DashboardLayout
@@ -486,16 +505,9 @@ export default function LiveMonitoring() {
                                 connectionStatus === 'STALE' ? <Clock className="h-3 w-3" /> :
                                     <WifiOff className="h-3 w-3" />}
 
-                            {useSimulation ? "SIMULATION MODE" :
-                                connectionStatus === 'CONNECTED' ? "LIVE SIGNAL" :
-                                    connectionStatus === 'STALE' ? "STALE DATA" : "OFFLINE"}
+                            {connectionStatus === 'CONNECTED' ? "LIVE SIGNAL" :
+                                connectionStatus === 'STALE' ? "STALE DATA" : "OFFLINE"}
                         </div>
-
-                        {useSimulation && (
-                            <Button size="sm" variant="outline" onClick={() => window.location.reload()}>
-                                <RefreshCw className="h-3 w-3 mr-2" /> Retry Connection
-                            </Button>
-                        )}
                     </div>
                 </div>
 
@@ -523,6 +535,7 @@ export default function LiveMonitoring() {
                             </div>
                         </CardHeader>
                         <CardContent className="p-0 h-[400px] bg-gradient-to-b from-card to-muted/20">
+                            {vitals.length > 0 ? (
                             <ResponsiveContainer width="100%" height="100%">
                                 <AreaChart data={vitals}>
                                     <defs>
@@ -559,6 +572,18 @@ export default function LiveMonitoring() {
                                     />
                                 </AreaChart>
                             </ResponsiveContainer>
+                            ) : (
+        <div className="text-center p-10">
+            <WifiOff className="h-12 w-12 mx-auto text-muted-foreground/40 mb-4" />
+            <h3 className="font-semibold text-lg text-muted-foreground">No Live Signal</h3>
+            <p className="text-sm text-muted-foreground max-w-xs mx-auto">
+                The patient's device is currently offline or hasn't transmitted data in the last 24 hours.
+            </p>
+            <Button variant="outline" size="sm" className="mt-4" onClick={fetchInitialData}>
+                <RefreshCw className="h-4 w-4 mr-2" /> Attempt Reconnect
+            </Button>
+        </div>
+    )}
                         </CardContent>
                     </Card>
 

@@ -96,16 +96,24 @@ export default function DoctorDashboard() {
 
         const sorted = list
           .filter((a: any) => {
-            if (!a.patientName || !a.timeSlot) return false;
-            if (isNaN(new Date(a.timeSlot).getTime())) return false;
-            if (a.status === 'CANCELLED' || a.status === 'COMPLETED') return false;
-            const aptDate = new Date(a.timeSlot);
+            // HYBRID READ
+            const timeSlot = a.resource?.start || a.timeSlot;
+            const patientName = a.resource?.participant?.find((p: any) => p.actor?.reference?.includes('Patient'))?.actor?.display || a.patientName;
+            const status = a.resource?.status || a.status;
+
+            if (!patientName || !timeSlot) return false;
+            if (isNaN(new Date(timeSlot).getTime())) return false;
+            if (status === 'CANCELLED' || status === 'COMPLETED' || status === 'cancelled' || status === 'fulfilled') return false;
+
+            const aptDate = new Date(timeSlot);
             return aptDate >= startOfToday && aptDate <= endOfToday;
           })
           .sort((a: any, b: any) => {
             if (a.patientArrived && !b.patientArrived) return -1;
             if (!a.patientArrived && b.patientArrived) return 1;
-            return new Date(a.timeSlot).getTime() - new Date(b.timeSlot).getTime();
+            const tA = a.resource?.start || a.timeSlot;
+            const tB = b.resource?.start || b.timeSlot;
+            return new Date(tA).getTime() - new Date(tB).getTime();
           });
 
         setAppointments(sorted);

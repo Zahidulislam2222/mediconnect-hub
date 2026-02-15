@@ -13,6 +13,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import DOMPurify from 'dompurify';
 import { PublicHeader } from "@/components/PublicHeader"; // Add import
+import { api } from "../lib/api";
 
 const categoryIcons: Record<string, any> = {
     "Heart Health": Heart,
@@ -54,60 +55,32 @@ export default function KnowledgeBasePost({ role = "patient" }: KnowledgeBasePos
             }
 
             try {
-                // Try fetching by Document ID (Strapi v5) or ID (Strapi v4)
-                console.log("Fetching article:", slug);
-                const STRAPI_URL = import.meta.env.VITE_STRAPI_API_URL || 'http://localhost:1337';
-                const response = await fetch(`${STRAPI_URL}/api/articles/${slug}?populate=*`);
+                setIsLoading(true);
 
-                if (!response.ok) {
-                    throw new Error(`Article not found (Status: ${response.status})`);
-                }
+                // 🟢 ARCHITECTURE #2: Talk to Patient Service (Port 8081)
+                const item = await api.get(`/public/knowledge/${encodeURIComponent(slug)}`);
 
-                const json = await response.json();
+                // Standardize published date
+                const publishedAt = item.date;
 
-                if (json.data) {
-                    const item = json.data;
-                    let imageUrl = null;
-                    const img = item.coverImage || item.attributes?.coverImage;
+                // 🛡️ SAFE PARSE: Convert Stringified JSON back to Object for the renderer
+                const rawContent = item.legacyData?.content;
+                const content = typeof rawContent === 'string' ? JSON.parse(rawContent) : rawContent;
 
-                    // Robust Image Extraction
-                    if (img) {
-                        const imgData = img.data || img;
-                        if (imgData) {
-                            const rawUrl = imgData.attributes?.url || imgData.url || (Array.isArray(imgData) ? imgData[0].url : null);
+                setArticle({
+                    id: item.id,
+                    title: item.description,
+                    category: item.legacyData?.category || "General",
+                    content: content,
+                    image: item.content[0]?.attachment?.url,
+                    publishDate: new Date(publishedAt).toLocaleDateString('en-US', {
+                        month: 'long', day: 'numeric', year: 'numeric'
+                    })
+                });
 
-                            if (rawUrl) {
-                                // If it starts with "http", it's from S3 -> Use it directly.
-                                // If it starts with "/", it's local -> Add localhost.
-                                imageUrl = rawUrl.startsWith('http')
-                                    ? rawUrl
-                                    : `${import.meta.env.VITE_STRAPI_API_URL || 'http://localhost:1337'}${rawUrl}`;
-                            }
-                        }
-                    }
-
-                    // Handle Title/Content location (attributes for v4, root for v5)
-                    const title = item.title || item.attributes?.title;
-                    const category = item.category || item.attributes?.category || "General";
-                    const content = item.content || item.attributes?.content;
-                    const publishedAt = item.publishedAt || item.attributes?.publishedAt;
-
-                    setArticle({
-                        id: item.id,
-                        title: title,
-                        category: category,
-                        content: content,
-                        image: imageUrl,
-                        publishDate: new Date(publishedAt).toLocaleDateString('en-US', {
-                            month: 'long', day: 'numeric', year: 'numeric'
-                        })
-                    });
-                } else {
-                    throw new Error("No data returned from CMS");
-                }
             } catch (error: any) {
                 console.error("Failed to fetch article details:", error);
-                setError(error.message);
+                setError("This article is no longer available.");
             } finally {
                 setIsLoading(false);
             }

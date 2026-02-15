@@ -40,10 +40,10 @@ const patientNavItems = [
   { icon: Calendar, label: "Appointments", path: "/appointments" },
   { icon: CreditCard, label: "Billing", path: "/billing" },
   { icon: Video, label: "Consultation", path: "/consultation" },
+  { icon: MessageSquare, label: "Messages", path: "/patient/messages" },
   { icon: Brain, label: "Symptom Checker", path: "/symptom-checker" },
   { icon: FileText, label: "Health Records", path: "/healthRecords" },
   { icon: Pill, label: "Pharmacy", path: "/pharmacy" },
-  { icon: MessageSquare, label: "Messages", path: "/patient/messages" },
   { icon: BookOpen, label: "Knowledge Base", path: "/knowledge" },
 ];
 
@@ -52,10 +52,10 @@ const doctorNavItems = [
   { icon: Users, label: "Patient Queue", path: "/patient-queue" },
   { icon: BarChart3, label: "Analytics", path: "/analytics" },
   { icon: Video, label: "Consultation", path: "/consultation" },
+  { icon: MessageSquare, label: "Messages", path: "/doctor/messages" },
   { icon: Activity, label: "Live Monitoring", path: "/live-monitoring" },
   { icon: FileText, label: "Patient Records", path: "/patient-records" },
   { icon: Pill, label: "Prescriptions", path: "/prescriptions" },
-  { icon: MessageSquare, label: "Messages", path: "/doctor/messages" },
   { icon: BookOpen, label: "Knowledge Base", path: "/knowledge" },
 ];
 

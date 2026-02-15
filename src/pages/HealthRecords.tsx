@@ -32,6 +32,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { api } from "@/lib/api";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 
 // --- DEMO FALLBACK FOR AI QUOTA LIMITS ---
 const DEMO_RADIOLOGY_REPORT = {
@@ -66,52 +67,64 @@ export default function HealthRecords() {
   const [uploadedImagePreview, setUploadedImagePreview] = useState<string | null>(null);
   const [aiResult, setAiResult] = useState<any>(null);
 
+  const [selectedNote, setSelectedNote] = useState<any>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+
   // --- 1. INITIAL DATA LOAD (AUTH + VAULT + GRAPH) ---
-  useEffect(() => {
-    async function loadData() {
+  // Define it outside so the Upload function can call it too
+  const loadData = async () => {
+    try {
+      setLoadingRecords(true);
+      const authUser = await getCurrentUser();
+      const userId = authUser.userId;
+
+      // A. Fetch Profile for Avatar/Name
       try {
-        // A. Get User
-        const authUser = await getCurrentUser();
-        const userId = authUser.userId;
+        const profile: any = await api.get(`/register-patient?id=${userId}`);
+        const userData = { name: profile.name || "Patient", id: userId, avatar: profile.avatar };
 
-        // Fetch Profile for Avatar/Name
+        setUser(userData);
+
+        // 🟢 Update Storage Safely
+        const currentLocal = JSON.parse(localStorage.getItem('user') || '{}');
+        localStorage.setItem('user', JSON.stringify({ ...currentLocal, ...userData }));
+      } catch (e) { /* ignore profile load error */ }
+
+      // B. Fetch Document Vault (Using POST-RPC Pattern)
+      try {
+        const data: any = await api.post('/ehr', {
+          action: "list_records",
+          patientId: userId
+        });
+        // Sort by newest first
+        const sorted = Array.isArray(data) ? data.sort((a: any, b: any) =>
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        ) : [];
+        setRecords(sorted);
+      } catch (e) { console.warn("EHR List Failed", e); }
+
+      // C. Fetch Relationship Graph
+      if (userId) {
         try {
-          const profile: any = await api.get(`/register-patient?id=${userId}`);
-          const userData = { name: profile.name || "Patient", id: userId, avatar: profile.avatar };
-
-          setUser(userData);
-
-          // 🟢 FIX: Update Storage Safely
-          const currentLocal = JSON.parse(localStorage.getItem('user') || '{}');
-          localStorage.setItem('user', JSON.stringify({ ...currentLocal, ...userData }));
-        } catch (e) { /* ignore profile load error */ }
-
-        // B. Fetch Document Vault (Using POST-RPC Pattern)
-        try {
-          const data: any = await api.post('/ehr', {
-            action: "list_records",
-            patientId: userId
-          });
-          // Sort by newest first
-          const sorted = Array.isArray(data) ? data.sort((a: any, b: any) =>
-            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-          ) : [];
-          setRecords(sorted);
-        } catch (e) { console.warn("EHR List Failed", e); }
-
-        // C. Fetch Relationship Graph (Using GET Pattern)
-        // Note: We append "PATIENT#" because DynamoDB stores keys like "PATIENT#123"
-        try {
+          setLoadingGraph(true); // 🟢 Start the spin
           const gData: any = await api.get(`/relationships?entityId=PATIENT#${userId}`);
           setGraphConnections(gData.connections || []);
-        } catch (e) { console.warn("Graph load failed"); }
-
-      } catch (error) {
-        console.error("Data Load Error:", error);
-      } finally {
-        setLoadingRecords(false);
+        } catch (e) {
+          console.warn("Graph load failed");
+        } finally {
+          setLoadingGraph(false); // 🔴 Stop the spin
+        }
       }
+
+    } catch (error) {
+      console.error("Data Load Error:", error);
+    } finally {
+      setLoadingRecords(false);
     }
+  };
+
+  // Run once on component mount
+  useEffect(() => {
     loadData();
   }, []);
 
@@ -135,13 +148,18 @@ export default function HealthRecords() {
     const base64Clean = base64Full.split(",")[1];
 
     try {
-      const data: any = await api.post('/analyze-image', {
+      const data: any = await api.post('/chat/analyze-image', {
         imageBase64: base64Clean,
-        patientId: user.id
+        patientId: user.id,
+        prompt: "Perform a detailed clinical analysis of this imaging scan."
       });
 
-      if (data.report && !data.report.diagnosis.includes("Analysis Failed")) {
-        setAiResult(data.report);
+      if (data.analysis) {
+        setAiResult({
+          diagnosis: data.analysis,
+          pdfData: data.pdfBase64, // 🟢 STORE THE PDF STRING
+          visionTags: ["Radiology", data.provider]
+        });
       } else {
         throw new Error("AI Failed");
       }
@@ -165,39 +183,47 @@ export default function HealthRecords() {
   // --- HELPER: Initials ---
   const getInitials = (name: string) => name.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2);
 
-  // --- HELPER: Graph Positions ---
-  // Maps the dynamic array of connections to fixed visual positions
-  const getGraphNodePosition = (index: number) => {
-    const positions = [
-      "top-0 left-1/2 -translate-x-1/2",    // Top Center
-      "right-0 top-1/2 -translate-y-1/2",   // Right Center
-      "bottom-0 left-1/2 -translate-x-1/2", // Bottom Center
-      "left-0 top-1/2 -translate-y-1/2"     // Left Center
-    ];
-    return positions[index % positions.length];
+  // --- HELPER: Professional Coordinate System ---
+  const getCoords = (type: 'DOCTOR' | 'DRUG', index: number, doctorIndex?: number, totalDoctors?: number) => {
+    const centerX = 50;
+    const centerY = 50;
+
+    if (type === 'DOCTOR') {
+      // Spread doctors in an arc across the top
+      const angle = (index / (Math.max(1, totalDoctors! - 1) || 1)) * 120 - 150;
+      const radius = 28;
+      return {
+        x: centerX + radius * Math.cos((angle * Math.PI) / 180),
+        y: centerY + radius * Math.sin((angle * Math.PI) / 180)
+      };
+    } else {
+      // Position drugs near their specific doctor
+      const angle = (doctorIndex! / (Math.max(1, totalDoctors! - 1) || 1)) * 120 - 150;
+      const drugOffset = (index * 15) - 7.5; // Fan out multiple drugs
+      const radius = 45; // Outer ring
+      return {
+        x: centerX + radius * Math.cos(((angle + drugOffset) * Math.PI) / 180),
+        y: centerY + radius * Math.sin(((angle + drugOffset) * Math.PI) / 180)
+      };
+    }
   };
   // 🟢 ADD THIS FUNCTION:
   const handleVaultUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || !e.target.files[0]) return;
-
     const file = e.target.files[0];
     setIsUploading(true);
 
     try {
-      // Step 1: Request Presigned URL from Lambda
-      const token = (await getCurrentUser()).userId; // Or fetch session token if needed
-
+      // 🟢 FIX: Catch 's3Key' from the response here
       const initRes: any = await api.post('/ehr', {
         action: "request_upload",
         patientId: user.id,
         fileName: file.name,
-        fileType: file.type,
-        description: "Uploaded by Patient via Portal"
+        fileType: file.type
       });
 
-      const { uploadUrl } = initRes;
+      const { uploadUrl, s3Key } = initRes; // 🟢 Now s3Key is defined!
 
-      // Step 2: Upload directly to S3
       const uploadRes = await fetch(uploadUrl, {
         method: "PUT",
         headers: { "Content-Type": file.type },
@@ -206,7 +232,18 @@ export default function HealthRecords() {
 
       if (!uploadRes.ok) throw new Error("S3 Upload Failed");
 
-      toast({ title: "Success", description: "Document securely uploaded to vault." });
+      // 🟢 Now this call will work because s3Key is defined above
+      await api.post('/ehr', {
+        action: "save_record_metadata",
+        patientId: user.id,
+        fileName: file.name,
+        fileType: file.type,
+        s3Key: s3Key,
+        description: "Self-uploaded via Patient Portal"
+      });
+
+      toast({ title: "Success", description: "Document saved to vault." });
+      loadData();
 
       // Step 3: Refresh List
       // We essentially re-run the "list_records" logic here
@@ -344,30 +381,44 @@ export default function HealthRecords() {
                   <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
                     {records.map((doc, idx) => (
                       <div key={idx} className="relative group bg-white border border-blue-100 rounded-xl p-3 shadow-sm hover:shadow-md transition-all">
+
+                        {/* 🟢 CHANGE START: SMART ICON LOGIC */}
                         <div className="aspect-square bg-slate-100 rounded-lg mb-2 overflow-hidden flex items-center justify-center">
-                          {doc.fileType?.includes("image") ? (
-                            <ImageIcon className="h-8 w-8 text-blue-400" />
+                          {doc.type === 'NOTE' ? (
+                            <FileText className="h-8 w-8 text-amber-500" /> /* Amber for Notes */
+                          ) : doc.fileType?.includes("image") ? (
+                            <ImageIcon className="h-8 w-8 text-blue-400" /> /* Blue for Images */
                           ) : (
-                            <FileText className="h-8 w-8 text-slate-400" />
+                            <FileText className="h-8 w-8 text-slate-400" /> /* Grey for PDFs */
                           )}
                         </div>
+
+                        {/* 🟢 CHANGE START: SMART LABEL LOGIC */}
                         <span className="text-sm font-semibold text-center block truncate text-blue-900">
-                          {doc.fileName || "Untitled"}
+                          {doc.resource?.description || doc.fileName || (doc.type === 'NOTE' ? "Untitled Clinical Note" : "Untitled File")}
                         </span>
+                        {/* 🟢 CHANGE END */}
+
                         <span className="text-xs text-blue-600/70 block text-center mt-1">
                           {new Date(doc.createdAt).toLocaleDateString()}
                         </span>
 
                         {/* Open Button */}
-                        {doc.s3Url && (
-                          <div className="absolute inset-0 bg-black/40 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2 backdrop-blur-[1px]">
-                            <a href={doc.s3Url} target="_blank" rel="noreferrer">
-                              <Button variant="secondary" size="icon" className="h-8 w-8 rounded-full">
-                                <Eye className="h-4 w-4" />
-                              </Button>
-                            </a>
-                          </div>
-                        )}
+                        <div
+                          className="absolute inset-0 bg-black/40 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2 backdrop-blur-[1px] cursor-pointer"
+                          onClick={() => {
+                            if (doc.type === 'NOTE') {
+                              setSelectedNote(doc); // This opens the text modal
+                              setIsModalOpen(true);
+                            } else if (doc.s3Url) {
+                              window.open(doc.s3Url, '_blank'); // This opens the file
+                            }
+                          }}
+                        >
+                          <Button variant="secondary" size="icon" className="h-8 w-8 rounded-full">
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -456,7 +507,20 @@ export default function HealthRecords() {
                       </div>
 
                       <div className="flex justify-end pt-2">
-                        <Button variant="outline" size="sm" className="gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="gap-2"
+                          onClick={() => {
+                            if (!aiResult.pdfData) return;
+                            const link = document.createElement('a');
+                            link.href = `data:application/pdf;base64,${aiResult.pdfData}`;
+                            link.download = `Radiology_Report_${new Date().getTime()}.pdf`;
+                            link.click();
+
+                            toast({ title: "Report Downloaded", description: "The clinical PDF is saved to your device." });
+                          }}
+                        >
                           <Download className="h-4 w-4" />
                           Save Report
                         </Button>
@@ -482,16 +546,16 @@ export default function HealthRecords() {
                       <div className="p-4 rounded-xl bg-secondary/30 hover:bg-secondary/50 transition-colors">
                         <div className="flex items-start justify-between mb-2">
                           <div>
-                            <h4 className="font-semibold text-foreground">{item.fileName}</h4>
+                            <h4 className="font-semibold text-foreground">{item.resource?.description || item.fileName || "Untitled Record"}</h4>
                             <p className="text-sm text-muted-foreground">
                               Uploaded by: {item.uploadedBy || "System"}
                             </p>
                           </div>
                           <Badge variant="outline" className="text-xs">
-                            {new Date(item.createdAt).toLocaleDateString()}
+                            {new Date(item.resource?.date || item.createdAt).toLocaleDateString()}
                           </Badge>
                         </div>
-                        <p className="text-sm text-muted-foreground mb-3">{item.description || "No notes attached."}</p>
+                        <p className="text-sm text-muted-foreground mb-3">{item.resource?.summary || item.description || "No notes attached."}</p>
                       </div>
                     </div>
                   ))}
@@ -509,73 +573,144 @@ export default function HealthRecords() {
               <CardHeader className="pb-3">
                 <CardTitle className="text-lg flex items-center gap-2">
                   <Network className="h-5 w-5 text-primary" />
-                  Care Network
+                  Clinical Chain of Care
                 </CardTitle>
-                <CardDescription>Visualizing your connected doctors and medications from DynamoDB.</CardDescription>
+                <CardDescription>Visualizing treatment pathways from your healthcare providers.</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="h-[400px] rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-center overflow-hidden">
-                  <div className="text-center w-full h-full flex items-center justify-center relative">
+                <div className="h-[500px] rounded-xl bg-slate-50/50 border border-slate-200 flex items-center justify-center overflow-hidden relative">
 
-                    {/* The Graph Canvas */}
-                    <div className="relative w-80 h-80">
+                  {loadingGraph ? (
+                    /* 🟢 OPTION 1: THE SPINNER */
+                    <div className="flex flex-col items-center gap-3 animate-in fade-in">
+                      <Loader2 className="h-10 w-10 animate-spin text-indigo-500" />
+                      <p className="text-sm font-medium text-slate-500 italic">Mapping Care Pathways...</p>
+                    </div>
+                  ) : graphConnections.length > 0 ? (
+                    /* 🟢 OPTION 2: THE REAL GRAPH */
+                    <div className="relative w-full h-full">
 
-                      {/* Central Node (YOU) */}
-                      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-24 h-24 rounded-full bg-indigo-600 text-white flex flex-col items-center justify-center shadow-xl z-20 border-4 border-white ring-2 ring-indigo-200 animate-in zoom-in">
-                        <Avatar className="h-10 w-10 mb-1 border-2 border-indigo-300">
-                          <AvatarImage src={user.avatar} />
-                          <AvatarFallback className="text-indigo-800 bg-indigo-100 text-xs">
-                            {getInitials(user.name)}
-                          </AvatarFallback>
-                        </Avatar>
-                        <span className="text-xs font-bold">YOU</span>
-                      </div>
-
-                      {/* Connected Nodes */}
-                      {graphConnections.length > 0 ? (
-                        graphConnections.map((conn, idx) => {
-                          // Clean the ID (Remove "DOCTOR#" prefix)
-                          const label = conn.SK.split("#")[1] || conn.SK;
-                          const pos = getGraphNodePosition(idx);
+                      {/* SVG CONNECTOR LINES */}
+                      <svg className="absolute inset-0 w-full h-full pointer-events-none" style={{ zIndex: 0 }}>
+                        {graphConnections.filter(c => c.SK.startsWith("DOCTOR#")).map((doc, dIdx, dArr) => {
+                          const dPos = getCoords('DOCTOR', dIdx, undefined, dArr.length);
 
                           return (
-                            <div
-                              key={idx}
-                              className={cn(
-                                "absolute w-20 h-20 rounded-full flex flex-col items-center justify-center text-xs font-medium shadow-md bg-white border border-slate-200 z-10 transition-all hover:scale-110 cursor-pointer",
-                                pos
-                              )}
-                            >
-                              <div className="h-8 w-8 rounded-full bg-teal-100 text-teal-700 flex items-center justify-center mb-1">
-                                <Stethoscope className="h-4 w-4" />
-                              </div>
-                              <span className="max-w-[80px] truncate px-1">{label}</span>
-                            </div>
-                          );
-                        })
-                      ) : (
-                        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 whitespace-nowrap bg-white px-3 py-1 rounded-full shadow text-xs text-muted-foreground">
-                          No connections found in database.
-                        </div>
-                      )}
+                            <g key={`links-${doc.SK}`}>
+                              {/* Line 1: Patient to Doctor */}
+                              <line
+                                x1="50%" y1="50%" x2={`${dPos.x}%`} y2={`${dPos.y}%`}
+                                stroke="#94a3b8" strokeWidth="2" strokeDasharray="5,5"
+                              />
 
-                      {/* Lines (SVG) */}
-                      {graphConnections.length > 0 && (
-                        <svg className="absolute inset-0 w-full h-full pointer-events-none" style={{ zIndex: 0 }}>
-                          <line x1="50%" y1="50%" x2="50%" y2="10%" stroke="#cbd5e1" strokeWidth="2" strokeDasharray="4 4" />
-                          <line x1="50%" y1="50%" x2="90%" y2="50%" stroke="#cbd5e1" strokeWidth="2" strokeDasharray="4 4" />
-                          <line x1="50%" y1="50%" x2="50%" y2="90%" stroke="#cbd5e1" strokeWidth="2" strokeDasharray="4 4" />
-                          <line x1="50%" y1="50%" x2="10%" y2="50%" stroke="#cbd5e1" strokeWidth="2" strokeDasharray="4 4" />
-                        </svg>
+                              {/* Line 2: Doctor to their specific Medications */}
+                              {graphConnections
+                                .filter(c => c.SK.startsWith("DRUG#") && (c.prescribedBy === doc.SK || c.prescribedBy === doc.SK.split('#')[1]))
+                                .map((drug, drIdx) => {
+                                  const drPos = getCoords('DRUG', drIdx, dIdx, dArr.length);
+                                  return (
+                                    <line
+                                      key={`link-drug-${drug.SK}`}
+                                      x1={`${dPos.x}%`} y1={`${dPos.y}%`} x2={`${drPos.x}%`} y2={`${drPos.y}%`}
+                                      stroke="#cbd5e1" strokeWidth="2"
+                                    />
+                                  );
+                                })}
+                            </g>
+                          );
+                        })}
+                      </svg>
+
+                      {/* 1. CENTRAL PATIENT NODE */}
+                      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-30">
+                        <div className="w-20 h-20 rounded-full bg-indigo-600 border-4 border-white shadow-xl flex flex-col items-center justify-center text-white ring-4 ring-indigo-50">
+                          <Avatar className="h-10 w-10 mb-1 border border-indigo-300">
+                            <AvatarImage src={user.avatar} />
+                            <AvatarFallback className="bg-indigo-100 text-indigo-700">{getInitials(user.name)}</AvatarFallback>
+                          </Avatar>
+                          <span className="text-[10px] font-bold">YOU</span>
+                        </div>
+                      </div>
+
+                      {/* 2. DOCTOR NODES (The Providers) */}
+                      {graphConnections.filter(c => c.SK.startsWith("DOCTOR#")).map((doc, idx, arr) => {
+                        const pos = getCoords('DOCTOR', idx, undefined, arr.length);
+                        return (
+                          <div
+                            key={doc.SK}
+                            className="absolute -translate-x-1/2 -translate-y-1/2 z-20 flex flex-col items-center group"
+                            style={{ left: `${pos.x}%`, top: `${pos.y}%` }}
+                          >
+                            <div className="w-16 h-16 rounded-full bg-white border-2 border-teal-400 shadow-lg flex items-center justify-center text-teal-600 group-hover:scale-110 transition-all">
+                              <Stethoscope className="h-6 w-6" />
+                            </div>
+                            <span className="mt-1 text-[10px] font-bold text-slate-700 bg-white/90 px-2 py-0.5 rounded-full border shadow-sm">
+                              Dr. {doc.doctorName || doc.SK.split('#')[1].substring(0, 6)}
+                            </span>
+                          </div>
+                        );
+                      })}
+
+                      {/* 3. MEDICATION NODES (The Outcomes) */}
+                      {graphConnections.filter(c => c.SK.startsWith("DOCTOR#")).map((doc, dIdx, dArr) =>
+                        graphConnections
+                          .filter(c => c.SK.startsWith("DRUG#") && (c.prescribedBy === doc.SK || c.prescribedBy === doc.SK.split('#')[1]))
+                          .map((drug, drIdx) => {
+                            const pos = getCoords('DRUG', drIdx, dIdx, dArr.length);
+                            const label = drug.SK.split('#')[1];
+                            return (
+                              <div
+                                key={drug.SK}
+                                className="absolute -translate-x-1/2 -translate-y-1/2 z-10 flex flex-col items-center"
+                                style={{ left: `${pos.x}%`, top: `${pos.y}%` }}
+                              >
+                                <div className="w-12 h-12 rounded-full bg-amber-50 border-2 border-amber-200 shadow-md flex items-center justify-center text-amber-600 hover:scale-110 transition-all">
+                                  <Pill className="h-4 w-4" />
+                                </div>
+                                <span className="mt-1 text-[9px] font-semibold text-slate-500 capitalize bg-white/50 px-1">
+                                  {label}
+                                </span>
+                              </div>
+                            );
+                          })
                       )}
                     </div>
-                  </div>
+                  ) : (
+                    /* 🟢 OPTION 3: REAL EMPTY STATE */
+                    <div className="flex flex-col items-center gap-2 animate-in zoom-in">
+                      <Network className="h-12 w-12 text-slate-300" />
+                      <p className="text-sm font-medium text-slate-500 text-center">
+                        No Clinical Connections Found<br />
+                        <span className="text-[10px] font-normal text-slate-400">Relationships will appear after your first consultation.</span>
+                      </p>
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>
           </TabsContent>
         </Tabs>
       </div>
+      {selectedNote && (
+        <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <FileText className="h-5 w-5 text-amber-500" />
+                {selectedNote.resource?.description || selectedNote.fileName || "Clinical Note"}
+              </DialogTitle>
+              <DialogDescription>
+                Created on {new Date(selectedNote.resource?.date || selectedNote.createdAt).toLocaleDateString()}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="p-6 bg-slate-50 rounded-lg border border-slate-200 mt-4 max-h-[60vh] overflow-y-auto">
+              <p className="whitespace-pre-wrap text-slate-800 leading-relaxed">
+                {selectedNote.resource?.summary || selectedNote.content || selectedNote.note || selectedNote.description || "No content available."}
+              </p>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
     </DashboardLayout>
   );
 }

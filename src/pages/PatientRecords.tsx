@@ -20,6 +20,7 @@ import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { api } from "@/lib/api";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 
 export default function PatientRecords() {
     const navigate = useNavigate();
@@ -53,6 +54,10 @@ export default function PatientRecords() {
     const [records, setRecords] = useState<any[]>([]);
     const [isUploading, setIsUploading] = useState(false);
     const vaultInputRef = useRef<HTMLInputElement>(null);
+    const [noteTitle, setNoteTitle] = useState("");
+
+    const [selectedNote, setSelectedNote] = useState<any>(null);
+    const [isModalOpen, setIsModalOpen] = useState(false);
 
     // --- 1. INITIAL LOAD (Doctor Profile & Patient List) ---
     useEffect(() => {
@@ -68,9 +73,6 @@ export default function PatientRecords() {
             const token = session.tokens?.idToken?.toString();
 
             // A. Fetch Doctor Profile
-            // (We add headers here just in case, though public endpoints might not need it)
-            // A. Fetch Doctor Profile
-            // (We add headers here just in case, though public endpoints might not need it)
             const profileRes: any = await api.get(`/register-doctor?id=${user.userId}`);
             if (profileRes) {
                 const data = profileRes;
@@ -78,32 +80,55 @@ export default function PatientRecords() {
                 setDoctorProfile(profile);
             }
 
-            // B. Fetch Appointments (WITH HEADERS & CORRECT PARSING)
+            // B. Fetch Appointments
             const scheduleRes: any = await api.get(`/doctor-appointments?doctorId=${user.userId}`);
 
-            if (scheduleRes) {
-                const data = scheduleRes;
+            // Prepare the list
+            const data = scheduleRes || {};
+            const rawList = data.existingBookings ? data.existingBookings : (Array.isArray(data) ? data : []);
 
-                // 🟢 2. HANDLE DATA STRUCTURE CORRECTLY
-                // The API might return { existingBookings: [...] } or just [...]
-                const rawList = data.existingBookings ? data.existingBookings : (Array.isArray(data) ? data : []);
+            setAllAppointments(rawList);
 
-                setAllAppointments(rawList);
+            // C. Deduplicate to get Unique Patients
+            const uniqueMap = new Map();
+            rawList.forEach((apt: any) => {
+                // Filter out bad data
+                if (apt.patientId && apt.patientName && !uniqueMap.has(apt.patientId)) {
+                    uniqueMap.set(apt.patientId, {
+                        id: apt.patientId,
+                        name: apt.patientName,
+                        lastVisit: apt.timeSlot || apt.createdAt,
+                        avatar: "" // Placeholder, we will fetch the real one below
+                    });
+                }
+            });
 
-                // C. Deduplicate to get Unique Patients
-                const uniqueMap = new Map();
-                rawList.forEach((apt: any) => {
-                    // Filter out bad data
-                    if (apt.patientId && apt.patientName && !uniqueMap.has(apt.patientId)) {
-                        uniqueMap.set(apt.patientId, {
-                            id: apt.patientId,
-                            name: apt.patientName,
-                            lastVisit: apt.timeSlot || apt.createdAt
-                        });
+            // 🟢 NEW: Fetch real profiles to get the photos (Logic copied from Prescriptions)
+            const uniqueIds = Array.from(uniqueMap.keys());
+            if (uniqueIds.length > 0) {
+                // Fetch all profiles in parallel
+                const profilePromises = uniqueIds.map(pid =>
+                    api.get(`/register-patient?id=${pid}`).catch(() => null)
+                );
+                const profiles = await Promise.all(profilePromises);
+
+                // Update the map with the real avatars
+                profiles.forEach((p: any) => {
+                    if (p) {
+                        const profileData = p.Item || p;
+                        const pid = profileData.patientId || profileData.id;
+                        if (uniqueMap.has(pid)) {
+                            const existing = uniqueMap.get(pid);
+                            existing.avatar = profileData.avatar;
+                            uniqueMap.set(pid, existing);
+                        }
                     }
                 });
-                setPatientList(Array.from(uniqueMap.values()));
             }
+
+            setPatientList(Array.from(uniqueMap.values()));
+
+            // ❌ DELETED THE DUPLICATE LOGIC BLOCK THAT WAS HERE ❌
 
         } catch (e) {
             console.error("Load Error", e);
@@ -150,6 +175,18 @@ export default function PatientRecords() {
             }
 
         } catch (e) { console.error("Patient Detail Error", e); }
+        // 🟢 Fetch real-time vitals for the AI
+        try {
+            const vitalsRes: any = await api.get(`/vitals?patientId=${pid}`);
+            if (vitalsRes && vitalsRes.vitals) {
+                setVitals({
+                    temp: parseFloat(vitalsRes.vitals.temperature) || 98.6,
+                    heartRate: vitalsRes.vitals.heartRate || 72,
+                    bpSys: vitalsRes.vitals.bloodPressureSys || 120,
+                    age: vitals.age
+                });
+            }
+        } catch (e) { console.warn("Vitals not found for patient"); }
     };
 
     const handleLogout = async () => {
@@ -172,24 +209,34 @@ export default function PatientRecords() {
 
     // --- 4. CLINICAL NOTE LOGIC (MongoDB) ---
     const handleSaveNote = async () => {
-        if (!noteText.trim() || !selectedPatientId) return;
+        if (!noteText.trim() || !selectedPatientId || !noteTitle.trim()) {
+            toast({ variant: "destructive", title: "Missing Info", description: "Please provide a title and note content." });
+            return;
+        }
+
         setIsSaving(true);
         try {
             const res = await api.post('/ehr', {
                 action: "add_clinical_note",
                 patientId: selectedPatientId,
-                doctorId: doctorProfile.doctorId,
                 note: noteText,
+                fileName: noteTitle, // 🟢 Matches backend Fix #1
                 authorName: doctorProfile.name
             });
 
-            if (res) {
-                toast({ title: "Note Saved", description: "Added to patient history via MongoDB." });
-                setNoteText("");
-            } else { throw new Error("Save Failed"); }
+            toast({ title: "Securely Saved", description: "Note encrypted and added to history." });
+
+            // 🟢 Reset UI
+            setNoteText("");
+            setNoteTitle("");
+
+            // Refresh the document list
+            loadPatientDetails(selectedPatientId);
         } catch (err) {
-            toast({ variant: "destructive", title: "Error", description: "Could not save clinical note." });
-        } finally { setIsSaving(false); }
+            toast({ variant: "destructive", title: "Error", description: "Compliance check failed or network error." });
+        } finally {
+            setIsSaving(false);
+        }
     };
 
     // --- 5. AI PREDICTION LOGIC (Real Inputs) ---
@@ -217,10 +264,19 @@ export default function PatientRecords() {
                 }
             };
 
-            const res: any = await api.post('/predict-health', payload);
+            const res: any = await api.post('/chat/predict-health', payload);
 
-            if (res) {
-                const data = res;
+            if (res && res.analysis) {
+                // 🟢 Map the new FHIR-compliant response to your UI
+                const data = {
+                    modelType: res.modelType || modelType,
+                    confidence: res.analysis.riskScore / 100, // Converts 85 to 0.85
+                    output: {
+                        risk: res.analysis.riskLevel,
+                        message: res.analysis.clinicalJustification,
+                        recommendation: res.analysis.recommendedIntervention
+                    }
+                };
                 setPredictionResult(data);
                 toast({ title: "Analysis Complete", description: `Ran ${modelType} model successfully.` });
             } else { throw new Error("Prediction API Failed"); }
@@ -247,20 +303,17 @@ export default function PatientRecords() {
         setIsUploading(true);
 
         try {
-            // 1. Get Presigned URL
             const initRes: any = await api.post('/ehr', {
                 action: "request_upload",
-                patientId: selectedPatientId, // 🔒 Linked to specific patient
+                patientId: selectedPatientId,
                 fileName: file.name,
                 fileType: file.type,
-                doctorId: doctorProfile.doctorId, // 🔒 Tracked by you
-                description: "Uploaded by Doctor"
+                doctorId: doctorProfile.doctorId
             });
 
-            if (!initRes) throw new Error("Init Failed");
-            const { uploadUrl } = initRes;
+            // 🟢 FIX: Extract 's3Key' here
+            const { uploadUrl, s3Key } = initRes;
 
-            // 2. Upload to S3
             const uploadRes = await fetch(uploadUrl, {
                 method: "PUT",
                 headers: { "Content-Type": file.type },
@@ -269,9 +322,17 @@ export default function PatientRecords() {
 
             if (!uploadRes.ok) throw new Error("S3 Upload Failed");
 
-            toast({ title: "Success", description: "File added to patient record." });
+            // 🟢 Now s3Key is valid
+            await api.post('/ehr', {
+                action: "save_record_metadata",
+                patientId: selectedPatientId,
+                fileName: file.name,
+                fileType: file.type,
+                s3Key: s3Key,
+                description: `Imaging uploaded by Dr. ${doctorProfile.name}`
+            });
 
-            // 3. Refresh List
+            toast({ title: "Success", description: "File added to patient record." });
             loadPatientDetails(selectedPatientId);
 
         } catch (error) {
@@ -286,8 +347,10 @@ export default function PatientRecords() {
     const handleViewFile = async (s3Key: string) => {
         if (!s3Key) return;
 
-        // 🟢 UX Check: Stop them before calling API if we already know they aren't approved
-        if (doctorProfile?.isOfficerApproved !== true) {
+        // 🟢 FIX: Smart check here too
+        const approved = doctorProfile.isOfficerApproved === true || doctorProfile.isOfficerApproved === "true";
+
+        if (!approved) {
             toast({ variant: "destructive", title: "Restricted", description: "You need Officer Approval to view scans." });
             return;
         }
@@ -317,6 +380,8 @@ export default function PatientRecords() {
             toast({ variant: "destructive", title: "Access Denied", description: error.message });
         }
     };
+
+    const isApproved = doctorProfile?.isOfficerApproved === true || doctorProfile?.isOfficerApproved === "true";
 
     return (
         <DashboardLayout
@@ -369,7 +434,12 @@ export default function PatientRecords() {
                                     )}
                                 >
                                     <Avatar className="h-10 w-10">
-                                        <AvatarFallback className="bg-blue-100 text-blue-700 font-bold">{getInitials(p.name)}</AvatarFallback>
+                                        {/* 👇 ADD THIS LINE HERE */}
+                                        <AvatarImage src={p.avatar} alt={p.name} />
+
+                                        <AvatarFallback className="bg-blue-100 text-blue-700 font-bold">
+                                            {getInitials(p.name)}
+                                        </AvatarFallback>
                                     </Avatar>
                                     <div className="flex-1 min-w-0">
                                         <h4 className="font-semibold text-sm text-slate-900">{p.name}</h4>
@@ -444,16 +514,21 @@ export default function PatientRecords() {
                                                 <CardDescription>Records are encrypted and stored in DocumentDB.</CardDescription>
                                             </CardHeader>
                                             <CardContent className="space-y-4">
-                                                <Textarea
-                                                    placeholder="Type patient symptoms, diagnosis, and treatment plan..."
-                                                    className="min-h-[150px] resize-none text-base"
-                                                    value={noteText}
-                                                    onChange={(e) => setNoteText(e.target.value)}
-                                                />
-                                                <div className="flex justify-between items-center">
-                                                    <p className="text-xs text-muted-foreground">Auto-saved to draft</p>
-                                                    <Button onClick={handleSaveNote} disabled={isSaving || !noteText}>
-                                                        {isSaving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
+                                                {/* 🟢 NEW TITLE INPUT */}
+                                                <div className="space-y-4">
+                                                    <Input
+                                                        placeholder="Note Title (e.g., Follow-up Visit)"
+                                                        value={noteTitle}
+                                                        onChange={(e) => setNoteTitle(e.target.value)}
+                                                        className="font-semibold"
+                                                    />
+                                                    <Textarea
+                                                        placeholder="Type patient symptoms, diagnosis, and treatment plan..."
+                                                        className="min-h-[150px] resize-none text-base"
+                                                        value={noteText}
+                                                        onChange={(e) => setNoteText(e.target.value)}
+                                                    />
+                                                    <Button onClick={handleSaveNote} disabled={isSaving || !noteText || !noteTitle}>
                                                         Save to Record
                                                     </Button>
                                                 </div>
@@ -488,26 +563,42 @@ export default function PatientRecords() {
                                                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                                                         {records.map((doc, idx) => (
                                                             <div key={idx} className="bg-white border p-3 rounded-xl shadow-sm hover:shadow-md transition-all group relative">
+
+                                                                {/* 🟢 CHANGE START: SMART ICON LOGIC */}
                                                                 <div className="aspect-square bg-slate-50 rounded-lg flex items-center justify-center mb-2">
-                                                                    {doc.fileType?.includes("image") ?
-                                                                        <ImageIcon className="h-8 w-8 text-blue-400" /> :
+                                                                    {doc.type === 'NOTE' ? (
+                                                                        <FileText className="h-8 w-8 text-amber-600" />
+                                                                    ) : doc.fileType?.includes("image") ? (
+                                                                        <ImageIcon className="h-8 w-8 text-blue-400" />
+                                                                    ) : (
                                                                         <FileText className="h-8 w-8 text-slate-400" />
-                                                                    }
+                                                                    )}
                                                                 </div>
-                                                                <p className="text-xs font-semibold truncate">{doc.fileName}</p>
+
+                                                                {/* 🟢 HYBRID FHIR MAPPING */}
+                                                                <p className="text-xs font-semibold truncate">
+                                                                    {/* Preference: FHIR Description -> Legacy fileName -> Defaults */}
+                                                                    {doc.resource?.description || doc.fileName || (doc.type === 'NOTE' ? "Untitled Clinical Note" : "Untitled File")}
+                                                                </p>
+
                                                                 <p className="text-[10px] text-muted-foreground">{new Date(doc.createdAt).toLocaleDateString()}</p>
                                                                 {/* Open Button */}
                                                                 <div
-                                                                    onClick={() => handleViewFile(doc.s3Key)}
                                                                     className="absolute inset-0 bg-black/5 rounded-xl opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity cursor-pointer"
+                                                                    onClick={() => {
+                                                                        if (doc.type === 'NOTE') {
+                                                                            setSelectedNote(doc); // This passes the data to the Dialog
+                                                                            setIsModalOpen(true);
+                                                                        } else if (doc.s3Url) {
+                                                                            window.open(doc.s3Url, '_blank');
+                                                                        }
+                                                                    }}
                                                                 >
-                                                                    {doctorProfile.isOfficerApproved === true ? (
-                                                                        /* ✅ APPROVED: Show Eye */
+                                                                    {isApproved ? (
                                                                         <Button variant="secondary" size="icon" className="h-8 w-8 rounded-full shadow-sm">
                                                                             <Eye className="h-4 w-4" />
                                                                         </Button>
                                                                     ) : (
-                                                                        /* ❌ NOT APPROVED: Show Lock */
                                                                         <Button variant="destructive" size="icon" className="h-8 w-8 rounded-full shadow-sm">
                                                                             <Lock className="h-4 w-4" />
                                                                         </Button>
@@ -653,8 +744,7 @@ export default function PatientRecords() {
                                                 {isAnalyzing ? (
                                                     <div className="text-center p-10">
                                                         <Loader2 className="h-10 w-10 animate-spin text-indigo-500 mx-auto mb-4" />
-                                                        <h3 className="font-semibold text-slate-700">Running Neural Network...</h3>
-                                                        <p className="text-sm text-slate-500">Processing vitals against records.</p>
+                                                        <h3 className="font-semibold text-slate-700">Neural Engine Running...</h3>
                                                     </div>
                                                 ) : predictionResult ? (
                                                     <CardContent className="p-8 space-y-6">
@@ -676,6 +766,16 @@ export default function PatientRecords() {
                                                                 {predictionResult.output.message}
                                                             </p>
                                                         </div>
+                                                        {predictionResult.output.recommendation && (
+                                                            <div className="mt-3 p-3 bg-indigo-50 border border-indigo-100 rounded-lg animate-in fade-in zoom-in-95">
+                                                                <h5 className="text-xs font-bold text-indigo-700 uppercase flex items-center gap-1">
+                                                                    <CheckCircle2 className="h-3 w-3" /> Recommended Intervention:
+                                                                </h5>
+                                                                <p className="text-sm text-indigo-900 mt-1 italic leading-snug">
+                                                                    {predictionResult.output.recommendation}
+                                                                </p>
+                                                            </div>
+                                                        )}
 
                                                         <div className="flex items-center gap-2 text-xs text-slate-400 justify-center">
                                                             <CheckCircle2 className="h-3 w-3" />
@@ -683,10 +783,16 @@ export default function PatientRecords() {
                                                         </div>
                                                     </CardContent>
                                                 ) : (
-                                                    <div className="text-center p-10 opacity-50">
+                                                    <div className="text-center p-10">
                                                         <Brain className="h-12 w-12 mx-auto mb-3 text-slate-300" />
-                                                        <p className="font-medium text-slate-500">No Analysis Run</p>
-                                                        <p className="text-xs text-slate-400">Select a model to view predictions.</p>
+                                                        <p className="font-medium text-slate-500">Clinical Decision Support</p>
+                                                        {vitals.heartRate === 72 && vitals.temp === 98.6 ? (
+                                                            <Badge variant="outline" className="mt-2 text-orange-500 border-orange-200">
+                                                                Waiting for Wearable Sync...
+                                                            </Badge>
+                                                        ) : (
+                                                            <p className="text-xs text-slate-400">Vitals loaded. Select a model to run AI risk assessment.</p>
+                                                        )}
                                                     </div>
                                                 )}
                                             </Card>
@@ -708,6 +814,26 @@ export default function PatientRecords() {
                     )}
                 </div>
             </div>
+            {selectedNote && (
+                <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+                    <DialogContent className="max-w-2xl">
+                        <DialogHeader>
+                            <DialogTitle className="flex items-center gap-2">
+                                <FileText className="h-5 w-5 text-amber-500" />
+                                {selectedNote.resource?.description || selectedNote.fileName || "Clinical Note"}
+                            </DialogTitle>
+                            <DialogDescription>
+                                Created on {new Date(selectedNote.resource?.date || selectedNote.createdAt).toLocaleDateString()}
+                            </DialogDescription>
+                        </DialogHeader>
+                        <div className="p-6 bg-slate-50 rounded-lg border border-slate-200 mt-4 max-h-[60vh] overflow-y-auto">
+                            <p className="whitespace-pre-wrap text-slate-800 leading-relaxed">
+                                {selectedNote.resource?.summary || selectedNote.note || selectedNote.content || "No content available."}
+                            </p>
+                        </div>
+                    </DialogContent>
+                </Dialog>
+            )}
         </DashboardLayout>
     );
 }

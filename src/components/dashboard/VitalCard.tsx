@@ -76,7 +76,11 @@ export function VitalCard({
       <div className="relative z-10">
         {/* Header */}
         <div className="flex items-start justify-between mb-4">
-          <div className={cn("flex h-11 w-11 items-center justify-center rounded-xl", colors.bg)}>
+          <div className={cn(
+            "flex h-11 w-11 items-center justify-center rounded-xl transition-all duration-300",
+            colors.bg,
+            status === "critical" ? "animate-[pulse_0.8s_infinite] scale-110 shadow-[0_0_15px_rgba(239,68,68,0.5)]" : ""
+          )}>
             <div className={colors.text}>{icon}</div>
           </div>
           <span className={cn("metric-badge", statusInfo.class)}>

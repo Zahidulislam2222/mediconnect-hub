@@ -66,7 +66,7 @@ export default function Analytics() {
             const [profileRes, analyticsRes] = await Promise.allSettled([
                 api.get(`/register-doctor?id=${userId}`),
                 // 🟢 THIS CALLS YOUR NEW LAMBDA LOGIC
-                api.get(`/billing?type=analytics&doctorId=${userId}`)
+                api.get(`/analytics?doctorId=${userId}`)
             ]);
 
             // 2. Handle Profile

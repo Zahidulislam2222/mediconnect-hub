@@ -139,7 +139,9 @@ export default function Prescriptions() {
         try {
             const payload = {
                 doctorId: user.id,
-                patientId: selectedPatient.id, // Auto-selected
+                doctorName: user.name, // 🟢 ADD THIS
+                patientId: selectedPatient.id,
+                patientName: selectedPatient.name, // 🟢 ADD THIS
                 medication: formData.medication,
                 dosage: formData.dosage,
                 instructions: formData.instructions
@@ -206,7 +208,11 @@ export default function Prescriptions() {
         return prescriptions.filter(p => p.patientId === selectedPatient.id);
     }, [prescriptions, selectedPatient]);
 
-    const activeRx = patientRx.filter(p => p.status === "ISSUED");
+    const activeRx = patientRx.filter(p =>
+        p.status === "ISSUED" ||
+        p.status === "READY_FOR_PICKUP" ||
+        p.status === "PENDING"
+    );
     const refillRx = patientRx.filter(p => p.status === "REFILL_REQUESTED");
 
     // --- RENDER ---
@@ -248,7 +254,10 @@ export default function Prescriptions() {
                         ) : (
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                                 {filteredPatients.map(patient => {
-                                    const rxCount = prescriptions.filter(p => p.patientId === patient.id && p.status === "ISSUED").length;
+                                    const rxCount = prescriptions.filter(p =>
+                                        p.patientId === patient.id &&
+                                        (p.status === "ISSUED" || p.status === "READY_FOR_PICKUP" || p.status === "PENDING")
+                                    ).length;
                                     const refillCount = prescriptions.filter(p => p.patientId === patient.id && p.status === "REFILL_REQUESTED").length;
 
                                     return (
