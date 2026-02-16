@@ -7,7 +7,7 @@
 ![IaC](https://img.shields.io/badge/IaC-Terraform-623CE4.svg)
 ![Standard](https://img.shields.io/badge/Standard-HL7%20FHIR%20R4-red)
 
-> **Architected by [Zahidul Islam](https://www.linkedin.com/in/zahidul-islam-developer/)**
+> **Architected by [Zahidul Islam](https://zahidul-islam.vercel.app/)**
 
 **MediConnect V2** is a state-of-the-art healthcare platform engineered for maximum security, regulatory compliance, and extreme cost-efficiency. By leveraging a **Triple-Cloud Strategy (AWS, GCP, Azure)** orchestrated via **Terraform**, the system achieves a **"Zero-Cost Idle"** state, scaling down to zero compute consumption when not in use.
 
