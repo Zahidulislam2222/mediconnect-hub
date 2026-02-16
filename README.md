@@ -7,7 +7,7 @@
 ![IaC](https://img.shields.io/badge/IaC-Terraform-623CE4.svg)
 ![Standard](https://img.shields.io/badge/Standard-HL7%20FHIR%20R4-red)
 
-> **Architected by [Zahidul Islam](https://zahidul-islam.vercel.app/)**
+> **Architected by [Zahidul Islam](https://www.linkedin.com/in/zahidul-islam-developer/)**
 
 **MediConnect V2** is a state-of-the-art healthcare platform engineered for maximum security, regulatory compliance, and extreme cost-efficiency. By leveraging a **Triple-Cloud Strategy (AWS, GCP, Azure)** orchestrated via **Terraform**, the system achieves a **"Zero-Cost Idle"** state, scaling down to zero compute consumption when not in use.
 
@@ -100,6 +100,7 @@ mediconnect-v2/
 │   ├── deploy_gcp.sh        # Deployment orchestration
 │   └── deploy_azure.sh
 └── docker-compose.yml       # Local development orchestration
+
 👨‍💻 Getting Started
 Prerequisites
 Node.js v18+
@@ -107,25 +108,24 @@ Docker & Docker Compose
 Terraform CLI
 AWS/GCP/Azure CLI tools installed
 1. Infrastructure Provisioning
-code
-Bash
+code Bash
+downloadcontent_copy
+expand_less
 cd terraform
 terraform init
 terraform plan
 terraform apply
 2. Local Development
-code
-Bash
+code Bash
+downloadcontent_copy
+expand_less
 # Install dependencies
 npm install
 
 # Start the local development cluster (Hot Reloading)
 npm run dev
+```
 📄 License & Contact
 This project is open-source and licensed under the MIT License.
 Architected by Muhammad Zahidul Islam
 LinkedIn Profile | GitHub Profile
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
