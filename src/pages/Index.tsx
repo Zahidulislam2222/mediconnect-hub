@@ -49,7 +49,7 @@ export default function Index() {
     {
       icon: Clock,
       title: "24/7 Care Access",
-      description: "Get medical advice round the clock from certified providers",
+      description: "Get medical advice round the clock from certified doctors",
     },
   ];
 
@@ -80,7 +80,7 @@ export default function Index() {
               </span>
             </h1>
             <p className="text-xl text-muted-foreground max-w-2xl mx-auto mb-8">
-              Connect with certified healthcare providers through secure video consultations,
+              Connect with certified doctors through secure video consultations,
               AI-powered diagnostics, and comprehensive health management tools.
             </p>
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
@@ -98,7 +98,7 @@ export default function Index() {
                 onClick={() => navigate("/auth")}
                 className="text-lg px-8 h-14"
               >
-                For Providers
+                For Doctors
               </Button>
             </div>
           </div>
@@ -170,7 +170,7 @@ export default function Index() {
               {
                 step: "02",
                 title: "Book Appointment",
-                description: "Choose your provider and schedule a convenient time",
+                description: "Choose your doctor and schedule a convenient time",
               },
               {
                 step: "03",

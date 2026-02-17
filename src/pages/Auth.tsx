@@ -520,7 +520,7 @@ export default function Auth() {
                 <Tabs value={userType} onValueChange={(v) => setUserType(v as any)} className="mb-6">
                   <TabsList className="grid w-full grid-cols-2">
                     <TabsTrigger value="patient" className="gap-2"><User className="h-4 w-4" /> Patient</TabsTrigger>
-                    <TabsTrigger value="provider" className="gap-2"><Building2 className="h-4 w-4" /> Provider</TabsTrigger>
+                    <TabsTrigger value="provider" className="gap-2"><Building2 className="h-4 w-4" /> Doctor</TabsTrigger>
                   </TabsList>
                 </Tabs>
 
@@ -552,14 +552,14 @@ export default function Auth() {
               <CardHeader className="text-center pb-2">
                 <CardTitle className="text-2xl">Create Account</CardTitle>
                 <CardDescription>
-                  Join as a <span className="font-semibold text-primary">{userType === 'patient' ? 'Patient' : 'Medical Provider'}</span>
+                  Join as a <span className="font-semibold text-primary">{userType === 'patient' ? 'Patient' : 'Doctor'}</span>
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 <Tabs value={userType} onValueChange={(v) => setUserType(v as any)} className="mb-6">
                   <TabsList className="grid w-full grid-cols-2">
                     <TabsTrigger value="patient" className="gap-2"><User className="h-4 w-4" /> Patient</TabsTrigger>
-                    <TabsTrigger value="provider" className="gap-2"><Building2 className="h-4 w-4" /> Provider</TabsTrigger>
+                    <TabsTrigger value="provider" className="gap-2"><Building2 className="h-4 w-4" /> Doctor</TabsTrigger>
                   </TabsList>
                 </Tabs>
 

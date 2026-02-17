@@ -116,7 +116,7 @@ export function Sidebar({ userRole, userName, userAvatar, onLogout, className }:
             )}
           >
             <Shield className="mr-1.5 h-3 w-3" />
-            {userRole === "doctor" ? "Provider Portal" : "Patient Portal"}
+            {userRole === "doctor" ? "Doctor Portal" : "Patient Portal"}
           </Badge>
         </div>
       )}
@@ -188,7 +188,7 @@ export function Sidebar({ userRole, userName, userAvatar, onLogout, className }:
                 {userName}
               </p>
               <p className="truncate text-xs text-sidebar-foreground/60">
-                {userRole === "doctor" ? "Provider" : "Patient"}
+                {userRole === "doctor" ? "Doctor" : "Patient"}
               </p>
             </div>
           )}

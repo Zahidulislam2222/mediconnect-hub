@@ -575,7 +575,7 @@ export default function HealthRecords() {
                   <Network className="h-5 w-5 text-primary" />
                   Clinical Chain of Care
                 </CardTitle>
-                <CardDescription>Visualizing treatment pathways from your healthcare providers.</CardDescription>
+                <CardDescription>Visualizing treatment pathways from your doctors.</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="h-[500px] rounded-xl bg-slate-50/50 border border-slate-200 flex items-center justify-center overflow-hidden relative">
