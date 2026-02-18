@@ -200,8 +200,8 @@ export default function PatientDashboard() {
       userAvatar={profile?.avatar || ""}
       onLogout={async () => {
         await signOut();
-        localStorage.removeItem('user');
-        navigate("/");
+        localStorage.clear(); // Clear all keys to be safe
+        window.location.href = "/";
       }}
     >
       <div className="space-y-6 animate-fade-in">

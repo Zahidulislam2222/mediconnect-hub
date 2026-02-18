@@ -180,7 +180,11 @@ export default function DoctorDashboard() {
       userRole="doctor"
       userName={doctorProfile.name}
       userAvatar={doctorProfile.avatar}
-      onLogout={async () => { await signOut(); navigate("/"); }}
+      onLogout={async () => {
+        await signOut();
+        localStorage.clear();
+        window.location.href = "/";
+      }}
     >
       <div className="space-y-6 animate-fade-in pb-10">
 

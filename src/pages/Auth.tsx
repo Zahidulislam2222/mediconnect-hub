@@ -488,7 +488,8 @@ export default function Auth() {
   // --- UI RENDER ---
   return (
     <div className="min-h-screen flex">
-      <PublicHeader />
+      {/* 🔴 HIDE HEADER DURING VERIFICATION STEPS */}
+      {!['identity', 'diploma-upload'].includes(authStep) && <PublicHeader />}
       <div className="hidden lg:flex lg:w-1/2 medical-gradient p-24 flex-col justify-between">
         <div>
           <div className="flex items-center gap-3 mb-12">
