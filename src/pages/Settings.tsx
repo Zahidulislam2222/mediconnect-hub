@@ -1,78 +1,21 @@
-import { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { signOut, getCurrentUser, fetchAuthSession, fetchUserAttributes } from 'aws-amplify/auth';
-import {
-    User,
-    Camera,
-    Save,
-    Loader2,
-    Mail,
-    MapPin,
-    Phone,
-    Lock,
-    Smartphone,
-    Stethoscope,
-    BadgeCheck,
-    DollarSign,
-    FileText,
-    Calendar, // 🟢 ADD THIS
-    CheckCircle,
-    Clock // 🟢 Added Icon
-} from "lucide-react";
+import { Save, Loader2 } from "lucide-react";
+
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Switch } from "@/components/ui/switch";
-import { Label } from "@/components/ui/label";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
 import { api } from "@/lib/api";
 
-const SettingsSkeleton = () => (
-    <div className="max-w-4xl mx-auto space-y-6 pb-10">
-        <Card className="shadow-card border-border/50">
-            <CardHeader>
-                <div className="flex justify-between">
-                    <div className="space-y-2">
-                        <Skeleton className="h-6 w-40" />
-                        <Skeleton className="h-4 w-60" />
-                    </div>
-                    <Skeleton className="h-6 w-24 rounded-full" />
-                </div>
-            </CardHeader>
-            <CardContent className="space-y-6">
-                <div className="flex items-center gap-6 pb-6 border-b border-border/40">
-                    <Skeleton className="h-24 w-24 rounded-full" />
-                    <div className="space-y-2">
-                        <Skeleton className="h-5 w-32" />
-                        <Skeleton className="h-4 w-48" />
-                    </div>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <Skeleton className="h-12 w-full" />
-                    <Skeleton className="h-12 w-full" />
-                    <Skeleton className="h-12 w-full" />
-                    <Skeleton className="h-12 w-full" />
-                </div>
-            </CardContent>
-        </Card>
-        <Card className="shadow-card border-border/50">
-            <CardHeader>
-                <Skeleton className="h-6 w-48 mb-2" />
-                <Skeleton className="h-4 w-64" />
-            </CardHeader>
-            <CardContent>
-                <Skeleton className="h-64 w-full" />
-            </CardContent>
-        </Card>
-    </div>
-);
+// 🟢 NEW: Import our newly created modular components
+import { ProfileInformationCard } from "@/components/settings/ProfileInformationCard";
+import { DoctorProfessionalCard } from "@/components/settings/DoctorProfessionalCard";
+import { DoctorScheduleCard } from "@/components/settings/DoctorScheduleCard";
+import { IntegrationsAndAlertsCard } from "@/components/settings/IntegrationsAndAlertsCard";
+import { SettingsSkeleton } from "@/components/settings/SettingsSkeleton";
 
-// 🟢 HELPER: Generate Time Options (08:00 - 20:00)
+// HELPER: Generate Time Options (08:00 - 22:00)
 const generateTimeOptions = () => {
     const times = [];
     for (let i = 7; i <= 22; i++) {
@@ -98,11 +41,9 @@ export default function Settings() {
 
     const [isLoading, setIsLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
-
-    const [userRole, setUserRole] = useState<"patient" | "doctor">(() =>
+    const [userRole] = useState<"patient" | "doctor">(() =>
         (localUser.role === 'doctor' || localUser.role === 'provider') ? 'doctor' : 'patient'
     );
-
     const [userId, setUserId] = useState("");
     const [calendarConnected, setCalendarConnected] = useState(false);
 
@@ -118,14 +59,8 @@ export default function Settings() {
         bio: ""
     });
 
-    // 🟢 NEW STATE: Doctor Schedule
     const [weeklySchedule, setWeeklySchedule] = useState<any>({});
-
-    const [preferences, setPreferences] = useState({
-        email: true,
-        sms: true,
-        promotional: false
-    });
+    const [preferences, setPreferences] = useState({ email: true, sms: true, promotional: false });
 
     useEffect(() => {
         isMounted.current = true;
@@ -142,24 +77,16 @@ export default function Settings() {
             ]);
 
             if (!isMounted.current) return;
-
-            const token = session.tokens?.idToken?.toString();
             const cognitoPhone = userAttrs?.phone_number || "";
-
             setUserId(authUser.userId);
 
-            // 1. Load Basic Profile
             const endpoint = userRole === 'doctor'
                 ? `/register-doctor?id=${authUser.userId}`
                 : `/register-patient?id=${authUser.userId}`;
 
             const data: any = await api.get(endpoint);
             if (data) {
-                // Remove rawData wrapper logic as api returns data directly
-                // But check if data structure matches "Item" or direct
-                // based on previous usage: const data = rawData.Item || rawData;
                 const profileData = data.Item || data;
-
                 if (isMounted.current) {
                     setFormData(prev => ({
                         ...prev,
@@ -173,20 +100,16 @@ export default function Settings() {
                         consultationFee: profileData.consultationFee || "",
                         bio: profileData.bio || ""
                     }));
-
                     if (profileData.preferences) setPreferences(profileData.preferences);
                 }
             }
 
-            // 🟢 2. Load Doctor Schedule (Separate standard standard fetch)
             if (userRole === 'doctor') {
                 try {
                     const scheduleData: any = await api.get(`/doctors/${authUser.userId}/schedule`);
-
-                    if (scheduleData) {
+                    if (scheduleData && isMounted.current) {
                         const schedule = scheduleData.schedule || {};
                         const parsedSchedule: any = {};
-
                         DAYS.forEach(day => {
                             const val = schedule[day];
                             if (val && val !== "OFF") {
@@ -196,76 +119,16 @@ export default function Settings() {
                                 parsedSchedule[day] = { active: false, start: "09:00", end: "17:00" };
                             }
                         });
-
-                        // 🟢 CRITICAL FIX: Add this line to update the UI
                         setWeeklySchedule(parsedSchedule);
                     }
-                } catch (e) {
-                    console.error("Schedule load error", e);
-                }
+
+                    const calStatus: any = await api.get(`/doctors/${authUser.userId}/calendar/status`);
+                    if (isMounted.current) setCalendarConnected(calStatus.connected);
+                } catch (e) { console.error("Schedule/Calendar load error", e); }
             }
-
-            // --- Inside handleSave() ---
-            const handleSave = async () => {
-                setIsSaving(true);
-                try {
-                    // ... setup ...
-
-                    // 1. Save Profile
-                    let profileReq;
-                    if (userRole === 'doctor') {
-                        // 🟢 FIX: Use standard /doctors/:id path
-                        profileReq = api.put(`/doctors/${userId}`, {
-                            ...formData,
-                            doctorId: userId
-                        });
-                    } else {
-                        // 🟢 FIX: Use standard /patients/:id path
-                        profileReq = api.put(`/patients/${userId}`, {
-                            ...formData,
-                            userId: userId
-                        });
-                    }
-
-                    // 2. Save Schedule (If Doctor)
-                    const promises = [profileReq];
-                    if (userRole === 'doctor') {
-                        const finalSchedule: any = {};
-                        DAYS.forEach(day => {
-                            const dayData = weeklySchedule[day] || { active: false, start: "09:00", end: "17:00" };
-                            finalSchedule[day] = dayData.active ? `${dayData.start}-${dayData.end}` : "OFF";
-                        });
-
-                        // 🟢 FIX: Use standard /doctors/:id/schedule path
-                        const scheduleReq = api.post(`/doctors/${userId}/schedule`, {
-                            schedule: finalSchedule
-                        });
-                        promises.push(scheduleReq);
-                    }
-
-                    // 🟢 3. Check Calendar Status (If Doctor)
-                    if (userRole === 'doctor') {
-                        try {
-                            // Check if connected
-                            const calStatus: any = await api.get(`/doctors/${authUser.userId}/calendar/status`);
-                            if (isMounted.current) setCalendarConnected(calStatus.connected);
-                        } catch (e) { console.error("Calendar status error", e); }
-                    }
-
-                    await Promise.all(promises);
-                    // ... success toast ...
-                } catch (error) { /* error toast */ }
-            };
-
         } catch (error) {
             console.error("Profile load failed:", error);
-            if (isMounted.current) {
-                toast({
-                    variant: "destructive",
-                    title: "Error loading profile",
-                    description: "Please refresh the page.",
-                });
-            }
+            if (isMounted.current) toast({ variant: "destructive", title: "Error loading profile" });
         } finally {
             if (isMounted.current) setIsLoading(false);
         }
@@ -274,12 +137,10 @@ export default function Settings() {
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (!file) return;
-
         if (file.size > 2000000) {
             toast({ variant: "destructive", title: "File too large", description: "Max size is 2MB." });
             return;
         }
-
         const reader = new FileReader();
         reader.onload = (ev) => {
             setFormData(prev => ({ ...prev, avatar: ev.target?.result as string }));
@@ -287,98 +148,52 @@ export default function Settings() {
         reader.readAsDataURL(file);
     };
 
-    // 🟢 HELPER: Update Schedule State
     const updateSchedule = (day: string, field: string, value: any) => {
         setWeeklySchedule((prev: any) => ({
-            ...prev,
-            [day]: {
-                ...prev[day],
-                [field]: value
-            }
+            ...prev, [day]: { ...prev[day], [field]: value }
         }));
     };
 
     const handleSave = async () => {
         setIsSaving(true);
         try {
-            const session = await fetchAuthSession();
-            const token = session.tokens?.idToken?.toString();
-
             const basePayload = {
-                name: formData.name,
-                phone: formData.phone,
-                avatar: formData.avatar,
-                preferences: preferences,
-                address: formData.address
+                name: formData.name, phone: formData.phone,
+                avatar: formData.avatar, preferences, address: formData.address
             };
 
-            // --- 1. Save Profile ---
             let profileReq;
-
             if (userRole === 'doctor') {
-                // 🟢 FIX: Use the specific ID path to match: router.put('/doctors/:id', ...)
                 profileReq = api.put(`/doctors/${userId}`, {
-                    ...basePayload,
-                    doctorId: userId,
-                    specialization: formData.specialization,
-                    consultationFee: formData.consultationFee,
-                    bio: formData.bio,
+                    ...basePayload, doctorId: userId,
+                    specialization: formData.specialization, consultationFee: formData.consultationFee, bio: formData.bio,
                 });
             } else {
-                // 🟢 FIX: Use the specific ID path to match: router.put('/patients/:id', ...)
-                profileReq = api.put(`/patients/${userId}`, {
-                    ...basePayload,
-                    userId: userId
-                });
+                profileReq = api.put(`/patients/${userId}`, { ...basePayload, userId: userId });
             }
 
-            // --- 2. Save Schedule (If Doctor) ---
             const promises = [profileReq];
 
             if (userRole === 'doctor') {
-                // Convert UI Format back to DB Format
                 const finalSchedule: any = {};
                 DAYS.forEach(day => {
                     const dayData = weeklySchedule[day] || { active: false, start: "09:00", end: "17:00" };
                     finalSchedule[day] = dayData.active ? `${dayData.start}-${dayData.end}` : "OFF";
                 });
-
-                // 🟢 FIX: Use the specific ID path to match: router.post('/doctors/:id/schedule', ...)
-                // This removes the "CRITICAL: Unknown Route" and the "404"
-                const scheduleReq = api.post(`/doctors/${userId}/schedule`, {
-                    schedule: finalSchedule
-                });
-                promises.push(scheduleReq);
+                promises.push(api.post(`/doctors/${userId}/schedule`, { schedule: finalSchedule }));
             }
 
             await Promise.all(promises);
 
-
-            await Promise.all(promises);
-
-            // Update local storage
-            const updatedUser = {
-                ...localUser,
-                name: formData.name,
-                avatar: formData.avatar,
-                role: userRole
-            };
+            const updatedUser = { ...localUser, name: formData.name, avatar: formData.avatar, role: userRole };
             localStorage.setItem('user', JSON.stringify(updatedUser));
             window.dispatchEvent(new Event("user-updated"));
             window.dispatchEvent(new Event("storage"));
 
-            toast({
-                title: "Settings Saved",
-                description: "Your profile and schedule have been updated.",
-            });
-
+            toast({ title: "Settings Saved", description: "Your profile has been updated." });
         } catch (error) {
             console.error("Save error:", error);
-            toast({
-                variant: "destructive",
-                title: "Save Failed",
-                description: "Could not update profile. Please try again.",
-            });
+            toast({ variant: "destructive", title: "Save Failed", description: "Could not update profile." });
         } finally {
             setIsSaving(false);
         }
@@ -389,15 +204,7 @@ export default function Settings() {
             await signOut();
             localStorage.removeItem('user');
             navigate("/");
-        } catch (error) {
-            console.error("Sign out error", error);
-        }
-    };
-
-    const getInitials = (n: string) => {
-        if (!n) return userRole === 'doctor' ? "DR" : "PT";
-        const parts = n.trim().split(" ");
-        return parts.length === 1 ? n.substring(0, 2).toUpperCase() : (parts[0][0] + parts[1][0]).toUpperCase();
+        } catch (error) { console.error("Sign out error", error); }
     };
 
     const handleDiscard = () => {
@@ -406,14 +213,11 @@ export default function Settings() {
         toast({ title: "Changes Discarded", description: "Form reset to saved values." });
     };
 
-    // 🟢 HANDLERS: Google Calendar
     const handleConnectCalendar = async () => {
         try {
             const res: any = await api.get(`/doctors/auth/google?id=${userId}`);
-            if (res.url) window.location.href = res.url; // Redirect to Google
-        } catch (e) {
-            toast({ variant: "destructive", title: "Connection Failed", description: "Could not initiate Google Login." });
-        }
+            if (res.url) window.location.href = res.url;
+        } catch (e) { toast({ variant: "destructive", title: "Connection Failed" }); }
     };
 
     const handleDisconnectCalendar = async () => {
@@ -421,9 +225,7 @@ export default function Settings() {
             await api.delete(`/doctors/${userId}/calendar`);
             setCalendarConnected(false);
             toast({ title: "Disconnected", description: "Google Calendar sync stopped." });
-        } catch (e) {
-            toast({ variant: "destructive", title: "Error", description: "Could not disconnect." });
-        }
+        } catch (e) { toast({ variant: "destructive", title: "Error" }); }
     };
 
     return (
@@ -436,290 +238,40 @@ export default function Settings() {
             onLogout={handleLogout}
         >
             {isLoading ? (
-                <SettingsSkeleton />
+                <SettingsSkeleton userRole={userRole} />
             ) : (
                 <div className="max-w-4xl mx-auto space-y-6 animate-fade-in pb-10">
-                    {/* --- 1. COMMON PROFILE HEADER --- */}
-                    <Card className="shadow-card border-border/50 bg-card">
-                        <CardHeader>
-                            <div className="flex justify-between items-start">
-                                <div>
-                                    <CardTitle>Profile Information</CardTitle>
-                                    <CardDescription>Update your photo and personal details</CardDescription>
-                                </div>
-                                <Badge variant={userRole === 'doctor' ? "default" : "secondary"} className="uppercase">
-                                    {userRole} Account
-                                </Badge>
-                            </div>
-                        </CardHeader>
-                        <CardContent className="space-y-6">
-                            <div className="flex items-center gap-6 pb-6 border-b border-border/40">
-                                <div className="relative group">
-                                    <Avatar className="h-24 w-24 border-4 border-background shadow-sm ring-2 ring-muted">
-                                        <AvatarImage src={formData.avatar} className="object-cover" />
-                                        <AvatarFallback className="text-xl bg-primary/10 text-primary font-bold">
-                                            {getInitials(formData.name)}
-                                        </AvatarFallback>
-                                    </Avatar>
-                                    <div
-                                        className="absolute bottom-0 right-0 p-2 bg-primary text-white rounded-full shadow-md cursor-pointer hover:bg-primary/90 transition-transform active:scale-95"
-                                        onClick={() => fileInputRef.current?.click()}
-                                        title="Change Photo"
-                                    >
-                                        <Camera className="h-4 w-4" />
-                                    </div>
-                                    <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleFileChange} />
-                                </div>
-                                <div className="space-y-1">
-                                    <h3 className="font-medium text-lg">Profile Picture</h3>
-                                    <p className="text-sm text-muted-foreground">JPG or PNG. Max size 2MB.</p>
-                                </div>
-                            </div>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <div className="space-y-2">
-                                    <Label htmlFor="name">Full Name</Label>
-                                    <div className="relative">
-                                        <User className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-                                        <Input
-                                            id="name" className="pl-9" value={formData.name}
-                                            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                                            placeholder="John Doe"
-                                        />
-                                    </div>
-                                </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="email">Email Address</Label>
-                                    <div className="relative group">
-                                        <Mail className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-                                        <Input
-                                            id="email" className="pl-9 pr-9 bg-muted/50 cursor-not-allowed text-muted-foreground"
-                                            value={formData.email} readOnly
-                                        />
-                                        <Lock className="absolute right-3 top-2.5 h-4 w-4 text-muted-foreground/50" />
-                                    </div>
-                                </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="phone">Phone Number</Label>
-                                    <div className="relative">
-                                        <Phone className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-                                        <Input
-                                            id="phone" className="pl-9" placeholder="+1 (555) 000-0000"
-                                            value={formData.phone}
-                                            onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                                        />
-                                    </div>
-                                </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="address">{userRole === 'doctor' ? "Clinic Address" : "Home Address"}</Label>
-                                    <div className="relative">
-                                        <MapPin className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-                                        <Input
-                                            id="address" className="pl-9" value={formData.address}
-                                            onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                                            placeholder="123 Medical Center Blvd"
-                                        />
-                                    </div>
-                                </div>
-                            </div>
-                        </CardContent>
-                    </Card>
+                    <ProfileInformationCard 
+                        formData={formData} 
+                        setFormData={setFormData} 
+                        userRole={userRole} 
+                        fileInputRef={fileInputRef} 
+                        handleFileChange={handleFileChange} 
+                    />
 
-                    {/* --- 2. DOCTOR SPECIFIC DETAILS --- */}
-                    {userRole === 'doctor' && (
-                        <>
-                            <Card className="shadow-card border-border/50">
-                                <CardHeader>
-                                    <CardTitle className="flex items-center gap-2">
-                                        <Stethoscope className="h-5 w-5 text-primary" />
-                                        Professional Details
-                                    </CardTitle>
-                                    <CardDescription>Manage your public practice information</CardDescription>
-                                </CardHeader>
-                                <CardContent className="space-y-6">
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                        <div className="space-y-2">
-                                            <Label htmlFor="specialization">Specialization</Label>
-                                            <div className="relative">
-                                                <BadgeCheck className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-                                                <Input
-                                                    id="specialization" className="pl-9" value={formData.specialization}
-                                                    onChange={(e) => setFormData({ ...formData, specialization: e.target.value })}
-                                                />
-                                            </div>
-                                        </div>
-                                        <div className="space-y-2">
-                                            <Label htmlFor="fee">Consultation Fee ($)</Label>
-                                            <div className="relative">
-                                                <DollarSign className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-                                                <Input
-                                                    id="fee" type="number" className="pl-9" value={formData.consultationFee}
-                                                    onChange={(e) => setFormData({ ...formData, consultationFee: e.target.value })}
-                                                    placeholder="150"
-                                                />
-                                            </div>
-                                        </div>
-                                        <div className="space-y-2">
-                                            <Label htmlFor="license">Medical License ID</Label>
-                                            <div className="relative">
-                                                <FileText className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-                                                <Input
-                                                    id="license" className="pl-9 bg-muted/50" value={formData.licenseNumber}
-                                                    readOnly placeholder="PENDING"
-                                                />
-                                                <Lock className="absolute right-3 top-2.5 h-4 w-4 text-muted-foreground/50" />
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label htmlFor="bio">Professional Bio</Label>
-                                        <Textarea
-                                            id="bio" placeholder="Describe your experience..."
-                                            className="min-h-[100px] resize-none" value={formData.bio}
-                                            onChange={(e) => setFormData({ ...formData, bio: e.target.value })}
-                                        />
-                                    </div>
-                                </CardContent>
-                            </Card>
+                    <DoctorProfessionalCard 
+                        formData={formData} 
+                        setFormData={setFormData} 
+                        userRole={userRole} 
+                    />
 
-                            {/* 🟢 3. NEW SCHEDULE CARD --- */}
-                            <Card className="shadow-card border-border/50">
-                                <CardHeader>
-                                    <CardTitle className="flex items-center gap-2">
-                                        <Clock className="h-5 w-5 text-primary" />
-                                        Weekly Schedule
-                                    </CardTitle>
-                                    <CardDescription>Set your availability for patient appointments</CardDescription>
-                                </CardHeader>
-                                <CardContent className="space-y-4">
-                                    {DAYS.map((day) => {
-                                        const schedule = weeklySchedule[day] || { active: false, start: "09:00", end: "17:00" };
-                                        return (
-                                            <div key={day} className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-3 rounded-lg border border-border/40 hover:bg-muted/30 transition-colors">
-                                                <div className="flex items-center gap-3 min-w-[140px]">
-                                                    <Switch
-                                                        checked={schedule.active}
-                                                        onCheckedChange={(checked) => updateSchedule(day, 'active', checked)}
-                                                    />
-                                                    <span className={`font-medium ${schedule.active ? 'text-foreground' : 'text-muted-foreground'}`}>
-                                                        {day}
-                                                    </span>
-                                                </div>
+                    <DoctorScheduleCard 
+                        weeklySchedule={weeklySchedule} 
+                        updateSchedule={updateSchedule} 
+                        DAYS={DAYS} 
+                        TIME_OPTIONS={TIME_OPTIONS} 
+                        userRole={userRole} 
+                    />
 
-                                                {schedule.active ? (
-                                                    <div className="flex items-center gap-2 flex-1">
-                                                        <div className="relative flex-1">
-                                                            <select
-                                                                className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                                                                value={schedule.start}
-                                                                onChange={(e) => updateSchedule(day, 'start', e.target.value)}
-                                                            >
-                                                                {TIME_OPTIONS.map(t => (
-                                                                    <option key={`start-${t}`} value={t}>{t}</option>
-                                                                ))}
-                                                            </select>
-                                                        </div>
-                                                        <span className="text-muted-foreground">-</span>
-                                                        <div className="relative flex-1">
-                                                            <select
-                                                                className="flex h-9 w-full rounded-md border border-input bg-background px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                                                                value={schedule.end}
-                                                                onChange={(e) => updateSchedule(day, 'end', e.target.value)}
-                                                            >
-                                                                {TIME_OPTIONS.map(t => (
-                                                                    <option key={`end-${t}`} value={t}>{t}</option>
-                                                                ))}
-                                                            </select>
-                                                        </div>
-                                                    </div>
-                                                ) : (
-                                                    <div className="flex-1 text-center sm:text-left text-sm text-muted-foreground italic pl-2">
-                                                        Unavailable / Off
-                                                    </div>
-                                                )}
-                                            </div>
-                                        );
-                                    })}
-                                </CardContent>
-                            </Card>
-                        </>
-                    )}
+                    <IntegrationsAndAlertsCard 
+                        preferences={preferences} 
+                        setPreferences={setPreferences} 
+                        calendarConnected={calendarConnected} 
+                        handleConnectCalendar={handleConnectCalendar} 
+                        handleDisconnectCalendar={handleDisconnectCalendar} 
+                        userRole={userRole} 
+                    />
 
-                    {/* --- 4. NOTIFICATIONS (Common) --- */}
-                    <Card className="shadow-card border-border/50">
-                        <CardHeader>
-                            <CardTitle>Notifications</CardTitle>
-                            <CardDescription>Configure alerts</CardDescription>
-                        </CardHeader>
-                        <CardContent className="space-y-6">
-                            <div className="flex items-center justify-between">
-                                <div className="space-y-0.5">
-                                    <div className="font-medium flex items-center gap-2">
-                                        <Mail className="h-4 w-4 text-primary" /> Email Alerts
-                                    </div>
-                                    <div className="text-sm text-muted-foreground">Receive booking updates via email</div>
-                                </div>
-                                <Switch
-                                    checked={preferences.email}
-                                    onCheckedChange={(c) => setPreferences({ ...preferences, email: c })}
-                                />
-                            </div>
-                            <div className="flex items-center justify-between">
-                                <div className="space-y-0.5">
-                                    <div className="font-medium flex items-center gap-2">
-                                        <Smartphone className="h-4 w-4 text-primary" /> SMS Alerts
-                                    </div>
-                                    <div className="text-sm text-muted-foreground">Get text messages for urgent updates</div>
-                                </div>
-                                <Switch
-                                    checked={preferences.sms}
-                                    onCheckedChange={(c) => setPreferences({ ...preferences, sms: c })}
-                                />
-                            </div>
-                        </CardContent>
-                    </Card>
-
-                    {/* 🟢 4. GOOGLE CALENDAR INTEGRATION (Doctor Only) */}
-                    {userRole === 'doctor' && (
-                        <Card className="shadow-card border-border/50">
-                            <CardHeader>
-                                <CardTitle className="flex items-center gap-2">
-                                    <Calendar className="h-5 w-5 text-primary" />
-                                    Google Calendar Sync
-                                </CardTitle>
-                                <CardDescription>Sync appointments to your personal calendar</CardDescription>
-                            </CardHeader>
-                            <CardContent className="space-y-4">
-                                <div className="flex items-center justify-between p-4 border border-border/40 rounded-lg bg-muted/20">
-                                    <div className="flex items-center gap-4">
-                                        <div className={`p-3 rounded-full ${calendarConnected ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
-                                            {calendarConnected ? <CheckCircle className="h-6 w-6" /> : <Calendar className="h-6 w-6" />}
-                                        </div>
-                                        <div>
-                                            <h4 className="font-medium">
-                                                {calendarConnected ? "Calendar Connected" : "Not Connected"}
-                                            </h4>
-                                            <p className="text-sm text-muted-foreground">
-                                                {calendarConnected
-                                                    ? "Appointments are syncing automatically."
-                                                    : "Connect to see appointments on your phone."}
-                                            </p>
-                                        </div>
-                                    </div>
-                                    {calendarConnected ? (
-                                        <Button variant="outline" onClick={handleDisconnectCalendar} className="border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700">
-                                            Disconnect
-                                        </Button>
-                                    ) : (
-                                        <Button onClick={handleConnectCalendar} className="bg-blue-600 hover:bg-blue-700 text-white">
-                                            Connect Google
-                                        </Button>
-                                    )}
-                                </div>
-                            </CardContent>
-                        </Card>
-                    )}
-
-                    {/* ACTION BAR */}
                     <div className="flex justify-end gap-4 sticky bottom-6 z-10">
                         <div className="bg-background/80 backdrop-blur-sm p-2 rounded-xl shadow-lg border border-border/50 flex gap-4">
                             <Button variant="ghost" onClick={handleDiscard} disabled={isSaving}>

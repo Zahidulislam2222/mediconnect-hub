@@ -11,7 +11,6 @@ import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { Badge } from "@/components/ui/badge";
 import { api } from "@/lib/api";
 
 const COLORS = ['#8884d8', '#00C49F', '#FFBB28', '#FF8042'];
@@ -30,18 +29,11 @@ export default function Analytics() {
     const [metrics, setMetrics] = useState({
         revenue: 0,
         consultations: 0,
-        satisfaction: "0.0"
+        satisfaction: "4.9"
     });
 
     const [revenueData, setRevenueData] = useState<any[]>([]);
-
-    // Placeholder for demographics (Backend currently focuses on Finance)
-    // You can extend the Lambda later to return this real data.
-    const [demographicData, setDemographicData] = useState([
-        { name: '18-30', value: 0 },
-        { name: '31-50', value: 0 },
-        { name: '50+', value: 0 },
-    ]);
+    const [demographicData, setDemographicData] = useState<any[]>([]);
 
     // --- AUTH HELPER ---
     const getAuthToken = async () => {
@@ -58,28 +50,25 @@ export default function Analytics() {
     const loadAnalytics = async () => {
         try {
             setIsLoading(true);
-            const token = await getAuthToken();
             const attributes = await fetchUserAttributes();
             const userId = attributes.sub;
 
-            // 1. Fetch Profile & Analytics in Parallel
-            const [profileRes, analyticsRes] = await Promise.allSettled([
-                api.get(`/register-doctor?id=${userId}`),
-                // 🟢 THIS CALLS YOUR NEW LAMBDA LOGIC
-                api.get(`/analytics?doctorId=${userId}`)
+            // 🟢 PARALLEL FETCH: Financials (Booking Service) + Demographics (Patient Service)
+            const [profileRes, analyticsRes, demoRes] = await Promise.allSettled([
+                // 1. FIXED: Correct RESTful Profile Route
+                api.get(`/doctors/${userId}`),
+                // 2. FINANCIALS: Calls booking.controller.ts -> getDoctorAnalytics
+                api.get(`/analytics?doctorId=${userId}`),
+                // 3. DEMOGRAPHICS: Calls patient.controller.ts -> getDemographics
+                api.get(`/demographics`) 
             ]);
 
-            // 2. Handle Profile
+            // 1. Handle Profile
             if (profileRes.status === "fulfilled") {
                 const data: any = profileRes.value;
-                // API might return array or single object depending on your setup
-                let myProfile = Array.isArray(data.doctors)
-                    ? data.doctors.find((d: any) => d.doctorId === userId)
-                    : data;
-
-                // Fallback if direct object
-                if (!myProfile && data.name) myProfile = data;
-
+                // DynamoDB GetItem returns .Item, Scan returns .doctors array
+                let myProfile = data.Item || (Array.isArray(data.doctors) ? data.doctors.find((d: any) => d.doctorId === userId) : data);
+                
                 if (myProfile) {
                     const updated = { ...doctorProfile, ...myProfile };
                     setDoctorProfile(updated);
@@ -87,32 +76,28 @@ export default function Analytics() {
                 }
             }
 
-            // 3. Handle Analytics (The New Data)
+            // 2. Handle Financial Analytics
             if (analyticsRes.status === "fulfilled") {
                 const data: any = analyticsRes.value;
-
                 setMetrics({
                     revenue: data.totalRevenue || 0,
                     consultations: data.consultationCount || 0,
                     satisfaction: data.patientSatisfaction || "4.9"
                 });
+                setRevenueData(data.chartData || []);
+            }
 
-                // Ensure the chart doesn't crash if empty
-                if (data.chartData && data.chartData.length > 0) {
-                    setRevenueData(data.chartData);
-                } else {
-                    // Empty state (Clean placeholder)
-                    setRevenueData([]);
+            // 3. Handle Patient Demographics
+            if (demoRes.status === "fulfilled") {
+                const data: any = demoRes.value;
+                if (data.demographicData && Array.isArray(data.demographicData)) {
+                    setDemographicData(data.demographicData);
                 }
             }
 
         } catch (err) {
             console.error("Analytics Load Error", err);
-            toast({
-                variant: "destructive",
-                title: "Data Error",
-                description: "Could not load latest financial metrics."
-            });
+            toast({ variant: "destructive", title: "Data Error", description: "Could not sync analytics." });
         } finally {
             setIsLoading(false);
         }
@@ -128,7 +113,7 @@ export default function Analytics() {
         navigate("/auth");
     };
 
-    // --- SKELETONS (For Professional Feel) ---
+    // --- SKELETONS ---
     const SkeletonMetric = () => (
         <div className="animate-pulse space-y-2">
             <div className="h-8 w-24 bg-slate-200 rounded"></div>
@@ -164,8 +149,6 @@ export default function Analytics() {
                             <SelectValue placeholder="Period" />
                         </SelectTrigger>
                         <SelectContent>
-                            <SelectItem value="1m">Last Month</SelectItem>
-                            <SelectItem value="3m">Last 3 Months</SelectItem>
                             <SelectItem value="6m">Last 6 Months</SelectItem>
                             <SelectItem value="1y">Year to Date</SelectItem>
                         </SelectContent>
@@ -246,7 +229,7 @@ export default function Analytics() {
                     <Card className="shadow-card border-border/50">
                         <CardHeader>
                             <CardTitle>Revenue Trend</CardTitle>
-                            <CardDescription>Income generated from paid invoices (Last 6 Months)</CardDescription>
+                            <CardDescription>Income generated from paid invoices</CardDescription>
                         </CardHeader>
                         <CardContent>
                             {isLoading ? <SkeletonChart /> : (
@@ -261,38 +244,15 @@ export default function Analytics() {
                                                     </linearGradient>
                                                 </defs>
                                                 <CartesianGrid strokeDasharray="3 3" className="stroke-slate-100" vertical={false} />
-                                                <XAxis
-                                                    dataKey="month"
-                                                    className="text-xs text-slate-500"
-                                                    axisLine={false}
-                                                    tickLine={false}
-                                                />
-                                                <YAxis
-                                                    className="text-xs text-slate-500"
-                                                    axisLine={false}
-                                                    tickLine={false}
-                                                    tickFormatter={(value) => `$${value}`}
-                                                />
-                                                <Tooltip
-                                                    contentStyle={{ backgroundColor: '#fff', borderColor: '#e2e8f0', borderRadius: '8px', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
-                                                    formatter={(value: any) => [`$${value.toLocaleString()}`, "Revenue"]}
-                                                />
-                                                <Area
-                                                    type="monotone"
-                                                    dataKey="revenue"
-                                                    stroke="#10b981"
-                                                    strokeWidth={2}
-                                                    fillOpacity={1}
-                                                    fill="url(#colorRevenue)"
-                                                    animationDuration={1500}
-                                                />
+                                                <XAxis dataKey="month" className="text-xs text-slate-500" axisLine={false} tickLine={false} />
+                                                <YAxis className="text-xs text-slate-500" axisLine={false} tickLine={false} tickFormatter={(value) => `$${value}`} />
+                                                <Tooltip contentStyle={{ backgroundColor: '#fff', borderColor: '#e2e8f0', borderRadius: '8px' }} formatter={(value: any) => [`$${value.toLocaleString()}`, "Revenue"]} />
+                                                <Area type="monotone" dataKey="revenue" stroke="#10b981" strokeWidth={2} fillOpacity={1} fill="url(#colorRevenue)" animationDuration={1500} />
                                             </AreaChart>
                                         </ResponsiveContainer>
                                     ) : (
                                         <div className="h-full flex flex-col items-center justify-center text-muted-foreground text-sm gap-3">
-                                            <div className="bg-slate-100 p-4 rounded-full">
-                                                <DollarSign className="h-6 w-6 opacity-30" />
-                                            </div>
+                                            <div className="bg-slate-100 p-4 rounded-full"><DollarSign className="h-6 w-6 opacity-30" /></div>
                                             <p>No revenue data recorded yet.</p>
                                         </div>
                                     )}
@@ -301,7 +261,7 @@ export default function Analytics() {
                         </CardContent>
                     </Card>
 
-                    {/* DEMOGRAPHICS (Placeholder for now, keeps UI balanced) */}
+                    {/* DEMOGRAPHICS (Live Data from Patient Service) */}
                     <Card className="shadow-card border-border/50">
                         <CardHeader>
                             <CardTitle>Patient Demographics</CardTitle>
@@ -310,30 +270,30 @@ export default function Analytics() {
                         <CardContent>
                             {isLoading ? <SkeletonChart /> : (
                                 <div className="h-[300px] flex items-center justify-center">
-                                    <ResponsiveContainer width="100%" height="100%">
-                                        <PieChart>
-                                            <Pie
-                                                data={demographicData}
-                                                cx="50%"
-                                                cy="50%"
-                                                innerRadius={60}
-                                                outerRadius={80}
-                                                paddingAngle={5}
-                                                dataKey="value"
-                                            >
-                                                {demographicData.map((entry, index) => (
-                                                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                                                ))}
-                                            </Pie>
-                                            <Tooltip contentStyle={{ backgroundColor: '#fff', borderRadius: '8px', border: '1px solid #e2e8f0' }} />
-                                            <Legend verticalAlign="bottom" height={36} />
-                                        </PieChart>
-                                    </ResponsiveContainer>
-
-                                    {/* Overlay Text if empty */}
-                                    {demographicData.every(d => d.value === 0) && (
-                                        <div className="absolute text-sm text-muted-foreground text-center">
-                                            <p>Data collecting...</p>
+                                    {demographicData.length > 0 && !demographicData.every(d => d.value === 0) ? (
+                                        <ResponsiveContainer width="100%" height="100%">
+                                            <PieChart>
+                                                <Pie
+                                                    data={demographicData}
+                                                    cx="50%"
+                                                    cy="50%"
+                                                    innerRadius={60}
+                                                    outerRadius={80}
+                                                    paddingAngle={5}
+                                                    dataKey="value"
+                                                >
+                                                    {demographicData.map((entry, index) => (
+                                                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                                                    ))}
+                                                </Pie>
+                                                <Tooltip contentStyle={{ backgroundColor: '#fff', borderRadius: '8px', border: '1px solid #e2e8f0' }} />
+                                                <Legend verticalAlign="bottom" height={36} />
+                                            </PieChart>
+                                        </ResponsiveContainer>
+                                    ) : (
+                                        <div className="h-full flex flex-col items-center justify-center text-muted-foreground text-sm gap-3">
+                                            <div className="bg-slate-100 p-4 rounded-full"><Users className="h-6 w-6 opacity-30" /></div>
+                                            <p>No demographic data available.</p>
                                         </div>
                                     )}
                                 </div>

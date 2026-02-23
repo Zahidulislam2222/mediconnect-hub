@@ -4,16 +4,16 @@ import { signOut, getCurrentUser, fetchAuthSession } from 'aws-amplify/auth';
 import {
   Heart, Activity, Droplets, Wind,
   Calendar, Brain, Pill,
-  CreditCard, ShieldCheck,
-  Loader2
+  CreditCard,
+  Loader2,
+  Video,
+  MapPin
 } from "lucide-react";
 
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { VitalCard } from "@/components/dashboard/VitalCard";
 import { ActionButton } from "@/components/dashboard/ActionButton";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { useToast } from "@/hooks/use-toast";
-// 🟢 Imports for Avatar Fix
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api";
@@ -33,16 +33,14 @@ const getAuthToken = async () => {
 const getInitials = (name: string) => {
   if (!name) return "DR";
   const cleanName = name.replace("Dr. ", "");
-
   return cleanName.substring(0, 2).toUpperCase();
 }
 
 export default function PatientDashboard() {
   const navigate = useNavigate();
-  const { toast } = useToast();
 
   // --- STATE ---
-  const [hasToday, setHasToday] = useState(true);
+  const [hasToday, setHasToday] = useState(false);
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState<any>(() => {
     try {
@@ -64,21 +62,30 @@ export default function PatientDashboard() {
 
   async function loadDashboardData() {
     try {
-      const token = await getAuthToken();
-      const user = await getCurrentUser();
-      const userId = user.userId;
+      // 🟢 1. STRICT AUTH CHECK: Catch fake demo tokens
+      let userId = "";
+      try {
+        const token = await getAuthToken();
+        const user = await getCurrentUser();
+        userId = user.userId;
+      } catch (authError) {
+        console.warn("Invalid AWS Session. Purging demo state and logging out.");
+        localStorage.clear();
+        navigate("/auth");
+        return; // Stop execution so we don't load fake data
+      }
 
-      // 1. Fetch Doctor Directory (Essential for Avatars)
+      // 2. Fetch Doctor Directory (Essential for Avatars)
       try {
         const docData: any = await api.get('/doctors');
         if (docData.doctors) setDoctors(docData.doctors);
+        else if (Array.isArray(docData)) setDoctors(docData);
       } catch (e) { console.warn("Doc Dir Error", e); }
 
-      // 2. Fetch Patient Data Parallel
-      // Note: api.get() returns the data directly.
+      // 3. Fetch Patient Data Parallel
       const results = await Promise.allSettled([
-        api.get(`/register-patient?id=${userId}`),
-        api.get(`/doctor-appointments?patientId=${userId}`),
+        api.get(`/patients/${userId}`),
+        api.get(`/appointments?patientId=${userId}`),
         api.get(`/billing?patientId=${userId}`),
         api.get(`/vitals?patientId=${userId}&limit=1`)
       ]);
@@ -88,11 +95,14 @@ export default function PatientDashboard() {
       // A. Profile Logic
       if (profileRes.status === 'fulfilled') {
         const data: any = profileRes.value;
-        const userData = (data.patients || []).find((p: any) => p.userId === userId) || data.Item;
+        // Handle DynamoDB Item structure
+        const userData = data.Item || data;
 
         if (userData) {
           setProfile(userData);
-          localStorage.setItem('user', JSON.stringify({ ...userData }));
+          // Update local storage so Header doesn't flicker next time
+          const currentLocal = JSON.parse(localStorage.getItem('user') || '{}');
+          localStorage.setItem('user', JSON.stringify({ ...currentLocal, ...userData }));
         }
       }
 
@@ -108,19 +118,20 @@ export default function PatientDashboard() {
         const seenIds = new Set();
         const allValid = list
           .filter((a: any) => {
-            // HYBRID READ
+            // HYBRID READ: Support both FHIR and Legacy
             const timeSlot = a.resource?.start || a.timeSlot;
-            const patientName = a.resource?.participant?.find((p: any) => p.actor?.reference?.includes('Patient'))?.actor?.display || a.patientName;
+            const patientName = a.patientName || a.resource?.participant?.find((p: any) => p.actor?.reference?.includes('Patient'))?.actor?.display;
 
-            if (!timeSlot || !patientName) return false;
+            if (!timeSlot) return false;
             if (seenIds.has(a.appointmentId)) return false;
-            // Also check resource status if available
-            const status = a.resource?.status || a.status;
+            seenIds.add(a.appointmentId);
+            
+            const status = a.status || a.resource?.status;
             if (['CANCELLED', 'COMPLETED', 'REJECTED', 'cancelled', 'fulfilled'].includes(status)) return false;
 
             const aptDate = new Date(timeSlot);
-            // Show if it hasn't happened yet, or started in the last 30 mins
-            return aptDate >= new Date(now.getTime() - 30 * 60000);
+            // Show if it hasn't happened yet, or started in the last 60 mins
+            return aptDate >= new Date(now.getTime() - 60 * 60000);
           })
           .sort((a: any, b: any) => {
             const tA = a.resource?.start || a.timeSlot;
@@ -134,7 +145,6 @@ export default function PatientDashboard() {
           return new Date(timeSlot) <= endOfToday;
         });
 
-        // 🟢 SET THE STATE HERE TO FIX THE ERROR
         setHasToday(todayOnly.length > 0);
 
         // If nothing today, show the next 3 upcoming ones. Otherwise, show today's list.
@@ -163,25 +173,30 @@ export default function PatientDashboard() {
 
   // --- LOGIC HELPERS ---
 
-  // 🟢 Handle Join Logic
+  // 🟢 Handle Join Logic (Matches booking.controller.ts)
   const handleJoin = async (apt: any) => {
     try {
-      await api.put('/book-appointment', {
+      await api.put('/appointments/update', {
         appointmentId: apt.appointmentId,
-        status: "CONFIRMED",
-        patientArrived: true // Critical Signal
+        status: apt.status, // Keep status as is
+        patientArrived: true // Critical Signal for Doctor Dashboard
       });
     } catch (e) { console.error("Check-in error", e); }
 
     navigate(`/consultation?appointmentId=${apt.appointmentId}&patientName=${encodeURIComponent(profile?.name || "Patient")}`);
   };
 
-  // 🟢 Get Doctor Details
+  // 🟢 Get Doctor Details (Matches Directory)
   const getDoctorDetails = (apt: any) => {
+    // Find the doctor in the directory we fetched
     const directoryDoc = doctors.find(d => d.doctorId === apt.doctorId);
-    let avatarUrl = directoryDoc?.avatar;
-    if (!avatarUrl || avatarUrl.trim() === "") {
-      avatarUrl = undefined;
+    
+    // Prioritize the directory avatar (signed URL) -> then Appointment Snapshot -> then Null
+    let avatarUrl = directoryDoc?.avatar || apt.doctorAvatar;
+    
+    // If it's a raw S3 key (legacy data), don't try to show it broken
+    if (avatarUrl && !avatarUrl.startsWith('http')) {
+        avatarUrl = undefined; 
     }
 
     return {
@@ -200,7 +215,7 @@ export default function PatientDashboard() {
       userAvatar={profile?.avatar || ""}
       onLogout={async () => {
         await signOut();
-        localStorage.clear(); // Clear all keys to be safe
+        localStorage.clear();
         window.location.href = "/";
       }}
     >
@@ -269,7 +284,7 @@ export default function PatientDashboard() {
               <div className="flex items-center justify-between">
                 <CardTitle className="text-lg flex items-center gap-2">
                   <Calendar className="h-5 w-5 text-primary" />
-                  {/* 🟢 DYNAMIC TITLE */}
+                  {/* DYNAMIC TITLE */}
                   {appointments.length > 0 && hasToday ? "Today's Appointments" : "Next Upcoming Appointments"}
                 </CardTitle>
                 <button onClick={() => navigate("/appointments")} className="text-sm text-primary hover:underline font-medium">
@@ -284,7 +299,6 @@ export default function PatientDashboard() {
               ) : appointments.length === 0 ? (
                 <div className="text-center py-10 text-muted-foreground bg-muted/10 rounded-lg border border-dashed">
                   <Calendar className="h-10 w-10 mx-auto mb-3 opacity-20" />
-                  {/* 🟢 CLEARER EMPTY STATE */}
                   <p className="font-medium">Your schedule is currently clear.</p>
                   <p className="text-xs">No upcoming appointments found.</p>
                   <button onClick={() => navigate("/appointments")} className="text-primary text-sm font-semibold hover:underline mt-2">
@@ -293,11 +307,12 @@ export default function PatientDashboard() {
                 </div>
               ) : (
                 appointments.slice(0, 3).map((apt) => {
-                  const dateObj = new Date(apt.timeSlot);
+                  const timeSlot = apt.resource?.start || apt.timeSlot;
+                  const dateObj = new Date(timeSlot);
                   const details = getDoctorDetails(apt);
-                  const uiType = apt.type === 'IN_PERSON' ? "In-Person" : "Video Call";
-
-                  // 🟢 DEFINED UI STATUS HERE TO FIX ERROR
+                  
+                  // UI Logic
+                  const uiType = "Video Call"; // Default to Video for this platform
                   const uiStatus = apt.status === 'COMPLETED' ? 'completed' : 'upcoming';
 
                   return (
@@ -306,7 +321,6 @@ export default function PatientDashboard() {
                       className="flex items-center justify-between p-4 rounded-xl border border-border bg-card mb-3 shadow-sm hover:shadow-md transition-all"
                     >
                       <div className="flex items-center gap-4">
-                        {/* 🟢 AVATAR LOGIC */}
                         <Avatar className="h-12 w-12 border-2 border-background shadow-sm">
                           <AvatarImage
                             src={details.avatar || ""}
@@ -323,9 +337,7 @@ export default function PatientDashboard() {
                           <div className="flex items-center gap-2 text-sm text-muted-foreground mt-0.5">
                             <span>{details.specialty}</span>
                             <span className="text-xs mx-1">•</span>
-                            <span className={uiType === 'In-Person' ? "text-orange-600 font-medium" : "text-blue-600 font-medium"}>
-                              {uiType}
-                            </span>
+                            <span className="text-blue-600 font-medium">Video Call</span>
                           </div>
                           <div className="text-xs text-muted-foreground mt-1">
                             {dateObj.toLocaleDateString()} at {dateObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
@@ -336,18 +348,12 @@ export default function PatientDashboard() {
                       {/* JOIN BUTTON */}
                       <Button
                         size="sm"
-                        variant={uiType === 'In-Person' ? "outline" : "default"}
-                        onClick={() => {
-                          if (uiType === "In-Person") {
-                            alert("This is an in-person visit. Please go to the clinic.");
-                          } else {
-                            handleJoin(apt);
-                          }
-                        }}
-                        className={uiStatus === 'completed' ? "opacity-50 cursor-not-allowed" : ""}
+                        onClick={() => handleJoin(apt)}
+                        className={uiStatus === 'completed' ? "opacity-50 cursor-not-allowed" : "bg-primary hover:bg-primary/90"}
                         disabled={uiStatus === 'completed'}
                       >
-                        {uiType === 'In-Person' ? 'Directions' : 'Join Call'}
+                         <Video className="h-4 w-4 mr-2" />
+                         {uiStatus === 'completed' ? 'Completed' : 'Join Call'}
                       </Button>
                     </div>
                   );

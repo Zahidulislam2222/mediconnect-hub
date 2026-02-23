@@ -58,21 +58,28 @@ function BillingContent() {
             const attributes = await fetchUserAttributes();
             const userId = attributes.sub;
 
-            // Parallel Fetch for Speed
+            // 🟢 PARALLEL FETCH (Optimized)
             const [profileRes, billingRes] = await Promise.allSettled([
-                api.get(`/register-patient?id=${userId}`),
+                // 1. FIXED ROUTE: Use the RESTful endpoint we verified in patient.controller.ts
+                api.get(`/patients/${userId}`),
+                // 2. BILLING: Fetch transaction history
                 api.get(`/billing?patientId=${userId}`)
             ]);
 
             // 1. Update Profile (if needed)
             if (profileRes.status === "fulfilled") {
                 const profileJson: any = profileRes.value;
+                // DynamoDB often returns the Item directly or wrapped
+                const p = profileJson.Item || profileJson;
+                
                 const freshProfile = {
-                    name: profileJson.name || attributes.name || "Patient",
-                    avatar: profileJson.avatar || "",
+                    name: p.name || attributes.name || "Patient",
+                    avatar: p.avatar || "",
                     id: userId
                 };
                 setUserProfile(freshProfile);
+                
+                // Sync to local storage for persistence
                 const currentLocal = JSON.parse(localStorage.getItem('user') || '{}');
                 localStorage.setItem('user', JSON.stringify({ ...currentLocal, ...freshProfile }));
             }
@@ -109,15 +116,16 @@ function BillingContent() {
         }
     };
 
-    // 🟢 PROFESSIONAL PAYMENT HANDLER
+    // 🟢 PROFESSIONAL PAYMENT HANDLER (FIFO Strategy)
     const handlePayBill = async () => {
         if (!stripe) return;
         if (!billingData?.transactions) return;
 
-        // 1. Find the Oldest Unpaid Bill (FIFO Strategy)
+        // 1. Find the Oldest Unpaid Bill (FIFO)
+        // This ensures patients pay off old debt before new debt
         const billToPay = [...billingData.transactions]
             .reverse() // Oldest first
-            .find((tx: any) => tx.status === 'PENDING' || tx.status === 'DUE');
+            .find((tx: any) => tx.status === 'PENDING' || tx.status === 'DUE' || tx.status === 'UNPAID');
 
         if (!billToPay || !billToPay.billId) {
             toast({ title: "No Pending Bills", description: "You are all caught up!" });
@@ -134,32 +142,24 @@ function BillingContent() {
                 description: `Invoice #${billToPay.billId.slice(0, 8)}`
             });
 
-            // STEP B: Create Payment Intent on Backend
+            // STEP B: Create Payment Intent on Backend (Zero-Trust)
+            // We send the Payment Method ID so backend can confirm it securely
             const paymentIntent: any = await api.post('/pay-bill', {
                 billId: billToPay.billId,
-                patientId: userProfile.id
+                patientId: userProfile.id,
+                paymentMethodId: paymentMethod.id // 🟢 CRITICAL: Pass the ID to controller
             });
 
-            const clientSecret = paymentIntent.client_secret;
+            // STEP C: Handle Success
+            if (paymentIntent.success || paymentIntent.status === 'succeeded') {
+                toast({
+                    title: "Payment Successful",
+                    description: `Transaction ${billToPay.billId.slice(0, 8)}... completed.`,
+                    className: "bg-green-50 border-green-200 text-green-900"
+                });
 
-            // STEP C: Confirm Payment
-            const result = await stripe.confirmCardPayment(clientSecret, {
-                payment_method: paymentMethod.id,
-            });
-
-            if (result.error) {
-                throw new Error(result.error.message);
-            } else {
-                if (result.paymentIntent.status === 'succeeded') {
-                    toast({
-                        title: "Payment Successful",
-                        description: `Transaction ${billToPay.billId.slice(0, 8)}... completed.`,
-                        className: "bg-green-50 border-green-200 text-green-900"
-                    });
-
-                    // 🟢 Auto-Refresh Data to show $0.00 Balance
-                    await loadFreshData();
-                }
+                // 🟢 Auto-Refresh Data to show $0.00 Balance
+                await loadFreshData();
             }
 
         } catch (e: any) {
@@ -215,8 +215,6 @@ function BillingContent() {
                                             : "You are all caught up! No payment due."}
                                     </p>
 
-                                    {/* STRIPE ELEMENT REMOVED (Now using Modal) */}
-
                                     <Button
                                         className="w-full bg-primary hover:bg-primary/90 transition-all"
                                         disabled={!billingData?.outstandingBalance || billingData?.outstandingBalance <= 0 || processingPayment}
@@ -239,8 +237,6 @@ function BillingContent() {
                     </Card>
                 </div>
 
-
-
                 {/* TRANSACTION HISTORY */}
                 <Card className="shadow-card border-border/50">
                     <CardHeader>
@@ -259,15 +255,14 @@ function BillingContent() {
                                 {billingData.transactions
                                     .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
                                     .map((tx: any, i: number) => {
-                                        // 🟢 NEW LOGIC: Define transaction categories clearly
+                                        // 🟢 CATEGORY LOGIC
                                         const isRefund = tx.type === 'REFUND' || tx.status === 'REFUNDED' || tx.amount < 0;
-                                        const isUnpaid = tx.status === 'PENDING' || tx.status === 'DUE';
-                                        const isPaidCharge = (tx.status === 'PAID' || tx.status === 'PROCESSED') && !isRefund;
-
+                                        const isUnpaid = tx.status === 'PENDING' || tx.status === 'DUE' || tx.status === 'UNPAID';
+                                        
                                         return (
                                             <div key={i} className="p-4 border rounded-lg flex items-center justify-between bg-white hover:bg-slate-50 transition-colors">
                                                 <div className="flex items-center gap-4">
-                                                    {/* 🟢 ICON LOGIC: Green for refunds, Slate for charges, Orange for unpaid */}
+                                                    {/* ICON LOGIC: Green for refunds, Slate for charges, Orange for unpaid */}
                                                     <div className={cn(
                                                         "h-10 w-10 rounded-full flex items-center justify-center",
                                                         isRefund ? "bg-green-100 text-green-600" :
@@ -283,27 +278,21 @@ function BillingContent() {
                                                                 {(() => {
                                                                     const desc = tx.description || "";
 
-                                                                    // 🟢 THE FIX: If this is a refund, find the name by matching the doctorId
+                                                                    // 🟢 REFUND DETECTION
                                                                     if (desc.includes("User requested cancellation") || tx.amount < 0) {
-                                                                        // Search the whole transaction list for a row with the same doctorId 
-                                                                        // that contains the doctor's name in the description
+                                                                        // Try to find the original consultation name
                                                                         const match = billingData.transactions.find((t: any) =>
                                                                             t.doctorId === tx.doctorId &&
                                                                             t.description?.includes("Consultation with")
                                                                         );
-
-                                                                        // Extract "Dr M" from "Consultation with Dr M"
                                                                         const name = match?.description?.split("with ")[1];
-
                                                                         return name ? `Cancelled Consultation: ${name}` : 'Cancelled Consultation';
                                                                     }
 
-                                                                    // Keep existing professional mapping for pharmacy
                                                                     if (desc.startsWith("Medication:")) {
                                                                         return desc.replace("Medication:", "Prescription Pharmacy:");
                                                                     }
-
-                                                                    return desc; // Returns "Consultation with Dr M" as is
+                                                                    return desc; 
                                                                 })()}
                                                             </p>
                                                             {isUnpaid && (
@@ -326,7 +315,7 @@ function BillingContent() {
                                                 </div>
 
                                                 <div className="text-right">
-                                                    {/* 🟢 AMOUNT LOGIC: Green (+) for refunds, Neutral/Black (-) for charges */}
+                                                    {/* AMOUNT LOGIC: Green (+) for refunds, Neutral/Black (-) for charges */}
                                                     <span className={cn(
                                                         "font-bold block text-lg",
                                                         isRefund ? "text-green-600" : "text-slate-900"
@@ -345,7 +334,7 @@ function BillingContent() {
                                     })}
                             </div>
                         ) : billingData?.outstandingBalance > 0 ? (
-                            // Fallback if balance exists but no transaction records (legacy data)
+                            // Legacy Data Fallback
                             <div className="p-4 border rounded-lg flex items-center justify-between bg-white">
                                 <div className="flex items-center gap-3">
                                     <div className="h-10 w-10 rounded-full bg-orange-100 flex items-center justify-center text-orange-600">
@@ -370,7 +359,6 @@ function BillingContent() {
                         )}
                     </CardContent>
                 </Card>
-
             </div>
         </DashboardLayout>
     );

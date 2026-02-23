@@ -6,14 +6,13 @@ import {
   Clock,
   Calendar,
   MoreVertical,
-  MapPin,
   Video,
   Loader2,
   TrendingUp,
   Activity,
   Star,
   CreditCard,
-  CheckCircle2
+  Stethoscope
 } from "lucide-react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -32,8 +31,8 @@ import { api } from "@/lib/api";
 
 // Helper: Smart Initials
 const getInitials = (name: string) => {
-  if (!name) return "DR";
-  const cleanName = name.replace("Dr. ", "");
+  if (!name) return "PT";
+  const cleanName = name.trim();
   const parts = cleanName.split(" ");
   if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
   return cleanName.substring(0, 2).toUpperCase();
@@ -44,7 +43,7 @@ export default function DoctorDashboard() {
   const { toast } = useToast();
 
   const [appointments, setAppointments] = useState<any[]>([]);
-  // 🟢 NEW: Store real patient profiles here
+  // 🟢 NEW: Store real patient profiles here (Secure S3 Links)
   const [patientDirectory, setPatientDirectory] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -67,14 +66,18 @@ export default function DoctorDashboard() {
 
       if (!token) return;
 
+      // 🟢 REST FIX: Use correct /doctors/:id and /appointments routes
       const [profileData, scheduleData] = await Promise.all([
-        api.get(`/register-doctor?id=${userId}`).catch(() => null),
-        api.get(`/doctor-appointments?doctorId=${userId}`).catch(() => null)
+        api.get(`/doctors/${userId}`).catch(() => null),
+        api.get(`/appointments?doctorId=${userId}`).catch(() => null)
       ]);
 
+      // 1. Handle Doctor Profile
       if (profileData) {
+        // DynamoDB return structure handling
         const data: any = profileData;
         let myProfile = data.Item || (data.doctors ? data.doctors.find((d: any) => d.doctorId === userId) : data);
+        
         if (myProfile && myProfile.name) {
           setDoctorProfile(prev => ({ ...prev, ...myProfile }));
           const currentLocal = JSON.parse(localStorage.getItem('user') || '{}');
@@ -82,13 +85,14 @@ export default function DoctorDashboard() {
         }
       }
 
+      // 2. Handle Schedule
       if (scheduleData) {
         const data: any = scheduleData;
         let list = [];
         if (Array.isArray(data)) list = data;
         else if (data.existingBookings) list = data.existingBookings;
 
-        // 1. FILTER APPOINTMENTS
+        // FILTER: Today's Appointments Only
         const startOfToday = new Date();
         startOfToday.setHours(0, 0, 0, 0);
         const endOfToday = new Date();
@@ -96,21 +100,22 @@ export default function DoctorDashboard() {
 
         const sorted = list
           .filter((a: any) => {
-            // HYBRID READ
+            // HYBRID READ: Support FHIR resource.start AND Legacy timeSlot
             const timeSlot = a.resource?.start || a.timeSlot;
-            const patientName = a.resource?.participant?.find((p: any) => p.actor?.reference?.includes('Patient'))?.actor?.display || a.patientName;
             const status = a.resource?.status || a.status;
 
-            if (!patientName || !timeSlot) return false;
+            if (!timeSlot) return false;
             if (isNaN(new Date(timeSlot).getTime())) return false;
-            if (status === 'CANCELLED' || status === 'COMPLETED' || status === 'cancelled' || status === 'fulfilled') return false;
+            if (['CANCELLED', 'COMPLETED', 'REJECTED', 'cancelled'].includes(status)) return false;
 
             const aptDate = new Date(timeSlot);
             return aptDate >= startOfToday && aptDate <= endOfToday;
           })
           .sort((a: any, b: any) => {
+            // Prioritize arrived patients
             if (a.patientArrived && !b.patientArrived) return -1;
             if (!a.patientArrived && b.patientArrived) return 1;
+            
             const tA = a.resource?.start || a.timeSlot;
             const tB = b.resource?.start || b.timeSlot;
             return new Date(tA).getTime() - new Date(tB).getTime();
@@ -118,21 +123,20 @@ export default function DoctorDashboard() {
 
         setAppointments(sorted);
 
-        // 🟢 2. NEW: FETCH REAL PATIENT PROFILES (Source of Truth)
-        // We look at the appointments to find which patients we need to look up
+        // 🟢 3. REAL PATIENT LOOKUP (Source of Truth for Avatars)
         const uniquePatientIds = [...new Set(sorted.map((a: any) => a.patientId))];
 
         if (uniquePatientIds.length > 0) {
+          // Parallel fetch to /patients/:id (which returns signed S3 URLs)
           const profilePromises = uniquePatientIds.map(pid =>
-            api.get(`/register-patient?id=${pid}`).catch(() => null)
+            api.get(`/patients/${pid}`).catch(() => null)
           );
 
           const profilesData = await Promise.all(profilePromises);
 
-          // Clean up the data structure (handle DynamoDB .Item or standard array)
           const cleanProfiles = profilesData
             .filter(p => p !== null)
-            .map((p: any) => p.Item || (p.patients ? p.patients[0] : p));
+            .map((p: any) => p.Item || p);
 
           setPatientDirectory(cleanProfiles);
         }
@@ -146,7 +150,9 @@ export default function DoctorDashboard() {
   };
 
   const handleJoinConsultation = (apt: any) => {
-    navigate(`/consultation`, { state: { appointmentId: apt.appointmentId, patientName: apt.patientName } });
+    // 🟢 PASS PATIENT NAME SAFELY
+    const details = getPatientDetails(apt);
+    navigate(`/consultation?appointmentId=${apt.appointmentId}&patientName=${encodeURIComponent(details.name)}`);
   };
 
   // SKELETON LOADING
@@ -163,13 +169,13 @@ export default function DoctorDashboard() {
     </div>
   );
 
-  // 🟢 NEW: Helper to get Real Patient Data
+  // 🟢 HELPER: Merge Appointment Data with Directory Data
   const getPatientDetails = (apt: any) => {
-    // Try to find the patient in our fetched directory
     const realProfile = patientDirectory.find((p: any) => p.patientId === apt.patientId);
     return {
       name: realProfile?.name || apt.patientName || "Unknown Patient",
-      avatar: realProfile?.avatar // This will now use the real uploaded photo!
+      avatar: realProfile?.avatar, // Secure Signed URL from backend
+      reason: apt.reason || apt.description || "General Checkup"
     };
   };
 
@@ -222,8 +228,10 @@ export default function DoctorDashboard() {
             <CardContent className="p-6">
               <div className="flex justify-between items-start">
                 <div>
-                  <p className="text-sm font-medium text-muted-foreground">Monthly Revenue</p>
-                  <h3 className="text-2xl font-bold mt-2">$12,450</h3>
+                  <p className="text-sm font-medium text-muted-foreground">Revenue (Est)</p>
+                  <h3 className="text-2xl font-bold mt-2">
+                    ${(appointments.length * 50).toLocaleString()}
+                  </h3>
                 </div>
                 <div className="p-2 bg-emerald-50 rounded-lg">
                   <TrendingUp className="h-5 w-5 text-emerald-600" />
@@ -260,8 +268,8 @@ export default function DoctorDashboard() {
               ) : (
                 <div className="space-y-3">
                   {appointments.map((apt: any) => {
-                    // 🟢 Call the helper to get Real Name & Avatar
                     const details = getPatientDetails(apt);
+                    const timeSlot = apt.resource?.start || apt.timeSlot;
 
                     return (
                       <div
@@ -274,7 +282,6 @@ export default function DoctorDashboard() {
                         <div className="flex items-center gap-4">
                           <div className="relative">
                             <Avatar className="h-12 w-12 border-2 border-background shadow-sm">
-                              {/* 🟢 Add the Image Component here */}
                               <AvatarImage src={details.avatar} className="object-cover" />
                               <AvatarFallback className="bg-primary/10 text-primary font-bold">
                                 {getInitials(details.name)}
@@ -287,12 +294,15 @@ export default function DoctorDashboard() {
                             )}
                           </div>
                           <div>
-                            {/* 🟢 Use details.name instead of apt.patientName */}
                             <h4 className="font-semibold text-lg group-hover:text-primary transition-colors">{details.name}</h4>
                             <div className="flex items-center gap-3 text-sm text-muted-foreground mt-1">
                               <span className="flex items-center gap-1 bg-muted px-2 py-0.5 rounded text-xs font-medium">
                                 <Clock className="h-3 w-3" />
-                                {new Date(apt.timeSlot).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                {new Date(timeSlot).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                              </span>
+                              <span className="flex items-center gap-1 text-xs">
+                                <Stethoscope className="h-3 w-3" />
+                                {details.reason}
                               </span>
                               {apt.paymentStatus === 'paid' && (
                                 <span className="flex items-center gap-1 text-emerald-600 text-xs font-medium">
@@ -316,8 +326,9 @@ export default function DoctorDashboard() {
                               <Button variant="ghost" size="icon"><MoreVertical className="h-4 w-4" /></Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
-                              <DropdownMenuItem>View Patient Record</DropdownMenuItem>
-                              <DropdownMenuItem className="text-red-500">Cancel Appointment</DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => navigate(`/patient-records`, { state: { patientId: apt.patientId } })}>
+                                View Patient Record
+                              </DropdownMenuItem>
                             </DropdownMenuContent>
                           </DropdownMenu>
                         </div>
@@ -329,7 +340,7 @@ export default function DoctorDashboard() {
             </CardContent>
           </Card>
 
-          {/* RIGHT: INSIGHTS (Quick Actions Removed) */}
+          {/* RIGHT: INSIGHTS */}
           <div className="space-y-6">
             <Card className="medical-gradient text-white border-none shadow-elevated overflow-hidden relative">
               <CardContent className="p-6 relative z-10">
@@ -339,8 +350,8 @@ export default function DoctorDashboard() {
                 </div>
                 <div className="space-y-4">
                   <div className="flex justify-between items-center text-sm border-b border-white/20 pb-2">
-                    <span className="opacity-90">New Patients</span>
-                    <span className="font-bold text-xl">+12</span>
+                    <span className="opacity-90">Today's Load</span>
+                    <span className="font-bold text-xl">{appointments.length}</span>
                   </div>
                   <div className="flex justify-between items-center text-sm border-b border-white/20 pb-2">
                     <span className="opacity-90">Pending Reports</span>

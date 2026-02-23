@@ -1,32 +1,40 @@
 import { fetchAuthSession } from 'aws-amplify/auth';
 
 function getServiceUrl(endpoint: string): string {
-    // 1. Patient & IoT Service (Port 8081)
+    // 🟢 1. Check the User's Legal Jurisdiction (US or EU)
+    // Default to 'US' if not set.
+    const userRegion = localStorage.getItem('userRegion') || 'US';
+    
+    // 2. Patient & IoT Service
     if (
         endpoint.startsWith('/patients') ||
         endpoint.startsWith('/register-patient') ||
         endpoint.startsWith('/verify-identity') ||
         endpoint.startsWith('/public/knowledge') ||
-        endpoint.startsWith('/vitals') ||     // 🟢 MOVED: Integrated into Patient Service
-        endpoint.startsWith('/emergency')      // 🟢 MOVED: Integrated into Patient Service
+        endpoint.startsWith('/vitals') ||     
+        endpoint.startsWith('/emergency')      
     ) {
-        return import.meta.env.VITE_PATIENT_SERVICE_URL;
+        return userRegion === 'EU' 
+            ? import.meta.env.VITE_PATIENT_SERVICE_URL_EU 
+            : import.meta.env.VITE_PATIENT_SERVICE_URL_US;
     }
 
-    // 2. Doctor Service (Port 8082)
+    // 3. Doctor & Clinical Service
     if (
         endpoint.startsWith('/doctors') || 
         endpoint.startsWith('/register-doctor') ||
-        endpoint.startsWith('/prescription') ||
-        endpoint.startsWith('/prescriptions') ||
+        endpoint.startsWith('/prescription') || 
+        endpoint.startsWith('/prescriptions') || 
         endpoint.startsWith('/pharmacy') ||
         endpoint.startsWith('/ehr') ||
         endpoint.startsWith('/relationships')
     ) {
-        return import.meta.env.VITE_DOCTOR_SERVICE_URL;
+        return userRegion === 'EU' 
+            ? import.meta.env.VITE_DOCTOR_SERVICE_URL_EU 
+            : import.meta.env.VITE_DOCTOR_SERVICE_URL_US;
     }
 
-    // 3. Booking Service (Port 8083)
+    // 4. Booking & Billing Service (Money)
     if (
         endpoint.startsWith('/appointments') ||
         endpoint.startsWith('/book-appointment') ||
@@ -37,23 +45,28 @@ function getServiceUrl(endpoint: string): string {
         endpoint.startsWith('/pay-bill') ||
         endpoint.startsWith('/receipt')
     ) {
-        return import.meta.env.VITE_BOOKING_SERVICE_URL;
+        return userRegion === 'EU' 
+            ? import.meta.env.VITE_BOOKING_SERVICE_URL_EU 
+            : import.meta.env.VITE_BOOKING_SERVICE_URL_US;
     }
 
-    // 4. Communication Service (Port 8084)
+    // 5. Communication & AI Service
     if (
         endpoint.startsWith('/chat') ||
         endpoint.startsWith('/video') ||
-        endpoint.startsWith('/predict-health') ||
-        endpoint.startsWith('/analyze-image')
+        endpoint.startsWith('/analyze-image') ||
+        endpoint.startsWith('/predict-health')
     ) {
-        // 🟢 FIXED: Variable name now matches docker-compose.yml
-        return import.meta.env.VITE_COMMUNICATION_SERVICE_URL;
+        return userRegion === 'EU' 
+            ? import.meta.env.VITE_COMMUNICATION_SERVICE_URL_EU 
+            : import.meta.env.VITE_COMMUNICATION_SERVICE_URL_US;
     }
 
-    // Default Fallback
     console.error(`CRITICAL: Unknown Service Route - ${endpoint}`);
-    return import.meta.env.VITE_PATIENT_SERVICE_URL;
+    // Fallback safely to Patient service matching the user's region
+    return userRegion === 'EU' 
+        ? import.meta.env.VITE_PATIENT_SERVICE_URL_EU 
+        : import.meta.env.VITE_PATIENT_SERVICE_URL_US;
 }
 
 export const api = {
@@ -71,14 +84,19 @@ async function request(endpoint: string, method: string, body?: any) {
             const session = await fetchAuthSession();
             const token = session.tokens?.idToken?.toString();
             if (token) headers['Authorization'] = `Bearer ${token}`;
+            
+            // 🟢 GDPR/HIPAA FIX: Inject Region Header
+            // The backend 'extractRegion' function relies on this to route to Frankfurt vs Virginia.
+            // Assumption: You store the user's region in localStorage upon Login.
+            const userRegion = localStorage.getItem('userRegion') || 'US';
+            headers['x-user-region'] = userRegion;
+
         } catch (e) {
-            // Guest access - No token added, this is fine for /knowledge
             console.log("Requesting as Guest user");
         }
 
         const serviceUrl = getServiceUrl(endpoint);
 
-        // Safety check
         if (!serviceUrl) throw new Error("Service URL is undefined. Check .env files.");
 
         const cleanServiceUrl = serviceUrl.replace(/\/$/, '');
@@ -93,6 +111,10 @@ async function request(endpoint: string, method: string, body?: any) {
 
         if (!response.ok) {
             const errorData = await response.json().catch(() => ({}));
+            // Handle 401 specifically to help debug Auth Middleware issues
+            if (response.status === 401) {
+                console.error("🔒 Auth Error: Token invalid or Region mismatch.");
+            }
             throw new Error(errorData.message || `API Error: ${response.status}`);
         }
 

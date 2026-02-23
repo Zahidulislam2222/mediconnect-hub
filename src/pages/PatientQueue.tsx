@@ -2,21 +2,9 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { getCurrentUser, signOut, fetchAuthSession } from 'aws-amplify/auth';
 import {
-    Clock,
-    CheckCircle2,
-    MoreVertical,
-    Play,
-    AlertCircle,
-    Loader2,
-    History,
-    CalendarCheck,
-    Video,
-    XCircle,
-    AlertTriangle,
-    Stethoscope,
-    FileText,
-    CalendarDays,
-    List
+    Clock, CheckCircle2, MoreVertical, Play, AlertCircle, Loader2,
+    History, CalendarCheck, Video, XCircle, AlertTriangle, Stethoscope,
+    FileText, CalendarDays, List
 } from "lucide-react";
 
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
@@ -26,12 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { HoverCard, HoverCardContent, HoverCardTrigger } from "@/components/ui/hover-card";
-import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -45,6 +28,9 @@ const getInitials = (name: string) => {
     if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
     return cleanName.substring(0, 2).toUpperCase();
 };
+
+// 🟢 FHIR HELPER: Safely extract the standardized time
+const getAptTime = (apt: any) => apt.resource?.start || apt.timeSlot;
 
 export default function PatientQueue() {
     const navigate = useNavigate();
@@ -76,8 +62,8 @@ export default function PatientQueue() {
         try {
             const user = await getCurrentUser();
 
-            // Fetch Profile
-            api.get(`/register-doctor?id=${user.userId}`)
+            // 🟢 REST FIX: Fetch Doctor Profile
+            api.get(`/doctors/${user.userId}`)
                 .then((data: any) => {
                     const profile = Array.isArray(data.doctors) ? data.doctors.find((d: any) => d.doctorId === user.userId) : data;
                     if (profile) {
@@ -86,33 +72,30 @@ export default function PatientQueue() {
                     }
                 }).catch(console.error);
 
-            // Fetch Appointments
-            const data: any = await api.get(`/doctor-appointments?doctorId=${user.userId}`);
+            // 🟢 REST FIX: Fetch Appointments
+            const data: any = await api.get(`/appointments?doctorId=${user.userId}`);
+            
             if (data) {
                 let allAppointments = [];
-
                 if (Array.isArray(data)) allAppointments = data;
                 else if (data.existingBookings) allAppointments = data.existingBookings;
 
-                // 1. SMART FILTER (Remove Bad Data)
+                // 1. SMART FILTER (Remove Bad Data & Support FHIR)
                 const validAppointments = allAppointments.filter((a: any) => {
                     if (!a.patientName) return false;
-                    if (!a.timeSlot) return false;
-                    const date = new Date(a.timeSlot);
-                    if (isNaN(date.getTime())) return false;
+                    const timeVal = getAptTime(a);
+                    if (!timeVal) return false;
+                    if (isNaN(new Date(timeVal).getTime())) return false;
                     return true;
                 });
 
                 setFullHistory(validAppointments);
 
-                // 🟢 NEW: FETCH REAL PATIENT PROFILES
+                // 🟢 REST & HIPAA FIX: Fetch Real Patient Profiles (S3 signed URLs)
                 const uniquePatientIds = [...new Set(validAppointments.map((a: any) => a.patientId))];
                 if (uniquePatientIds.length > 0) {
-                    const session = await fetchAuthSession();
-                    const token = session.tokens?.idToken?.toString();
-
                     const profilePromises = uniquePatientIds.map(pid =>
-                        api.get(`/register-patient?id=${pid}`)
+                        api.get(`/patients/${pid}`)
                             .then(r => r || null)
                             .catch(() => null)
                     );
@@ -130,26 +113,26 @@ export default function PatientQueue() {
                     a.status === 'WAITING' || a.status === 'CONFIRMED' || a.status === 'IN_PROGRESS'
                 );
 
-                const todayList = [];
-                const futureList = [];
+                const todayList: any[] = [];
+                const futureList: any[] = [];
 
                 activeList.forEach(apt => {
-                    const aptDate = new Date(apt.timeSlot);
+                    const aptDate = new Date(getAptTime(apt));
                     aptDate.setHours(0, 0, 0, 0);
                     if (aptDate.getTime() === today.getTime()) todayList.push(apt);
                     else if (aptDate.getTime() > today.getTime()) futureList.push(apt);
                 });
 
-                // 3. SORTING
+                // 3. SORTING (FHIR Safe)
                 todayList.sort((a, b) => {
                     if (a.status === 'IN_PROGRESS') return -1;
                     if (b.status === 'IN_PROGRESS') return 1;
                     if (a.patientArrived && !b.patientArrived) return -1;
                     if (!a.patientArrived && b.patientArrived) return 1;
-                    return new Date(a.timeSlot).getTime() - new Date(b.timeSlot).getTime();
+                    return new Date(getAptTime(a)).getTime() - new Date(getAptTime(b)).getTime();
                 });
 
-                futureList.sort((a, b) => new Date(a.timeSlot).getTime() - new Date(b.timeSlot).getTime());
+                futureList.sort((a, b) => new Date(getAptTime(a)).getTime() - new Date(getAptTime(b)).getTime());
 
                 setTodayQueue(todayList);
                 setUpcomingQueue(futureList);
@@ -157,11 +140,10 @@ export default function PatientQueue() {
                 // 4. STATS
                 const completedList = validAppointments.filter((a: any) => a.status === 'COMPLETED');
 
-                // Calculate Avg Wait only for today's active items
                 let totalWait = 0;
                 let validCount = 0;
                 todayList.filter(a => a.status !== 'IN_PROGRESS').forEach(a => {
-                    const waitMs = Math.max(0, Date.now() - new Date(a.timeSlot).getTime());
+                    const waitMs = Math.max(0, Date.now() - new Date(getAptTime(a)).getTime());
                     totalWait += waitMs;
                     validCount++;
                 });
@@ -170,8 +152,8 @@ export default function PatientQueue() {
                 setStats({
                     waiting: todayList.length,
                     completed: completedList.filter(a => {
-                        const d = new Date(a.timeSlot); d.setHours(0, 0, 0, 0);
-                        return d.getTime() === today.getTime(); // Today's completed count
+                        const d = new Date(getAptTime(a)); d.setHours(0, 0, 0, 0);
+                        return d.getTime() === today.getTime(); 
                     }).length,
                     avgWait: `${avgMinutes}m`
                 });
@@ -186,8 +168,8 @@ export default function PatientQueue() {
     const updateStatus = async (appointmentId: string, newStatus: string, patientName: string) => {
         setProcessingId(appointmentId);
         try {
-            const user = await getCurrentUser();
-            const res = await api.put('/book-appointment', { appointmentId, doctorId: user.userId, status: newStatus });
+            // 🟢 ZERO-TRUST SECURITY FIX: Removed 'doctorId' from payload. Backend trusts token.
+            const res = await api.put('/appointments/update', { appointmentId, status: newStatus });
 
             if (res) {
                 toast({ title: "Status Updated", description: `Patient marked as ${newStatus}` });
@@ -206,7 +188,7 @@ export default function PatientQueue() {
 
     const renderCard = (patient: any, isUpcoming = false) => {
         const realProfile = patientDirectory.find(p => p.patientId === patient.patientId);
-        const aptDate = new Date(patient.timeSlot);
+        const aptDate = new Date(getAptTime(patient));
         const diffMs = Date.now() - aptDate.getTime();
         const diffMins = Math.floor(diffMs / 60000);
 
@@ -237,7 +219,8 @@ export default function PatientQueue() {
                             <HoverCardTrigger asChild>
                                 <div className="relative cursor-help">
                                     <Avatar className="h-14 w-14 border-2 border-background shadow-sm">
-                                        <AvatarImage src={realProfile?.avatar} alt={patient.patientName} />                                        <AvatarFallback className="bg-primary/10 text-primary font-bold text-lg">
+                                        <AvatarImage src={realProfile?.avatar} alt={patient.patientName} />                                        
+                                        <AvatarFallback className="bg-primary/10 text-primary font-bold text-lg">
                                             {getInitials(patient.patientName)}
                                         </AvatarFallback>
                                     </Avatar>
@@ -339,8 +322,6 @@ export default function PatientQueue() {
             onLogout={() => { signOut(); navigate("/"); }}
         >
             <div className="space-y-6 animate-fade-in pb-10">
-
-                {/* STATS */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
                     <Card className="bg-blue-600 text-white border-none shadow-md">
                         <CardContent className="p-6 flex items-center justify-between">
@@ -352,7 +333,6 @@ export default function PatientQueue() {
                         </CardContent>
                     </Card>
 
-                    {/* 🟢 FIXED: STATIC COMPLETED CARD + SMALL ACTION BUTTON */}
                     <Card
                         className="bg-emerald-600 text-white border-none shadow-md cursor-pointer hover:bg-emerald-700 transition-all active:scale-95"
                         onClick={() => setShowSummary(true)}
@@ -378,9 +358,7 @@ export default function PatientQueue() {
                     </Card>
                 </div>
 
-                {/* 🟢 TABS: TODAY vs UPCOMING */}
                 <Tabs defaultValue="today" className="w-full">
-                    {/* ... (Tabs List and Content Logic Remains Perfect) ... */}
                     <TabsList className="w-full max-w-md grid grid-cols-2 mb-4">
                         <TabsTrigger value="today">Today's Queue ({todayQueue.length})</TabsTrigger>
                         <TabsTrigger value="upcoming">Upcoming ({upcomingQueue.length})</TabsTrigger>
@@ -416,7 +394,6 @@ export default function PatientQueue() {
                 </Tabs>
             </div>
 
-            {/* 🟢 FIXED: MODAL VISUALS (Fixed missing list issue) */}
             <Dialog open={showSummary} onOpenChange={setShowSummary}>
                 <DialogContent className="max-w-2xl bg-white max-h-[80vh] overflow-y-auto">
                     <DialogHeader>
@@ -429,7 +406,6 @@ export default function PatientQueue() {
                             <p className="text-center text-muted-foreground py-8 border rounded-lg">No history record for today.</p>
                         ) : (
                             <>
-                                {/* Completed List */}
                                 <h4 className="font-semibold text-sm text-emerald-700">Completed ({fullHistory.filter(a => a.status === 'COMPLETED').length})</h4>
                                 <div className="space-y-2">
                                     {fullHistory.filter(a => a.status === 'COMPLETED').map(apt => (
@@ -438,7 +414,7 @@ export default function PatientQueue() {
                                                 <Avatar className="h-8 w-8"><AvatarFallback>{getInitials(apt.patientName)}</AvatarFallback></Avatar>
                                                 <div>
                                                     <p className="font-medium text-sm">{apt.patientName}</p>
-                                                    <p className="text-xs text-muted-foreground">{new Date(apt.timeSlot).toLocaleTimeString()}</p>
+                                                    <p className="text-xs text-muted-foreground">{new Date(getAptTime(apt)).toLocaleTimeString()}</p>
                                                 </div>
                                             </div>
                                             <Badge className="bg-emerald-200 text-emerald-800 border-none">Billed</Badge>
@@ -446,7 +422,6 @@ export default function PatientQueue() {
                                     ))}
                                 </div>
 
-                                {/* Cancelled List */}
                                 {fullHistory.filter(a => a.status === 'CANCELLED').length > 0 && (
                                     <>
                                         <h4 className="font-semibold text-sm text-red-700 mt-4">Cancelled / No-Show</h4>
@@ -457,7 +432,7 @@ export default function PatientQueue() {
                                                         <Avatar className="h-8 w-8"><AvatarFallback>{getInitials(apt.patientName)}</AvatarFallback></Avatar>
                                                         <div>
                                                             <p className="font-medium text-sm">{apt.patientName}</p>
-                                                            <p className="text-xs text-muted-foreground">{new Date(apt.timeSlot).toLocaleTimeString()}</p>
+                                                            <p className="text-xs text-muted-foreground">{new Date(getAptTime(apt)).toLocaleTimeString()}</p>
                                                         </div>
                                                     </div>
                                                     <Badge variant="destructive">Cancelled</Badge>
@@ -471,7 +446,6 @@ export default function PatientQueue() {
                     </div>
                 </DialogContent>
             </Dialog>
-
         </DashboardLayout>
     );
 }
