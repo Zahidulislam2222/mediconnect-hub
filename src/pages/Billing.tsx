@@ -39,6 +39,9 @@ function BillingContent() {
     const [billingData, setBillingData] = useState<any>(null);
     const [processingPayment, setProcessingPayment] = useState(false);
 
+    const [lastEvaluatedKey, setLastEvaluatedKey] = useState<any>(null);
+    const [loadingMore, setLoadingMore] = useState(false);
+
     // --- AUTH HELPER ---
     const getAuthToken = async () => {
         try {
@@ -86,18 +89,24 @@ function BillingContent() {
 
             // 2. Update Billing Data
             if (billingRes.status === "fulfilled") {
-                const billingJson: any = billingRes.value;
-                setBillingData(billingJson);
-            } else {
+    const billingJson: any = billingRes.value;
+    setBillingData(billingJson);
+    setLastEvaluatedKey(billingJson.lastEvaluatedKey || null); 
+} else {
                 console.error("Billing fetch failed");
             }
 
-        } catch (e) {
-            console.error("Background Fetch Error", e);
-            toast({ variant: "destructive", title: "Connection Error", description: "Could not load billing details." });
-        } finally {
-            setLoadingBilling(false);
-        }
+        } catch (e: any) {
+    console.error("Auth/Load Error", e);
+    const msg = e?.message || String(e);
+    // Logic: Only logout if user is actually deleted/banned
+    if (msg.includes('401') || msg.includes('403') || msg.includes('404')) {
+        localStorage.clear();
+        navigate("/auth");
+    }
+} finally {
+    setLoadingBilling(false);
+}
     }
 
     // Initial Load
@@ -144,7 +153,7 @@ function BillingContent() {
 
             // STEP B: Create Payment Intent on Backend (Zero-Trust)
             // We send the Payment Method ID so backend can confirm it securely
-            const paymentIntent: any = await api.post('/pay-bill', {
+            const paymentIntent: any = await api.post('/billing/pay', {
                 billId: billToPay.billId,
                 patientId: userProfile.id,
                 paymentMethodId: paymentMethod.id // 🟢 CRITICAL: Pass the ID to controller
@@ -175,6 +184,25 @@ function BillingContent() {
             setProcessingPayment(false);
         }
     };
+
+    const handleLoadMore = async () => {
+    if (!lastEvaluatedKey) return;
+    try {
+        setLoadingMore(true);
+        const keyParam = encodeURIComponent(JSON.stringify(lastEvaluatedKey));
+        const res: any = await api.get(`/billing?patientId=${userProfile.id}&startKey=${keyParam}`);
+        
+        setBillingData((prev: any) => ({
+            ...prev,
+            transactions: [...prev.transactions, ...(res.transactions || [])]
+        }));
+        setLastEvaluatedKey(res.lastEvaluatedKey || null);
+    } catch (e) {
+        toast({ variant: "destructive", title: "Error", description: "Could not load more transactions." });
+    } finally {
+        setLoadingMore(false);
+    }
+};
 
     // --- RENDER ---
     return (
@@ -332,6 +360,16 @@ function BillingContent() {
                                             </div>
                                         );
                                     })}
+                                    {lastEvaluatedKey && (
+                                        <Button 
+                                            variant="ghost" 
+                                            className="w-full mt-4 text-primary hover:bg-primary/5"
+                                            onClick={handleLoadMore}
+                                            disabled={loadingMore}
+                                        >
+                                            {loadingMore ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : "Load More Activity"}
+                                        </Button>
+                                    )}
                             </div>
                         ) : billingData?.outstandingBalance > 0 ? (
                             // Legacy Data Fallback

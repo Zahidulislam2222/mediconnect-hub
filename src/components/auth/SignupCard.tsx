@@ -1,10 +1,11 @@
-import React from "react";
+import React, { useState } from "react";
 import { User, Building2, Globe, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox"; // 🟢 ADDED: shadcn Checkbox
 
 type Region = "US" | "EU";
 
@@ -39,19 +40,37 @@ export const SignupCard: React.FC<SignupCardProps> = ({
   handleSignUp,
   setAuthStep
 }) => {
+  // 🟢 ADDED: State for explicit consent
+  const [agreedToTerms, setAgreedToTerms] = useState(false);
+  const [consentError, setConsentError] = useState(false);
+
+  // 🟢 ADDED: Intercept the form submission to enforce consent
+  const onFormSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!agreedToTerms) {
+      setConsentError(true);
+      return;
+    }
+    setConsentError(false);
+    
+    // Temporarily store the consent proof so auth.tsx can send it to the DB later
+    localStorage.setItem('pending_consent', JSON.stringify({
+      agreedToTerms: true,
+      policyVersion: "v1.0",
+      timestamp: new Date().toISOString()
+    }));
+
+    handleSignUp(e);
+  };
+
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      {/* 🟢 GDPR JURISDICTION SELECTOR (Silo Enforcement) */}
       <div className="bg-slate-50 border border-slate-200 rounded-lg p-2 flex items-center justify-between shadow-sm">
         <div className="flex items-center gap-2 text-sm font-medium text-slate-600 pl-2">
           <Globe className="h-4 w-4 text-primary" /> 
           <span>Data Region</span>
         </div>
-        <Tabs 
-          value={selectedRegion} 
-          onValueChange={(v) => setSelectedRegion(v as Region)} 
-          className="w-[140px]"
-        >
+        <Tabs value={selectedRegion} onValueChange={(v) => setSelectedRegion(v as Region)} className="w-[140px]">
           <TabsList className="grid w-full grid-cols-2 h-8">
             <TabsTrigger value="US" className="text-xs">US</TabsTrigger>
             <TabsTrigger value="EU" className="text-xs">EU</TabsTrigger>
@@ -67,7 +86,6 @@ export const SignupCard: React.FC<SignupCardProps> = ({
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {/* Role Selector */}
           <Tabs value={userType} onValueChange={(v) => setUserType(v as any)} className="mb-6">
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="patient" className="gap-2"><User className="h-4 w-4" /> Patient</TabsTrigger>
@@ -75,67 +93,51 @@ export const SignupCard: React.FC<SignupCardProps> = ({
             </TabsList>
           </Tabs>
 
-          <form onSubmit={handleSignUp} className="space-y-4">
+          {/* 🟢 CHANGED: Form now calls onFormSubmit instead of handleSignUp */}
+          <form onSubmit={onFormSubmit} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="signup-name">Full Name</Label>
-              <Input 
-                id="signup-name"
-                type="text" 
-                placeholder="John Doe" 
-                value={name} 
-                onChange={e => setName(e.target.value)} 
-                required 
-                className="bg-slate-50/50"
-              />
+              <Input id="signup-name" type="text" placeholder="John Doe" value={name} onChange={e => setName(e.target.value)} required className="bg-slate-50/50" />
             </div>
             <div className="space-y-2">
               <Label htmlFor="signup-email">Email Address</Label>
-              <Input 
-                id="signup-email"
-                type="email" 
-                placeholder="name@example.com"
-                value={email} 
-                onChange={e => setEmail(e.target.value)} 
-                required 
-                className="bg-slate-50/50"
-              />
+              <Input id="signup-email" type="email" placeholder="name@example.com" value={email} onChange={e => setEmail(e.target.value)} required className="bg-slate-50/50" />
             </div>
             <div className="space-y-2">
               <Label htmlFor="signup-password">Password</Label>
-              <Input 
-                id="signup-password"
-                type="password" 
-                value={password} 
-                onChange={e => setPassword(e.target.value)} 
-                required 
-                className="bg-slate-50/50"
-              />
-              <p className="text-[10px] text-muted-foreground mt-1">
-                Must contain at least 8 characters, one uppercase, and one number.
-              </p>
+              <Input id="signup-password" type="password" value={password} onChange={e => setPassword(e.target.value)} required className="bg-slate-50/50" />
+              <p className="text-[10px] text-muted-foreground mt-1">Must contain at least 8 characters, one uppercase, and one number.</p>
             </div>
 
-            <Button 
-              type="submit" 
-              className="w-full bg-primary hover:bg-primary/90 shadow-md mt-2" 
-              disabled={loading}
-            >
-              {loading ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                "Create Secure Account"
-              )}
+            {/* 🟢 ADDED: Explicit Consent Checkbox UI */}
+            <div className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4 mt-4 shadow-sm">
+              <Checkbox 
+                id="terms" 
+                checked={agreedToTerms} 
+                onCheckedChange={(checked) => {
+                  setAgreedToTerms(checked as boolean);
+                  if (checked) setConsentError(false);
+                }} 
+              />
+              <div className="space-y-1 leading-none">
+                <Label htmlFor="terms" className="text-sm font-medium leading-none cursor-pointer">
+                  Accept Terms & Privacy Policy
+                </Label>
+                <p className="text-xs text-muted-foreground">
+                  I agree to the processing of my medical data in accordance with the HIPAA/GDPR policies.
+                </p>
+                {consentError && <p className="text-xs text-red-500 font-semibold mt-1">You must accept the terms to register.</p>}
+              </div>
+            </div>
+
+            <Button type="submit" className="w-full bg-primary hover:bg-primary/90 shadow-md mt-2" disabled={loading}>
+              {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Create Secure Account"}
             </Button>
           </form>
 
           <div className="mt-6 text-center text-sm">
             Already have an account?{" "}
-            <button 
-              onClick={() => setAuthStep("login")} 
-              className="text-primary font-medium hover:underline"
-            >
-              Sign in
-            </button>
+            <button onClick={() => setAuthStep("login")} className="text-primary font-medium hover:underline">Sign in</button>
           </div>
         </CardContent>
       </Card>

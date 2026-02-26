@@ -12,7 +12,8 @@ function getServiceUrl(endpoint: string): string {
         endpoint.startsWith('/verify-identity') ||
         endpoint.startsWith('/public/knowledge') ||
         endpoint.startsWith('/vitals') ||     
-        endpoint.startsWith('/emergency')      
+        endpoint.startsWith('/emergency') ||
+        endpoint.startsWith('/stats')    
     ) {
         return userRegion === 'EU' 
             ? import.meta.env.VITE_PATIENT_SERVICE_URL_EU 
@@ -85,9 +86,6 @@ async function request(endpoint: string, method: string, body?: any) {
             const token = session.tokens?.idToken?.toString();
             if (token) headers['Authorization'] = `Bearer ${token}`;
             
-            // 🟢 GDPR/HIPAA FIX: Inject Region Header
-            // The backend 'extractRegion' function relies on this to route to Frankfurt vs Virginia.
-            // Assumption: You store the user's region in localStorage upon Login.
             const userRegion = localStorage.getItem('userRegion') || 'US';
             headers['x-user-region'] = userRegion;
 
@@ -110,8 +108,13 @@ async function request(endpoint: string, method: string, body?: any) {
         });
 
         if (!response.ok) {
+
+            if (response.status === 404) {
+                 throw new Error("404_NOT_FOUND");
+            }
+
             const errorData = await response.json().catch(() => ({}));
-            // Handle 401 specifically to help debug Auth Middleware issues
+            
             if (response.status === 401) {
                 console.error("🔒 Auth Error: Token invalid or Region mismatch.");
             }
@@ -119,8 +122,12 @@ async function request(endpoint: string, method: string, body?: any) {
         }
 
         return await response.json();
-    } catch (error) {
-        console.error(`API Request Failed: ${endpoint}`, error);
+    } catch (error: any) {
+
+        if (error.message !== "404_NOT_FOUND") {
+            console.error(`API Request Failed: ${endpoint}`, error);
+        }
+
         throw error;
     }
 }

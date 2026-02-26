@@ -113,7 +113,7 @@ export default function SymptomChecker() {
 
     try {
       // API CALL
-      const data: any = await api.post('/chat/symptom-check', {
+      const data: any = await api.post('/ai/symptoms', {
         text: userText
       });
 

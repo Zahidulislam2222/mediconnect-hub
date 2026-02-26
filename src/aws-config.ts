@@ -1,8 +1,7 @@
 // src/aws-config.ts
-import { Amplify, type ResourcesConfig } from 'aws-amplify';
+import { type ResourcesConfig } from 'aws-amplify';
 
-// 🟢 DYNAMIC CONFIGURATION BUILDER
-// This function builds the config based on the user's selected region (US or EU)
+// 🟢 1. Amplify Configuration Builder
 export const getAwsConfig = (): ResourcesConfig => {
   const region = localStorage.getItem('userRegion') || 'US';
   const isEU = region === 'EU';
@@ -12,13 +11,12 @@ export const getAwsConfig = (): ResourcesConfig => {
   return {
     Auth: {
       Cognito: {
-        // 🔴 IDENTITY SWITCHER
         userPoolId: isEU 
           ? import.meta.env.VITE_COGNITO_USER_POOL_ID_EU 
           : import.meta.env.VITE_COGNITO_USER_POOL_ID_US,
         
         userPoolClientId: isEU 
-          ? import.meta.env.VITE_COGNITO_CLIENT_PATIENT_EU // Default to Patient, overwritten by specific logic if needed
+          ? import.meta.env.VITE_COGNITO_CLIENT_PATIENT_EU 
           : import.meta.env.VITE_COGNITO_CLIENT_PATIENT_US,
 
         identityPoolId: isEU 
@@ -33,7 +31,6 @@ export const getAwsConfig = (): ResourcesConfig => {
     },
     Storage: {
       S3: {
-        // 🔴 STORAGE SWITCHER
         bucket: isEU 
           ? import.meta.env.VITE_S3_IDENTITY_BUCKET_EU 
           : import.meta.env.VITE_S3_IDENTITY_BUCKET_US,
@@ -46,12 +43,35 @@ export const getAwsConfig = (): ResourcesConfig => {
   };
 };
 
-// Export constants for other parts of the app
+// 🟢 2. Professional Resource Registry (The missing function)
+export const getRegionalResources = () => {
+  const region = localStorage.getItem('userRegion') || 'US';
+  const isEU = region === 'EU';
+
+  return {
+    region: isEU 
+      ? (import.meta.env.VITE_AWS_REGION_EU || 'eu-central-1') 
+      : (import.meta.env.VITE_AWS_REGION_US || 'us-east-1'),
+    buckets: {
+      identity: isEU 
+        ? import.meta.env.VITE_S3_IDENTITY_BUCKET_EU 
+        : import.meta.env.VITE_S3_IDENTITY_BUCKET_US,
+      credentials: isEU 
+        ? import.meta.env.VITE_S3_CREDENTIALS_BUCKET_EU 
+        : import.meta.env.VITE_S3_CREDENTIALS_BUCKET_US,
+      ehr: isEU 
+        ? import.meta.env.VITE_S3_EHR_RECORDS_BUCKET_EU 
+        : import.meta.env.VITE_S3_EHR_RECORDS_BUCKET_US,
+    }
+  };
+};
+
+// Export constants
 const region = localStorage.getItem('userRegion') || 'US';
 export const STRAPI_URL = import.meta.env.VITE_STRAPI_API_URL;
-export const S3_BUCKET_URL = `https://${region === 'EU' 
-  ? import.meta.env.VITE_S3_IDENTITY_BUCKET_EU 
-  : import.meta.env.VITE_S3_IDENTITY_BUCKET_US}.s3.amazonaws.com`;
+export const getS3BucketUrl = () => {
+  const { buckets } = getRegionalResources();
+  return `https://${buckets.identity}.s3.amazonaws.com`;
+};
 
-// Default export is no longer a static object, but we keep the type for compatibility
 export default getAwsConfig();

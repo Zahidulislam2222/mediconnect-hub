@@ -1,8 +1,10 @@
-import React from "react";
+import React, { useState } from "react";
 import { Shield, Camera, CheckCircle2, ScanLine, AlertTriangle, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import { Checkbox } from "@/components/ui/checkbox"; 
+import { Label } from "@/components/ui/label"; 
 
 interface IdentityVerificationProps {
   selfieImage: string | null;
@@ -17,6 +19,7 @@ interface IdentityVerificationProps {
 }
 
 export const IdentityVerification: React.FC<IdentityVerificationProps> = ({
+  
   selfieImage,
   idImage,
   handleFileChange,
@@ -27,6 +30,7 @@ export const IdentityVerification: React.FC<IdentityVerificationProps> = ({
   statusMessage,
   handleSkip
 }) => {
+  const [biometricConsent, setBiometricConsent] = useState(false);
   return (
     <Card className="shadow-elevated border-border/50 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <CardHeader className="text-center pb-2">
@@ -103,6 +107,25 @@ export const IdentityVerification: React.FC<IdentityVerificationProps> = ({
           </label>
         </div>
 
+        {/* 🟢 NEW: Explicit Biometric Consent Checkbox */}
+        {(selfieImage && idImage) && (
+          <div className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4 bg-slate-50 mt-4 shadow-sm">
+            <Checkbox 
+              id="biometric-consent" 
+              checked={biometricConsent} 
+              onCheckedChange={(c) => setBiometricConsent(c as boolean)} 
+            />
+            <div className="space-y-1 leading-none">
+              <Label htmlFor="biometric-consent" className="text-sm font-medium leading-none cursor-pointer">
+                I consent to AI Biometric Processing
+              </Label>
+              <p className="text-[11px] text-muted-foreground mt-1 leading-relaxed">
+                I explicitly agree to let MediConnect use AI facial recognition to compare my selfie and ID. I understand my ID image will be permanently deleted after 24 hours.
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* Processing Indicator */}
         {imageProcessing && (
           <div className="text-xs text-center text-muted-foreground flex items-center justify-center gap-2 py-1">
@@ -125,7 +148,7 @@ export const IdentityVerification: React.FC<IdentityVerificationProps> = ({
         <Button
           onClick={handleSubmitIdentity}
           className="w-full bg-primary hover:bg-primary/90 shadow-md"
-          disabled={loading || imageProcessing || !selfieImage || !idImage}
+          disabled={loading || imageProcessing || !selfieImage || !idImage || !biometricConsent} 
         >
           {loading ? (
             <div className="flex items-center gap-2">

@@ -264,7 +264,7 @@ export default function PatientRecords() {
                 }
             };
 
-            const res: any = await api.post('/chat/predict-health', payload);
+            const res: any = await api.post('/ai/predict', payload);
 
             if (res && res.analysis) {
                 // 🟢 Map the new FHIR-compliant response to your UI

@@ -142,8 +142,15 @@ export default function DoctorDashboard() {
         }
       }
 
-    } catch (err) {
-      console.error("Dashboard Load Error:", err);
+    } catch (error: any) {
+        console.error("Load Error:", error);
+        const msg = error?.message || String(error);
+        
+        // ONLY log out if the backend explicitly says you are unauthorized/deleted
+        if (msg.includes('401') || msg.includes('403') || msg.includes('404')) {
+            localStorage.clear();
+            navigate("/auth");
+        }
     } finally {
       setIsLoading(false);
     }

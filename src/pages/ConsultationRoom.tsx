@@ -515,7 +515,7 @@ export default function ConsultationRoom() {
                           onClick={async () => {
                             setIsJoining(true); // Re-use loading state
                             try {
-                              const res: any = await api.post('/predict/summarize', {
+                              const res: any = await api.post('/ai/summarize', {
                                 appointmentId,
                                 transcript: fullTranscriptRef.current,
                                 patientId: location.state?.patientId // Ensure this is passed in state

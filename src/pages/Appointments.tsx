@@ -48,6 +48,9 @@ function AppointmentsContent() {
     const [loadingSlots, setLoadingSlots] = useState(false);
     const [doctorTimezone, setDoctorTimezone] = useState("UTC");
 
+    const [lastEvaluatedKey, setLastEvaluatedKey] = useState<any>(null);
+    const [isLoadingMore, setIsLoadingMore] = useState(false);
+
     // --- AUTH HELPER ---
     const getAuthToken = async () => {
         try {
@@ -57,27 +60,35 @@ function AppointmentsContent() {
     };
 
     // --- FETCH APPOINTMENTS ---
-    const fetchAppointments = async (patientId: string) => {
-        try {
-            setLoadingAppointments(true);
-            const data: any = await api.get(`/appointments?patientId=${patientId}`);
+    const fetchAppointments = async (patientId: string, isLoadMore = false) => {
+    try {
+        if (isLoadMore) setIsLoadingMore(true);
+        else setLoadingAppointments(true);
 
-            let list = Array.isArray(data) ? data : (data.existingBookings || []);
-
-            // 🟢 FHIR FIX: Sort using FHIR resource.start first, fallback to legacy timeSlot
-            list.sort((a: any, b: any) => {
-                const timeA = new Date(a.resource?.start || a.timeSlot || 0).getTime();
-                const timeB = new Date(b.resource?.start || b.timeSlot || 0).getTime();
-                return timeB - timeA;
-            });
-            
-            setAppointments(list);
-        } catch (e) {
-            console.error("Failed to load appointments", e);
-        } finally {
-            setLoadingAppointments(false);
+        let url = `/appointments?patientId=${patientId}`;
+        if (isLoadMore && lastEvaluatedKey) {
+            url += `&startKey=${encodeURIComponent(JSON.stringify(lastEvaluatedKey))}`;
         }
-    };
+
+        const data: any = await api.get(url);
+        const newList = Array.isArray(data) ? data : (data.existingBookings || []);
+
+        setAppointments(prev => isLoadMore ? [...prev, ...newList] : newList);
+        setLastEvaluatedKey(data.lastEvaluatedKey || null);
+    } catch (error: any) {
+        console.error("Load Error:", error);
+        const msg = error?.message || String(error);
+        
+        // ONLY log out if the backend explicitly says you are unauthorized/deleted
+        if (msg.includes('401') || msg.includes('403') || msg.includes('404')) {
+            localStorage.clear();
+            navigate("/auth");
+        }
+    } finally {
+        setLoadingAppointments(false);
+        setIsLoadingMore(false);
+    }
+};
 
     // --- FETCH DOCTORS & USER ---
     useEffect(() => {
@@ -180,7 +191,7 @@ function AppointmentsContent() {
                 description: `Consultation with ${selectedDoc?.name || "Doctor"}`
             });
 
-            await api.post('/book-appointment', {
+            await api.post('/appointments', {
                 doctorId: formData.doctorId,
                 doctorName: selectedDoc?.name || "Doctor",
                 timeSlot: timeSlotISO,
@@ -205,7 +216,7 @@ function AppointmentsContent() {
     const handleCancel = async (appointmentId: string) => {
         if (!confirm("Are you sure? This will refund your payment.")) return;
         try {
-            await api.post('/cancel-appointment', { appointmentId });
+            await api.post('/appointments/cancel', { appointmentId });
             toast({ title: "Cancelled", description: "Appointment cancelled and refunded." });
             fetchAppointments(user.id);
         } catch (e) {
@@ -217,7 +228,7 @@ function AppointmentsContent() {
     const handleJoin = async (apt: any) => {
         try {
             // 🟢 SYNC FIX: Matches backend 'updateAppointment' controller format
-            await api.put('/appointments/update', {
+            await api.put('/appointments', {
                 appointmentId: apt.appointmentId,
                 status: apt.status,
                 patientArrived: true 
@@ -381,7 +392,7 @@ function AppointmentsContent() {
                                                 <Button variant="outline" size="sm" className="h-9 border-slate-200 text-slate-600"
                                                     onClick={async () => {
                                                         try {
-                                                            const res: any = await api.get(`/receipt/${apt.appointmentId}`);
+                                                            const res: any = await api.get(`/billing/receipt/${apt.appointmentId}`);
                                                             if (res.downloadUrl) window.open(res.downloadUrl, '_blank');
                                                         } catch (e) { toast({ variant: "destructive", title: "Error", description: "Receipt not ready." }); }
                                                     }}
@@ -435,7 +446,7 @@ function AppointmentsContent() {
                                                 <Button variant="outline" size="sm" className="h-8"
                                                     onClick={async () => {
                                                         try {
-                                                            const res: any = await api.get(`/receipt/${apt.appointmentId}`);
+                                                            const res: any = await api.get(`/billing/receipt/${apt.appointmentId}`);
                                                             if (res.downloadUrl) window.open(res.downloadUrl, '_blank');
                                                         } catch (e) { toast({ variant: "destructive", title: "Error", description: "Receipt not available." }); }
                                                     }}
@@ -456,6 +467,17 @@ function AppointmentsContent() {
                              return a.status === 'CANCELLED' || a.status === 'COMPLETED' || (t && new Date(t) < new Date());
                         }).length === 0 && (
                             <div className="text-center text-muted-foreground py-10">No past appointments.</div>
+                        )}
+                        {lastEvaluatedKey && (
+                            <Button 
+                                variant="outline" 
+                                className="w-full mt-4" 
+                                onClick={() => fetchAppointments(user.id, true)}
+                                disabled={isLoadingMore}
+                            >
+                                {isLoadingMore ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Plus className="h-4 w-4 mr-2" />}
+                                Load Older Appointments
+                            </Button>
                         )}
                     </TabsContent>
                 </Tabs>

@@ -148,7 +148,7 @@ export default function HealthRecords() {
     const base64Clean = base64Full.split(",")[1];
 
     try {
-      const data: any = await api.post('/chat/analyze-image', {
+      const data: any = await api.post('/ai/imaging', {
         imageBase64: base64Clean,
         patientId: user.id,
         prompt: "Perform a detailed clinical analysis of this imaging scan."

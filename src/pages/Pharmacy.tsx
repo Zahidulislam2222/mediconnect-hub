@@ -125,7 +125,7 @@ export default function Pharmacy() {
 
       // 3. Execute Payment on Backend
       // We pass the billId and the paymentMethod.id
-      await api.post('/pay-bill', {
+      await api.post('/billing/pay', {
         billId: transaction.billId,
         patientId: user.id,
         paymentMethodId: paymentMethod.id

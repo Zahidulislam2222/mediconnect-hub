@@ -158,9 +158,14 @@ export default function PatientQueue() {
                     avgWait: `${avgMinutes}m`
                 });
             }
-        } catch (error) {
-            console.error("Queue Error:", error);
-        } finally {
+        } catch (error: any) {
+    console.error("Queue Error:", error);
+    const msg = error?.message || String(error);
+    if (msg.includes('401') || msg.includes('403') || msg.includes('404')) {
+        localStorage.clear();
+        navigate("/auth");
+    }
+} finally {
             if (!silent) setIsLoading(false);
         }
     };
@@ -169,7 +174,7 @@ export default function PatientQueue() {
         setProcessingId(appointmentId);
         try {
             // 🟢 ZERO-TRUST SECURITY FIX: Removed 'doctorId' from payload. Backend trusts token.
-            const res = await api.put('/appointments/update', { appointmentId, status: newStatus });
+            const res = await api.put('/appointments', { appointmentId, status: newStatus });
 
             if (res) {
                 toast({ title: "Status Updated", description: `Patient marked as ${newStatus}` });

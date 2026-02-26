@@ -21,6 +21,7 @@ export default function Analytics() {
 
     // --- STATE ---
     const [isLoading, setIsLoading] = useState(true);
+    const [period, setPeriod] = useState("6m");
     const [doctorProfile, setDoctorProfile] = useState(() => {
         const saved = localStorage.getItem('user');
         return saved ? JSON.parse(saved) : { name: "Doctor", avatar: null, role: "doctor" };
@@ -58,9 +59,9 @@ export default function Analytics() {
                 // 1. FIXED: Correct RESTful Profile Route
                 api.get(`/doctors/${userId}`),
                 // 2. FINANCIALS: Calls booking.controller.ts -> getDoctorAnalytics
-                api.get(`/analytics?doctorId=${userId}`),
+                api.get(`/analytics/revenue?doctorId=${userId}&period=${period}`),
                 // 3. DEMOGRAPHICS: Calls patient.controller.ts -> getDemographics
-                api.get(`/demographics`) 
+                api.get(`/stats/demographics`) 
             ]);
 
             // 1. Handle Profile
@@ -95,17 +96,21 @@ export default function Analytics() {
                 }
             }
 
-        } catch (err) {
-            console.error("Analytics Load Error", err);
-            toast({ variant: "destructive", title: "Data Error", description: "Could not sync analytics." });
-        } finally {
+        } catch (err: any) {
+    console.error("Auth/Load Error:", err);
+    const msg = err?.message || String(err);
+    if (msg.includes('401') || msg.includes('403') || msg.includes('404')) {
+        localStorage.clear();
+        navigate("/auth");
+    }
+} finally {
             setIsLoading(false);
         }
     };
 
     useEffect(() => {
-        loadAnalytics();
-    }, []);
+    loadAnalytics();
+}, [period]);
 
     const handleLogout = async () => {
         await signOut();
@@ -144,15 +149,17 @@ export default function Analytics() {
                         <Activity className="h-5 w-5 text-primary" />
                         Performance Overview
                     </h2>
-                    <Select defaultValue="6m">
-                        <SelectTrigger className="w-[160px] bg-white">
-                            <SelectValue placeholder="Period" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="6m">Last 6 Months</SelectItem>
-                            <SelectItem value="1y">Year to Date</SelectItem>
-                        </SelectContent>
-                    </Select>
+                    <Select value={period} onValueChange={(v) => setPeriod(v)}>
+    <SelectTrigger className="w-[160px] bg-white">
+        <SelectValue placeholder="Period" />
+    </SelectTrigger>
+    <SelectContent>
+        <SelectItem value="3m">Last 3 Months</SelectItem>
+        <SelectItem value="6m">Last 6 Months</SelectItem>
+        <SelectItem value="1y">Last Year</SelectItem>
+        <SelectItem value="all">All Time</SelectItem>
+    </SelectContent>
+</Select>
                 </div>
 
                 {/* KPI CARDS */}

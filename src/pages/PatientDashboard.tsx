@@ -72,7 +72,7 @@ export default function PatientDashboard() {
         console.warn("Invalid AWS Session. Purging demo state and logging out.");
         localStorage.clear();
         navigate("/auth");
-        return; // Stop execution so we don't load fake data
+        return;
       }
 
       // 2. Fetch Doctor Directory (Essential for Avatars)
@@ -164,8 +164,15 @@ export default function PatientDashboard() {
         if (Array.isArray(vData) && vData.length > 0) setRealVitals(vData[0]);
       }
 
-    } catch (error) {
-      console.error("Dashboard Load Error:", error);
+    } catch (error: any) {
+        console.error("Load Error:", error);
+        const msg = error?.message || String(error);
+        
+        // ONLY log out if the backend explicitly says you are unauthorized/deleted
+        if (msg.includes('401') || msg.includes('403') || msg.includes('404')) {
+            localStorage.clear();
+            navigate("/auth");
+        }
     } finally {
       setLoading(false);
     }
@@ -176,7 +183,7 @@ export default function PatientDashboard() {
   // 🟢 Handle Join Logic (Matches booking.controller.ts)
   const handleJoin = async (apt: any) => {
     try {
-      await api.put('/appointments/update', {
+      await api.put('/appointments', {
         appointmentId: apt.appointmentId,
         status: apt.status, // Keep status as is
         patientArrived: true // Critical Signal for Doctor Dashboard
@@ -193,11 +200,9 @@ export default function PatientDashboard() {
     
     // Prioritize the directory avatar (signed URL) -> then Appointment Snapshot -> then Null
     let avatarUrl = directoryDoc?.avatar || apt.doctorAvatar;
-    
-    // If it's a raw S3 key (legacy data), don't try to show it broken
-    if (avatarUrl && !avatarUrl.startsWith('http')) {
-        avatarUrl = undefined; 
-    }
+if (avatarUrl && !avatarUrl.startsWith('http')) {
+    avatarUrl = undefined;
+}
 
     return {
       name: directoryDoc?.name || apt.doctorName || "Medical Provider",
@@ -228,7 +233,7 @@ export default function PatientDashboard() {
           <div className="lg:col-span-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <div
               className="cursor-pointer transition-transform hover:scale-[1.02]"
-              onClick={() => navigate(`/live-monitoring?patientId=${profile?.userId}`)}
+              onClick={() => navigate(`/live-monitoring?patientId=${profile?.patientId}`)}
             >
               <VitalCard
                 title="Heart Rate"
@@ -392,7 +397,7 @@ export default function PatientDashboard() {
                 icon={<Activity className="h-5 w-5" />}
                 label="Monitor"
                 description="Live Vitals"
-                onClick={() => navigate(`/live-monitoring?patientId=${profile?.userId}`)}
+                onClick={() => navigate(`/live-monitoring?patientId=${profile?.patientId}`)}
               />
             </CardContent>
           </Card>
@@ -401,7 +406,7 @@ export default function PatientDashboard() {
         {/* 4. MARKETING BANNER */}
         <Card className="medical-gradient text-white shadow-elevated border-0 overflow-hidden relative group cursor-pointer"
           onClick={() => {
-            if (profile?.userId) navigate(`/live-monitoring?patientId=${profile.userId}`);
+            if (profile?.patientId) navigate(`/live-monitoring?patientId=${profile.patientId}`);
           }}
         >
           <CardContent className="py-8 relative z-10">
