@@ -278,7 +278,16 @@ export default function Auth() {
         const user = await getCurrentUser();
         const session = await fetchAuthSession();
         const token = session.tokens?.idToken?.toString();
-        if (token && user) await strictVerifyAndRedirect(user.userId, token, true); 
+        if (token && user) {
+  const success = await strictVerifyAndRedirect(user.userId, token, true);
+  if (!success) {
+    toast({ 
+      variant: "destructive", 
+      title: "Server Unreachable", 
+      description: "Successfully authenticated, but unable to connect to the database." 
+    });
+  }
+}
       } else if (nextStep.signInStep === 'CONTINUE_SIGN_IN_WITH_TOTP_SETUP') {
         const setupKey = nextStep.totpSetupDetails?.sharedSecret;
         setMfaSetupKey(setupKey || "");

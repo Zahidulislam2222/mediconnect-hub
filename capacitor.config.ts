@@ -4,10 +4,13 @@ const config: CapacitorConfig = {
   appId: 'com.mediconnect.app',
   appName: 'MediConnect',
   webDir: 'dist',
-  // 🟢 ADD THIS BLOCK:
+
+  server: {
+    androidScheme: 'https'
+  },
   plugins: {
     PushNotifications: {
-      presentationOptions: ["badge", "sound", "alert"],
+      presentationOptions:["badge", "sound", "alert"],
     },
   },
 };
