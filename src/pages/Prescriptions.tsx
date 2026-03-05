@@ -118,9 +118,15 @@ export default function Prescriptions() {
                 setPatientList(Array.from(uniqueMap.values()));
             }
 
-        } catch (e) {
+        } catch (e: any) {
             console.error("Load Error", e);
-            toast({ variant: "destructive", title: "Error", description: "Failed to load clinic data." });
+            const msg = e?.message || String(e);
+            if (msg.includes('401') || msg.includes('403') || msg.includes('404')) {
+                localStorage.clear();
+                navigate("/auth");
+            } else {
+                toast({ variant: "destructive", title: "Error", description: "Failed to load clinic data." });
+            }
         } finally {
             setIsLoading(false);
         }

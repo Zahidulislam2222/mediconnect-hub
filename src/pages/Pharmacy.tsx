@@ -80,13 +80,19 @@ export default function Pharmacy() {
         const data: any = rxData;
         setPrescriptions(data.prescriptions || []);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to load pharmacy data:", error);
-      toast({
-        variant: "destructive",
-        title: "Connection Error",
-        description: "Could not sync with pharmacy network."
-      });
+      const msg = error?.message || String(error);
+      if (msg.includes('401') || msg.includes('403') || msg.includes('404')) {
+          localStorage.clear();
+          navigate("/auth");
+      } else {
+          toast({
+            variant: "destructive",
+            title: "Connection Error",
+            description: "Could not sync with pharmacy network."
+          });
+      }
     } finally {
       setLoading(false);
     }

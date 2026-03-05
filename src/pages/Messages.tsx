@@ -15,7 +15,7 @@ import { cn } from "@/lib/utils";
 import { api } from "@/lib/api";
 import { useToast } from "@/hooks/use-toast";
 
-// Interface for our Clean Contact List (Not Appointments)
+// Interface for our Clean Contact List
 interface Contact {
     id: string;          // The Person's ID (PatientID or DoctorID)
     name: string;        // Name
@@ -31,17 +31,15 @@ interface Message {
     timestamp: string;
     conversationId?: string;
     resource?: any; // FHIR structure
-    isOptimistic?: boolean; // 🟢 Add this line to fix the error
+    isOptimistic?: boolean; 
 }
 
+// Helper to get raw JWT for WebSocket
 const getAuthToken = () => {
     for (let i = 0; i < localStorage.length; i++) {
         const key = localStorage.key(i);
-        // Cognito keys usually end in .idToken or .accessToken
-        // Your Authorizer is configured for "id" tokens
         if (key && key.includes("idToken")) {
             const token = localStorage.getItem(key);
-            // Ensure we don't return the literal string "null"
             return (token && token !== "null") ? token : null;
         }
     }
@@ -58,11 +56,9 @@ export default function Messages() {
     const [currentUser, setCurrentUser] = useState<any>(null);
     const [userRole, setUserRole] = useState<'patient' | 'doctor'>('patient');
     
-    // The "Single Thread" Contact List
     const [contacts, setContacts] = useState<Contact[]>([]);
     const [loadingContacts, setLoadingContacts] = useState(true);
 
-    // Active Chat
     const [selectedRecipientId, setSelectedRecipientId] = useState<string | null>(null);
     const [activeContact, setActiveContact] = useState<Contact | null>(null);
     
@@ -72,25 +68,25 @@ export default function Messages() {
 
     // --- 1. INITIALIZATION & DEDUPLICATION ---
     useEffect(() => {
-    const init = async () => {
-        try {
-            const authUser = await getCurrentUser();
-            const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
-            const currentRole = storedUser.role || 'patient';
-            const isDoctor = currentRole === 'doctor';
+        const init = async () => {
+            try {
+                const authUser = await getCurrentUser();
+                const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
+                const currentRole = storedUser.role || 'patient';
+                const isDoctor = currentRole === 'doctor';
 
-            setCurrentUser({ ...storedUser, id: authUser.userId });
-            setUserRole(currentRole);
+                setCurrentUser({ ...storedUser, id: authUser.userId });
+                setUserRole(currentRole);
 
-            // 1. Fetch Appointments
-            const paramKey = isDoctor ? 'doctorId' : 'patientId';
-            const res: any = await api.get(`/doctor-appointments?${paramKey}=${authUser.userId}`);
-            const rawList = res.existingBookings || (Array.isArray(res) ? res : []);
-            
-            const uniqueMap = new Map<string, Contact>();
+                // 1. Fetch Appointments to build contact list
+                const paramKey = isDoctor ? 'doctorId' : 'patientId';
+                const res: any = await api.get(`/doctor-appointments?${paramKey}=${authUser.userId}`);
+                const rawList = res.existingBookings || (Array.isArray(res) ? res : []);
+                
+                const uniqueMap = new Map<string, Contact>();
 
-            // 2. Identify Unique People
-            rawList.forEach((item: any) => {
+                // 2. Identify Unique People from Appointments
+                rawList.forEach((item: any) => {
                     const contactId = isDoctor ? item.patientId : item.doctorId;
                     const contactName = isDoctor ? item.patientName : item.doctorName;
 
@@ -107,113 +103,129 @@ export default function Messages() {
                     }
                 });
 
-                // 2. 🟢 Fetch Fresh Profiles (to get real S3 URLs)
+                // 3. 🟢 FIX: Fetch Profiles using correct REST endpoints (Matches Appointments.tsx logic)
                 const uniqueContactIds = Array.from(uniqueMap.keys());
                 const profiles = await Promise.all(
                     uniqueContactIds.map(id => {
-                        // Fetch from the source service to get the Presigned URL
-                        const endpoint = isDoctor ? `/register-patient?id=${id}` : `/register-doctor?id=${id}`;
+                        // Use standard GET endpoints, NOT /register-...
+                        const endpoint = isDoctor ? `/patients/${id}` : `/doctors/${id}`;
                         return api.get(endpoint).catch(() => null);
                     })
                 );
 
-                // 3. 🟢 Hydrate Map with real Avatars
+                // 4. Hydrate Map with real Avatars
                 profiles.forEach((p: any) => {
                     if (p) {
-                        const profileData = p.Item || p;
+                        const profileData = p.Item || p; // Handle DynamoDB wrapper if present
                         const pid = profileData.patientId || profileData.doctorId || profileData.id;
                         
                         if (uniqueMap.has(pid)) {
-    const contact = uniqueMap.get(pid)!;
-    contact.avatar = profileData.avatar || ""; 
-    // 🟢 Also get fresh specialization/role info
-    if (profileData.specialization) contact.specialization = profileData.specialization;
-    uniqueMap.set(pid, contact);
-}
+                            const contact = uniqueMap.get(pid)!;
+                            contact.avatar = profileData.avatar || ""; 
+                            if (profileData.specialization) contact.specialization = profileData.specialization;
+                            uniqueMap.set(pid, contact);
+                        }
                     }
                 });
 
-            // 5. Update State
-            const cleanContacts = Array.from(uniqueMap.values());
-            setContacts(cleanContacts);
+                // 5. Update State
+                setContacts(Array.from(uniqueMap.values()));
 
-            // 6. Handle URL Redirect
-            const targetAptId = searchParams.get("appointmentId");
-            if (targetAptId && rawList.length > 0) {
-                const targetApt = rawList.find((a: any) => a.appointmentId === targetAptId);
-                if (targetApt) {
-                    const personId = isDoctor ? targetApt.patientId : targetApt.doctorId;
-                    setSelectedRecipientId(personId);
+                // 6. Handle URL Redirect (e.g. clicking "Message" from Appointment Card)
+                const targetAptId = searchParams.get("appointmentId");
+                if (targetAptId && rawList.length > 0) {
+                    const targetApt = rawList.find((a: any) => a.appointmentId === targetAptId);
+                    if (targetApt) {
+                        const personId = isDoctor ? targetApt.patientId : targetApt.doctorId;
+                        setSelectedRecipientId(personId);
+                    }
                 }
+            } catch (error: any) {
+                console.error("Init Error:", error);
+                const msg = error?.message || String(error);
+
+                if (
+                    msg.includes('401') || 
+                    msg.includes('403') || 
+                    msg.includes('The user is not authenticated') 
+                ) {
+                    localStorage.clear();
+                    navigate("/auth");
+                }
+            } finally {
+                setLoadingContacts(false);
             }
-        } catch (error) {
-            console.error("Init Error:", error);
-        } finally {
-            setLoadingContacts(false);
+        };
+        init();
+    }, []);
+
+    // --- 🟢 REAL-TIME WEBSOCKET LISTENER ---
+    useEffect(() => {
+        // 1. Safety Guard
+        if (!currentUser || !selectedRecipientId) return;
+
+        // 🟢 FIX: REGIONAL LOGIC (Matches ConsultationRoom.tsx)
+        const userRegion = localStorage.getItem('userRegion') || 'US';
+        const wsBaseUrl = userRegion === 'EU' 
+            ? import.meta.env.VITE_COMMUNICATION_WS_URL_EU 
+            : import.meta.env.VITE_COMMUNICATION_WS_URL_US;
+
+        const token = getAuthToken();
+
+        // 2. Security Guard
+        if (!token) {
+            console.warn("⚠️ WebSocket: Auth token not found. Real-time messaging is disabled.");
+            return;
         }
-    };
-    init();
-}, []);
 
-// --- 🟢 REAL-TIME WEBSOCKET LISTENER ---
-useEffect(() => {
-    // 1. Safety Guard: Don't connect if we don't have a user or a selected chat
-    if (!currentUser || !selectedRecipientId) return;
+        if (!wsBaseUrl) {
+            console.error("❌ WebSocket: Endpoint URL is missing in .env configuration.");
+            return;
+        }
 
-    const wsUrl = import.meta.env.VITE_COMMUNICATION_WS_URL;
-    const token = getAuthToken();
+        console.log(`📡 Attempting Secure WebSocket Connection [${userRegion}]...`);
+        const socket = new WebSocket(`${wsBaseUrl}?token=${token}`);
 
-    // 2. Security Guard: If token is missing, don't attempt connection
-    // This prevents the wss://.../?token=null error in your console
-    if (!token) {
-        console.warn("⚠️ WebSocket: Auth token not found. Real-time messaging is disabled.");
-        return;
-    }
+        socket.onopen = () => {
+            console.log("✅ Secure WebSocket Connected");
+        };
 
-    console.log("📡 Attempting Secure WebSocket Connection...");
-    const socket = new WebSocket(`${wsUrl}?token=${token}`);
-
-    socket.onopen = () => {
-        console.log("✅ Secure WebSocket Connected");
-    };
-
-    socket.onmessage = (event) => {
-        try {
-            const data = JSON.parse(event.data);
-            
-            // 🟢 HIPAA Logic: Only display if the message belongs to the current conversation
-            // and the recipient matches our current view
-            if (data.type === "message" && data.senderId === selectedRecipientId) {
-                setMessages(prev => {
-                    const isDuplicate = prev.some(m => m.timestamp === data.timestamp && m.text === data.text);
-                    if (isDuplicate) return prev;
-                    return [...prev, data];
-                });
+        socket.onmessage = (event) => {
+            try {
+                const data = JSON.parse(event.data);
+                
+                // 🟢 HIPAA Logic: Only display if the message belongs to current view
+                if (data.type === "message" && data.senderId === selectedRecipientId) {
+                    setMessages(prev => {
+                        // Dedup based on timestamp + text
+                        const isDuplicate = prev.some(m => m.timestamp === data.timestamp && m.text === data.text);
+                        if (isDuplicate) return prev;
+                        return [...prev, data];
+                    });
+                }
+            } catch (err) {
+                console.error("❌ WS Message Parsing Error:", err);
             }
-        } catch (err) {
-            console.error("❌ WS Message Parsing Error:", err);
-        }
-    };
+        };
 
-    socket.onerror = (error) => {
-        console.error("❌ WebSocket Security/Network Error:", error);
-    };
+        socket.onerror = (error) => {
+            console.error("❌ WebSocket Security/Network Error:", error);
+        };
 
-    socket.onclose = (event) => {
-        if (event.code === 1008) { // Policy Violation (usually expired token)
-            console.error("❌ WebSocket: Policy Violation. Token likely expired.");
-        } else {
-            console.log("❌ WebSocket Connection Closed.");
-        }
-    };
+        socket.onclose = (event) => {
+            if (event.code === 1008) {
+                console.error("❌ WebSocket: Policy Violation. Token likely expired.");
+            } else {
+                console.log("❌ WebSocket Connection Closed.");
+            }
+        };
 
-    // 3. Cleanup: Close pipe when switching chats or leaving page
-    return () => {
-        if (socket.readyState === WebSocket.OPEN) {
-            socket.close();
-        }
-    };
-}, [currentUser, selectedRecipientId]);
+        return () => {
+            if (socket.readyState === WebSocket.OPEN) {
+                socket.close();
+            }
+        };
+    }, [currentUser, selectedRecipientId]);
 
     // --- 2. UPDATE ACTIVE CONTACT METADATA ---
     useEffect(() => {
@@ -223,14 +235,13 @@ useEffect(() => {
         }
     }, [selectedRecipientId, contacts]);
 
-    // --- 3. LOAD HISTORY (Single Thread API) ---
+    // --- 3. LOAD HISTORY ---
     useEffect(() => {
         if (!selectedRecipientId) return;
 
         const loadHistory = async () => {
             setLoadingMessages(true);
             try {
-                // 🟢 UPDATED API CALL: Uses recipientId, not conversationId/appointmentId
                 const history: any = await api.get(`/chat/history?recipientId=${selectedRecipientId}`);
                 setMessages(history); 
             } catch (error) {
@@ -254,20 +265,20 @@ useEffect(() => {
         try {
             // Optimistic UI Update
             const tempMsg: Message = {
-    senderId: currentUser.id,
-    text: inputMessage,
-    timestamp: new Date().toISOString(),
-    isOptimistic: true // Custom flag
-};
-setMessages(prev => [...prev, tempMsg]);
+                senderId: currentUser.id,
+                text: inputMessage,
+                timestamp: new Date().toISOString(),
+                isOptimistic: true
+            };
+            setMessages(prev => [...prev, tempMsg]);
+            
             const msgToSend = inputMessage;
             setInputMessage(""); // Clear input immediately
 
-            // 🟢 UPDATED PAYLOAD: Matches chat.controller.ts logic
             await api.post('/chat/ws-event', {
                 routeKey: "sendMessage",
                 body: {
-                    recipientId: selectedRecipientId, // Target Person
+                    recipientId: selectedRecipientId,
                     text: msgToSend
                 }
             });
@@ -289,7 +300,7 @@ setMessages(prev => [...prev, tempMsg]);
         >
             <div className="h-[calc(100vh-12rem)] min-h-[600px] flex rounded-xl overflow-hidden border border-border/50 bg-card shadow-sm animate-fade-in">
                 
-                {/* LEFT: CONTACT LIST (DEDUPLICATED) */}
+                {/* LEFT: CONTACT LIST */}
                 <div className={cn(
                     "w-full md:w-80 border-r border-border/50 bg-slate-50/50 flex flex-col",
                     selectedRecipientId ? "hidden md:flex" : "flex"
@@ -368,7 +379,6 @@ setMessages(prev => [...prev, tempMsg]);
                                     </div>
                                 </div>
                                 <div className="flex gap-2">
-                                    {/* Video Call links to generic consultation page, not tied to Appointment ID anymore */}
                                     <Button variant="outline" size="sm" onClick={() => navigate(`/consultation?patientName=${activeContact.name}`)}>
                                         <Video className="h-4 w-4 mr-2" /> 
                                         Video Call
@@ -391,7 +401,6 @@ setMessages(prev => [...prev, tempMsg]);
                                     <div className="space-y-4">
                                         {messages.map((msg, idx) => {
                                             const isMe = msg.senderId === currentUser.id;
-                                            // Handle FHIR structure or flattened structure from AWS
                                             const content = msg.resource?.payload?.[0]?.contentString || msg.text || "";
                                             const displayTime = msg.timestamp ? new Date(msg.timestamp).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : "";
                                             

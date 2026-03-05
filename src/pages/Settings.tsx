@@ -80,9 +80,9 @@ export default function Settings() {
             const cognitoPhone = userAttrs?.phone_number || "";
             setUserId(authUser.userId);
 
-            const endpoint = userRole === 'doctor'
-                ? `/register-doctor?id=${authUser.userId}`
-                : `/register-patient?id=${authUser.userId}`;
+            const endpoint = userRole === 'doctor' 
+    ? `/doctors/${authUser.userId}` 
+    : `/patients/${authUser.userId}`;
 
             const data: any = await api.get(endpoint);
             if (data) {
@@ -126,9 +126,25 @@ export default function Settings() {
                     if (isMounted.current) setCalendarConnected(calStatus.connected);
                 } catch (e) { console.error("Schedule/Calendar load error", e); }
             }
-        } catch (error) {
-            console.error("Profile load failed:", error);
-            if (isMounted.current) toast({ variant: "destructive", title: "Error loading profile" });
+        } catch (error: any) {
+        console.error("Operation failed:", error);
+        const msg = error?.message || String(error);
+        
+        // 🟢 STANDARD AUTH RULE
+        if (msg.includes('401') || msg.includes('403') || msg.includes('The user is not authenticated')) {
+            localStorage.clear();
+            navigate("/auth");
+            return;
+        }
+        
+        // If it's a 404 on the PROFILE, that's also a security issue
+        if (msg.includes('404')) {
+            localStorage.clear();
+            navigate("/auth");
+            return;
+        }
+
+        toast({ variant: "destructive", title: "Error", description: "Operation failed. Please try again." });
         } finally {
             if (isMounted.current) setIsLoading(false);
         }
@@ -155,35 +171,44 @@ export default function Settings() {
     };
 
     const handleSave = async () => {
-        setIsSaving(true);
-        try {
-            const basePayload = {
-                name: formData.name, phone: formData.phone,
-                avatar: formData.avatar, preferences, address: formData.address
-            };
+    setIsSaving(true);
+    try {
+        // Base payload for both roles
+        const basePayload = {
+            name: formData.name, 
+            phone: formData.phone,
+            avatar: formData.avatar, 
+            preferences, 
+            address: formData.address
+        };
 
-            let profileReq;
-            if (userRole === 'doctor') {
-                profileReq = api.put(`/doctors/${userId}`, {
-                    ...basePayload, doctorId: userId,
-                    specialization: formData.specialization, consultationFee: formData.consultationFee, bio: formData.bio,
-                });
-            } else {
-                profileReq = api.put(`/patients/${userId}`, { ...basePayload, userId: userId });
-            }
+        let profileReq;
+        if (userRole === 'doctor') {
+            profileReq = api.put(`/doctors/${userId}`, {
+                ...basePayload, 
+                doctorId: userId,
+                specialization: formData.specialization, 
+                bio: formData.bio,
+                // 🟢 RULE: Removed consultationFee. Only the backend sets the price.
+            });
+        } else {
+            profileReq = api.put(`/patients/${userId}`, { ...basePayload, userId: userId });
+        }
 
-            const promises = [profileReq];
+        const promises = [profileReq];
 
-            if (userRole === 'doctor') {
-                const finalSchedule: any = {};
-                DAYS.forEach(day => {
-                    const dayData = weeklySchedule[day] || { active: false, start: "09:00", end: "17:00" };
-                    finalSchedule[day] = dayData.active ? `${dayData.start}-${dayData.end}` : "OFF";
-                });
-                promises.push(api.post(`/doctors/${userId}/schedule`, { schedule: finalSchedule }));
-            }
+        if (userRole === 'doctor') {
+            const finalSchedule: any = {};
+            DAYS.forEach(day => {
+                const dayData = weeklySchedule[day] || { active: false, start: "09:00", end: "17:00" };
+                finalSchedule[day] = dayData.active ? `${dayData.start}-${dayData.end}` : "OFF";
+            });
+            
+            // 🟢 FIX: Changed .post to .put to match backend controller logic
+            promises.push(api.put(`/doctors/${userId}/schedule`, { schedule: finalSchedule }));
+        }
 
-            await Promise.all(promises);
+        await Promise.all(promises);
 
             const updatedUser = { ...localUser, name: formData.name, avatar: formData.avatar, role: userRole };
             localStorage.setItem('user', JSON.stringify(updatedUser));
@@ -191,9 +216,25 @@ export default function Settings() {
             window.dispatchEvent(new Event("storage"));
 
             toast({ title: "Settings Saved", description: "Your profile has been updated." });
-        } catch (error) {
-            console.error("Save error:", error);
-            toast({ variant: "destructive", title: "Save Failed", description: "Could not update profile." });
+        } catch (error: any) {
+        console.error("Operation failed:", error);
+        const msg = error?.message || String(error);
+        
+        // 🟢 STANDARD AUTH RULE
+        if (msg.includes('401') || msg.includes('403') || msg.includes('The user is not authenticated')) {
+            localStorage.clear();
+            navigate("/auth");
+            return;
+        }
+        
+        // If it's a 404 on the PROFILE, that's also a security issue
+        if (msg.includes('404')) {
+            localStorage.clear();
+            navigate("/auth");
+            return;
+        }
+
+        toast({ variant: "destructive", title: "Error", description: "Operation failed. Please try again." });
         } finally {
             setIsSaving(false);
         }

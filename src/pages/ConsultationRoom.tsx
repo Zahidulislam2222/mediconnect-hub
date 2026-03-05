@@ -73,11 +73,14 @@ export default function ConsultationRoom() {
       try {
         const session = await fetchAuthSession();
         const token = session.tokens?.idToken?.toString();
-
         if (!token) throw new Error("Authentication token missing");
 
-        // WSS Protocol ensures TLS encryption (HIPAA requirement for transit)
-        const wsUrl = `${import.meta.env.VITE_COMMUNICATION_WS_URL}?token=${token}&appointmentId=${appointmentId}`;
+        const userRegion = localStorage.getItem('userRegion') || 'US';
+        const wsBaseUrl = userRegion === 'EU' 
+            ? import.meta.env.VITE_COMMUNICATION_WS_URL_EU 
+            : import.meta.env.VITE_COMMUNICATION_WS_URL_US; 
+
+        const wsUrl = `${wsBaseUrl}?token=${token}&appointmentId=${appointmentId}`;
         ws = new WebSocket(wsUrl);
         socketRef.current = ws;
 
@@ -326,10 +329,20 @@ export default function ConsultationRoom() {
 
     } catch (error: any) {
       console.error("Join Error:", error);
+      const msg = error?.message || String(error);
+      
+      // 🟢 ADDED AUTH RULE
+      if (msg.includes('401') || msg.includes('403') || msg.includes('The user is not authenticated')) {
+        localStorage.clear();
+        navigate("/auth");
+        return;
+      }
+
       toast({ variant: "destructive", title: "Connection Failed", description: "Could not establish secure link." });
     } finally {
       setIsJoining(false);
     }
+    
 
   };
 
@@ -522,7 +535,16 @@ export default function ConsultationRoom() {
                               });
                               toast({ title: "Clinical Note Saved", description: "AI Summary added to EHR." });
                               setActiveTab("scribe");
-                            } catch (e) {
+                            } catch (error: any) {
+                              const msg = error?.message || String(error);
+                              
+                              // 🟢 ADDED AUTH RULE
+                              if (msg.includes('401') || msg.includes('403')) {
+                                localStorage.clear();
+                                navigate("/auth");
+                                return;
+                              }
+
                               toast({ variant: "destructive", title: "Summary Failed" });
                             } finally {
                               setIsJoining(false);

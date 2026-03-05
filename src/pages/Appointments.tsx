@@ -97,15 +97,21 @@ function AppointmentsContent() {
                 const json: any = await api.get('/doctors');
                 if (json.doctors) setDoctors(json.doctors);
                 else if (Array.isArray(json)) setDoctors(json);
-            } catch (e) { console.error("Doctor Directory Error:", e); }
+            } catch (e: any) { 
+                console.error("Doctor Directory Error:", e);
+
+                if (e.message?.includes('401') || e.message?.includes('403')) {
+                    localStorage.clear();
+                    navigate("/auth");
+                }
+            }
         }
 
         async function getUser() {
             try {
-                const attr = await fetchUserAttributes();
+                const attr = await fetchUserAttributes(); // Throws error if session is dead
                 let u = { id: attr.sub, name: attr.name || attr.email, avatar: "" };
 
-                // 🟢 ENDPOINT FIX: Using correct RESTful route for Patient Profile
                 try {
                     const data: any = await api.get(`/patients/${attr.sub}`);
                     if (data.avatar) u.avatar = data.avatar;
@@ -115,11 +121,17 @@ function AppointmentsContent() {
                 setUser(u);
                 localStorage.setItem('user', JSON.stringify({ ...JSON.parse(localStorage.getItem('user') || '{}'), ...u }));
                 await fetchAppointments(u.id);
-            } catch (e) { }
+            } catch (e) {
+
+                console.error("Session Expired or Auth Error", e);
+                localStorage.clear();
+                navigate("/auth"); 
+            }
         }
+        
         getUser();
         fetchDoctors();
-    }, []);
+    }, [navigate]); 
 
     // --- SMART SCHEDULE LOGIC ---
     useEffect(() => {
