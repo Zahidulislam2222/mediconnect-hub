@@ -7,15 +7,19 @@ const CONFIG = {
 
 function getServiceConfig(endpoint: string) {
     const userRegion = localStorage.getItem('userRegion') || 'US';
+    const userRole = localStorage.getItem('userRole') || ''; // 🟢 ADDED: Get user role
     const isEU = userRegion === 'EU';
 
     let primary = '';
     let backup = '';
 
+    const isDoctorVerification = endpoint.startsWith('/verify-identity') && (userRole === 'doctor' || userRole === 'provider');
+
     // 1. Patient & IoT Service
     if (
+        (!isDoctorVerification && endpoint.startsWith('/verify-identity')) || 
         endpoint.startsWith('/patients') || endpoint.startsWith('/register-patient') ||
-        endpoint.startsWith('/verify-identity') || endpoint.startsWith('/public') ||
+        endpoint.startsWith('/public') ||
         endpoint.startsWith('/vitals') || endpoint.startsWith('/emergency') || endpoint.startsWith('/stats') || endpoint.startsWith('/search')
     ) {
         primary = isEU ? import.meta.env.VITE_PATIENT_SERVICE_URL_EU : import.meta.env.VITE_PATIENT_SERVICE_URL_US;
@@ -23,6 +27,7 @@ function getServiceConfig(endpoint: string) {
     }
     // 2. Doctor & Clinical Service
     else if (
+        isDoctorVerification || 
         endpoint.startsWith('/doctors') || endpoint.startsWith('/register-doctor') ||
         endpoint.startsWith('/prescription') || endpoint.startsWith('/prescriptions') || 
         endpoint.startsWith('/pharmacy') || endpoint.startsWith('/ehr') || endpoint.startsWith('/relationships')
