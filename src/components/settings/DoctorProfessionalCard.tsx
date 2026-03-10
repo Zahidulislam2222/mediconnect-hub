@@ -67,17 +67,20 @@ export const DoctorProfessionalCard: React.FC<DoctorProfessionalCardProps> = ({
                     {/* Consultation Fee - GDPR Financial Transparency */}
                     <div className="space-y-2">
                         <Label htmlFor="fee">Consultation Fee ($)</Label>
-                        <div className="relative">
+                        <div className="relative group">
                             <DollarSign className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
                             <Input
                                 id="fee"
-                                type="number"
-                                className="pl-9 focus-visible:ring-primary"
+                                className="pl-9 bg-muted/50 cursor-not-allowed text-muted-foreground border-dashed"
                                 value={formData.consultationFee}
-                                onChange={(e) => setFormData({ ...formData, consultationFee: e.target.value })}
-                                placeholder="150"
+                                readOnly // 🟢 Prevents typing
+                                placeholder="50"
                             />
+                            <Lock className="absolute right-3 top-2.5 h-4 w-4 text-muted-foreground/50" /> 
                         </div>
+                        <p className="text-[10px] text-muted-foreground mt-1 px-1">
+                            Standard platform rate. Only administrators can modify this value.
+                        </p>
                     </div>
 
                     {/* License Number - IMMUTABLE (Security/HIPAA Guard) */}

@@ -15,6 +15,8 @@ interface IdentityVerificationProps {
   imageProcessing: boolean;
   verificationStatus: "idle" | "verifying" | "success" | "failed";
   statusMessage: string;
+  gender: string;                          
+  setGender: (value: string) => void;
   handleSkip: () => void;
 }
 
@@ -28,6 +30,8 @@ export const IdentityVerification: React.FC<IdentityVerificationProps> = ({
   imageProcessing,
   verificationStatus,
   statusMessage,
+  gender,    
+  setGender,
   handleSkip
 }) => {
   const [biometricConsent, setBiometricConsent] = useState(false);
@@ -144,11 +148,28 @@ export const IdentityVerification: React.FC<IdentityVerificationProps> = ({
             <AlertTriangle className="h-4 w-4" /> Verification Failed. Please retry.
           </div>
         )}
+        {(selfieImage && idImage && biometricConsent) && (
+          <div className="space-y-2 mt-4 animate-in fade-in zoom-in duration-300">
+            <Label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground ml-1">
+              Confirm Gender (Required for Clinical Accuracy)
+            </Label>
+            <select 
+              value={gender} 
+              onChange={(e) => setGender(e.target.value)}
+              className="w-full h-10 px-3 rounded-md border border-input bg-background text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+            >
+              <option value="unknown" disabled>Select Gender...</option>
+              <option value="male">Male</option>
+              <option value="female">Female</option>
+              <option value="other">Other / Non-binary</option>
+            </select>
+          </div>
+        )}
 
         <Button
           onClick={handleSubmitIdentity}
           className="w-full bg-primary hover:bg-primary/90 shadow-md"
-          disabled={loading || imageProcessing || !selfieImage || !idImage || !biometricConsent} 
+          disabled={loading || imageProcessing || !selfieImage || !idImage || !biometricConsent || gender === "unknown"} 
         >
           {loading ? (
             <div className="flex items-center gap-2">

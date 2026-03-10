@@ -70,6 +70,7 @@ export default function Auth() {
 
   const [selfieImage, setSelfieImage] = useState<string | null>(null);
   const [idImage, setIdImage] = useState<string | null>(null);
+  const [gender, setGender] = useState("unknown");
   const [verificationStatus, setVerificationStatus] = useState<"idle" | "verifying" | "success" | "failed">("idle");
   const [statusMessage, setStatusMessage] = useState("");
   const [diplomaFile, setDiplomaFile] = useState<File | null>(null);
@@ -390,7 +391,7 @@ export default function Auth() {
     try {
 
       const user = await getCurrentUser();
-      const payload = { selfieImage, idImage };
+      const payload = { selfieImage, idImage, gender };
 
       const endpoint = userType === 'provider' 
         ? `/doctors/${user.userId}/verify-identity` 
@@ -521,7 +522,7 @@ export default function Auth() {
           )}
 
           {authStep === "identity" && (
-            <IdentityVerification selfieImage={selfieImage} idImage={idImage} handleFileChange={handleFileChange} handleSubmitIdentity={handleSubmitIdentity} loading={loading} imageProcessing={imageProcessing} verificationStatus={verificationStatus} statusMessage={statusMessage} handleSkip={handleSkip} />
+            <IdentityVerification selfieImage={selfieImage} idImage={idImage} handleFileChange={handleFileChange} handleSubmitIdentity={handleSubmitIdentity} loading={loading} imageProcessing={imageProcessing} verificationStatus={verificationStatus} statusMessage={statusMessage} gender={gender} setGender={setGender} handleSkip={handleSkip} />
           )}
 
           {authStep === "diploma-upload" && (

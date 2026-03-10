@@ -309,22 +309,23 @@ export default function Settings() {
     };
 
     const handleDeleteAccount = async () => {
-    const confirm = window.confirm("Are you absolutely sure? This cannot be undone.");
-    if (!confirm) return;
+        const confirm = window.confirm("Are you absolutely sure? This cannot be undone.");
+        if (!confirm) return;
 
-    try {
-        if (userRole === 'patient') {
-            await api.delete('/me');
-            toast({ title: "Account Deleted", description: "Your identity has been erased." });
-            handleLogout(); // Clean up local storage and redirect
-        } else {
-            // Doctors send a request or call the delete endpoint if allowed
-            toast({ title: "Request Sent", description: "Admin will review your closure request." });
+        try {
+            if (userRole === 'patient') {
+                await api.delete('/me');
+                toast({ title: "Account Deleted", description: "Your identity has been erased." });
+                handleLogout(); 
+            } else {
+                // 🟢 PROFESSIONAL FIX: Actually call the backend to trigger the SNS Email!
+                await api.post(`/doctors/${userId}/request-closure`, {});
+                toast({ title: "Request Sent", description: "Admin will review your closure request." });
+            }
+        } catch (e) {
+            toast({ variant: "destructive", title: "Error", description: "Could not complete deletion." });
         }
-    } catch (e) {
-        toast({ variant: "destructive", title: "Error", description: "Could not complete deletion." });
-    }
-};
+    };
 
     return (
         <DashboardLayout
