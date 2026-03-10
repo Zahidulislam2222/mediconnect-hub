@@ -183,9 +183,9 @@ export default function Settings() {
         setIsSaving(true);
         try {
             const session = await fetchAuthSession();
-            let finalAvatarKey = null;
+            let finalAvatarKey = avatarFile ? "" : rawAvatarKey;
 
-            // 🟢 1. PROFESSIONAL S3 UPLOAD (If a new file was selected)
+            // 🟢 1. PROFESSIONAL S3 UPLOAD
             if (avatarFile) {
                 const resources = getRegionalResources();
                 const s3Client = new S3Client({ 
@@ -195,21 +195,21 @@ export default function Settings() {
 
                 const fileExt = avatarFile.name.split('.').pop();
                 const folder = userRole === 'doctor' ? 'doctor' : 'patient';
-                const key = `${folder}/${userId}/profile_picture.${fileExt}`;
+                
+                // Define key here and immediately assign it to finalAvatarKey
+                const newKey = `${folder}/${userId}/profile_picture.${fileExt}`;
+                finalAvatarKey = newKey; 
 
                 await s3Client.send(new PutObjectCommand({
                     Bucket: userRole === 'doctor' ? resources.buckets.doctor : resources.buckets.patient,
-                    Key: key,
+                    Key: newKey, // 🟢 Use newKey
                     Body: new Uint8Array(await avatarFile.arrayBuffer()),
                     ContentType: avatarFile.type,
-                    // 🟢 Law 2026: Tag as biometric so lifecycle rule can purge it if needed
                     Tagging: "DataType=Biometric" 
                 }));
-
-                finalAvatarKey = key; 
             }
 
-            // 🟢 2. Build Payload Smartly (To avoid overwriting with expired URLs)
+            // 🟢 2. SAVE PROFILE 
             const basePayload: any = {
                 name: formData.name, 
                 phone: formData.phone,
@@ -234,7 +234,7 @@ export default function Settings() {
                 profileReq = api.put(`/patients/${userId}`, { ...basePayload, userId: userId });
             }
 
-            const promises = [profileReq];
+            const promises =[profileReq];
 
             // 🟢 3. Handle Doctor Schedule
             if (userRole === 'doctor') {
@@ -243,7 +243,6 @@ export default function Settings() {
                     const dayData = weeklySchedule[day] || { active: false, start: "09:00", end: "17:00" };
                     finalSchedule[day] = dayData.active ? `${dayData.start}-${dayData.end}` : "OFF";
                 });
-                // Standardized to PUT to match professional backend update
                 promises.push(api.put(`/doctors/${userId}/schedule`, { schedule: finalSchedule }));
             }
 
@@ -253,7 +252,6 @@ export default function Settings() {
             const updatedUser = { 
                 ...localUser, 
                 name: formData.name, 
-                // Only update local avatar string if we have a new local preview
                 avatar: avatarFile ? formData.avatar : localUser.avatar, 
                 role: userRole 
             };
@@ -263,7 +261,7 @@ export default function Settings() {
             window.dispatchEvent(new Event("storage"));
 
             toast({ title: "Settings Saved", description: "Your profile has been updated." });
-            setAvatarFile(null); // Clear pending file after success
+            setAvatarFile(null); 
             
         } catch (error: any) {
             console.error("Operation failed:", error);
