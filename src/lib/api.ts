@@ -7,18 +7,27 @@ const CONFIG = {
 
 function getServiceConfig(endpoint: string) {
     const userRegion = localStorage.getItem('userRegion') || 'US';
-    const userRole = localStorage.getItem('userRole') || ''; // 🟢 ADDED: Get user role
+    
+    // 🟢 PROFESSIONAL FIX: Extract role correctly from the serialized user object
+    let userRole = '';
+    try {
+        const userStr = localStorage.getItem('user');
+        if (userStr) {
+            userRole = JSON.parse(userStr).role || '';
+        }
+    } catch (e) {
+        console.error("Failed to parse user session for routing");
+    }
+
     const isEU = userRegion === 'EU';
 
     let primary = '';
     let backup = '';
 
-    const isDoctorVerification = endpoint.startsWith('/verify-identity') && (userRole === 'doctor' || userRole === 'provider');
-
     // 1. Patient & IoT Service
     if (
-        (!isDoctorVerification && endpoint.startsWith('/verify-identity')) || 
-        endpoint.startsWith('/patients') || endpoint.startsWith('/register-patient') ||
+        endpoint.startsWith('/patients') || 
+        endpoint.startsWith('/register-patient') ||
         endpoint.startsWith('/public') ||
         endpoint.startsWith('/vitals') || endpoint.startsWith('/emergency') || endpoint.startsWith('/stats') || endpoint.startsWith('/search')
     ) {
@@ -27,8 +36,8 @@ function getServiceConfig(endpoint: string) {
     }
     // 2. Doctor & Clinical Service
     else if (
-        isDoctorVerification || 
-        endpoint.startsWith('/doctors') || endpoint.startsWith('/register-doctor') ||
+        endpoint.startsWith('/doctors') || 
+        endpoint.startsWith('/register-doctor') ||
         endpoint.startsWith('/prescription') || endpoint.startsWith('/prescriptions') || 
         endpoint.startsWith('/pharmacy') || endpoint.startsWith('/ehr') || endpoint.startsWith('/relationships')
     ) {

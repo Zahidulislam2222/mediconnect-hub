@@ -388,8 +388,16 @@ export default function Auth() {
     setLoading(true);
     setVerificationStatus("verifying");
     try {
+
+      const user = await getCurrentUser();
       const payload = { selfieImage, idImage };
-      const data = await api.post('/verify-identity', payload);
+
+      const endpoint = userType === 'provider' 
+        ? `/doctors/${user.userId}/verify-identity` 
+        : `/patients/${user.userId}/verify-identity`; 
+
+      const data = await api.post(endpoint, payload);
+
       if (data.verified) {
         setVerificationStatus("success");
         const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
@@ -401,8 +409,12 @@ export default function Auth() {
         setVerificationStatus("failed");
         toast({ variant: "destructive", title: "Verification Failed", description: data.message });
       }
-    } catch (error) { setVerificationStatus("failed"); toast({ variant: "destructive", title: "System Error", description: "Service unavailable." }); }
-    finally { setLoading(false); }
+    } catch (error) { 
+      setVerificationStatus("failed"); 
+      toast({ variant: "destructive", title: "System Error", description: "Service unavailable." }); 
+    } finally { 
+      setLoading(false); 
+    }
   };
 
   const handleDiplomaUpload = async () => {
@@ -417,7 +429,7 @@ export default function Auth() {
       await api.get(userType === 'provider' ? `/doctors/${user.userId}` : `/patients/${user.userId}`);
 
       const resources = getRegionalResources();
-      const targetBucket = resources.buckets.credentials;
+      const targetBucket = resources.buckets.doctor; // 🟢 Unified Doctor Bucket
       
       const s3Client = new S3Client({ 
         region: resources.region, 
@@ -425,7 +437,8 @@ export default function Auth() {
       });
 
       const fileExtension = diplomaFile.name.split('.').pop();
-      const fileName = `doctor/${user.userId}/id_card.${fileExtension}`;
+      // 🟢 Professionally named and placed in the unified folder
+      const fileName = `doctor/${user.userId}/diploma.${fileExtension}`;
 
       const fileBuffer = new Uint8Array(await diplomaFile.arrayBuffer());
       
