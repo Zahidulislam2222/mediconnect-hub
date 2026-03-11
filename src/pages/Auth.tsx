@@ -420,6 +420,18 @@ export default function Auth() {
 
   const handleDiplomaUpload = async () => {
     if (!diplomaFile) return;
+
+    // 🟢 SECURITY FIX 1: Strict File Type & Size Validation (Max 5MB)
+    const allowedTypes =['application/pdf', 'image/jpeg', 'image/png'];
+    if (!allowedTypes.includes(diplomaFile.type)) {
+      toast({ variant: "destructive", title: "Security Block", description: "Only PDF, JPG, and PNG files are permitted." });
+      return;
+    }
+    if (diplomaFile.size > 5 * 1024 * 1024) {
+      toast({ variant: "destructive", title: "File Too Large", description: "Maximum file size is 5MB." });
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -427,10 +439,11 @@ export default function Auth() {
       const session = await fetchAuthSession();
       if (!session.credentials) throw new Error("No AWS credentials.");
 
+      // 🟢 Confirm the user still exists in the DB (Addresses Question 2)
       await api.get(userType === 'provider' ? `/doctors/${user.userId}` : `/patients/${user.userId}`);
 
       const resources = getRegionalResources();
-      const targetBucket = resources.buckets.doctor; // 🟢 Unified Doctor Bucket
+      const targetBucket = resources.buckets.doctor; 
       
       const s3Client = new S3Client({ 
         region: resources.region, 
@@ -438,16 +451,17 @@ export default function Auth() {
       });
 
       const fileExtension = diplomaFile.name.split('.').pop();
-      // 🟢 Professionally named and placed in the unified folder
       const fileName = `doctor/${user.userId}/diploma.${fileExtension}`;
 
       const fileBuffer = new Uint8Array(await diplomaFile.arrayBuffer());
       
+      // 🟢 SECURITY FIX 2: Add metadata tags for AWS Macie / Antivirus tracking
       await s3Client.send(new PutObjectCommand({ 
         Bucket: targetBucket, 
         Key: fileName, 
         Body: fileBuffer, 
-        ContentType: diplomaFile.type 
+        ContentType: diplomaFile.type,
+        Tagging: "ScanStatus=Pending" 
       }));
 
       toast({ title: "Scanning", description: "AI is verifying your diploma..." });
@@ -473,8 +487,21 @@ export default function Auth() {
   };
 
   const handleSkip = () => {
+    // 🟢 SECURITY FIX: Completely disable this button in Production!
+    if (import.meta.env.MODE === 'production' || import.meta.env.PROD) {
+      toast({ variant: "destructive", title: "Action Blocked", description: "Demo mode is disabled in production." });
+      return;
+    }
+
     const role = userType === 'provider' ? 'doctor' : 'patient';
-    localStorage.setItem('user', JSON.stringify({ name: name || "Demo User", email: email || "demo@local", role, isIdentityVerified: true, identityStatus: 'VERIFIED', verificationStatus: 'APPROVED' }));
+    localStorage.setItem('user', JSON.stringify({ 
+        name: name || "Demo User", 
+        email: email || "demo@local", 
+        role, 
+        isIdentityVerified: true, 
+        identityStatus: 'VERIFIED', 
+        verificationStatus: 'APPROVED' 
+    }));
     localStorage.setItem('access_token', 'demo-token-bypass');
     role === 'doctor' ? navigate("/doctor-dashboard") : navigate("/patient-dashboard");
     toast({ title: "Demo Mode", description: "Verification bypassed." });
