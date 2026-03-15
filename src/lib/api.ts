@@ -29,7 +29,8 @@ function getServiceConfig(endpoint: string) {
         endpoint.startsWith('/patients') || 
         endpoint.startsWith('/register-patient') ||
         endpoint.startsWith('/public') ||
-        endpoint.startsWith('/vitals') || endpoint.startsWith('/emergency') || endpoint.startsWith('/stats') || endpoint.startsWith('/search')
+        endpoint.startsWith('/vitals') || endpoint.startsWith('/emergency') || endpoint.startsWith('/stats') || endpoint.startsWith('/search') ||
+        endpoint.startsWith('/upload-scan')
     ) {
         primary = isEU ? import.meta.env.VITE_PATIENT_SERVICE_URL_EU : import.meta.env.VITE_PATIENT_SERVICE_URL_US;
         backup = isEU ? import.meta.env.VITE_PATIENT_SERVICE_URL_EU_BACKUP : import.meta.env.VITE_PATIENT_SERVICE_URL_US_BACKUP;
@@ -93,7 +94,10 @@ async function fetchWithTimeout(url: string, options: any, timeoutMs: number) {
 }
 
 async function request(endpoint: string, method: string, body?: any) {
-    const headers: HeadersInit = { 'Content-Type': 'application/json' };
+    // 🟢 PROFESSIONAL FIX: Support binary file uploads (FormData) vs JSON
+    const isFormData = body instanceof FormData;
+    const headers: HeadersInit = isFormData ? {} : { 'Content-Type': 'application/json' };
+    
     try {
         const session = await fetchAuthSession();
         const token = session.tokens?.idToken?.toString();
@@ -110,14 +114,13 @@ async function request(endpoint: string, method: string, body?: any) {
     const cleanEndpoint = endpoint.replace(/^\//, '');
     const primaryUrl = `${primary.replace(/\/$/, '')}/${cleanEndpoint}`;
     
-    // 🟢 AI TIMEOUT LOGIC
-    const isAiRoute = endpoint.startsWith('/ai') || endpoint.startsWith('/analyze-image');
-    const primaryTimeout = isAiRoute ? 20000 : CONFIG.PRIMARY_TIMEOUT_MS;
+    const isAiRoute = endpoint.startsWith('/ai') || endpoint.startsWith('/analyze-image') || endpoint.startsWith('/upload-scan');
+    const primaryTimeout = isAiRoute ? 30000 : CONFIG.PRIMARY_TIMEOUT_MS; // 🟢 Increased timeout for heavy DICOMs
 
     const fetchOptions = {
         method,
         headers,
-        body: body ? JSON.stringify(body) : undefined,
+        body: isFormData ? body : (body ? JSON.stringify(body) : undefined), 
     };
 
     try {

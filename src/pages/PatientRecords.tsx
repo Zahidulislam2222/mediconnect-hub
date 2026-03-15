@@ -587,8 +587,17 @@ export default function PatientRecords() {
                                                                     className="absolute inset-0 bg-black/5 rounded-xl opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity cursor-pointer"
                                                                     onClick={() => {
                                                                         if (doc.type === 'NOTE') {
-                                                                            setSelectedNote(doc); // This passes the data to the Dialog
+                                                                            setSelectedNote(doc); 
                                                                             setIsModalOpen(true);
+                                                                        } else if (doc.type === 'IMAGING_STUDY') {
+                                                                            // 🟢 NEW: View DICOM Thumbnail from FHIR Resource
+                                                                            // The Python script saves the S3 URL in endpoint[1]
+                                                                            const thumbUrl = doc.resource?.endpoint?.[1]?.reference;
+                                                                            if (thumbUrl) {
+                                                                                window.open(thumbUrl, '_blank');
+                                                                            } else {
+                                                                                toast({ variant: "destructive", title: "Not Found", description: "Thumbnail generation failed for this scan." });
+                                                                            }
                                                                         } else if (doc.s3Url) {
                                                                             window.open(doc.s3Url, '_blank');
                                                                         }

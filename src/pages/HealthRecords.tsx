@@ -47,6 +47,7 @@ export default function HealthRecords() {
 
   const vaultInputRef = useRef<HTMLInputElement>(null); // New (for Vault)
   const [isUploading, setIsUploading] = useState(false);
+  const dicomInputRef = useRef<HTMLInputElement>(null);
 
   // --- STATE ---
   const [user, setUser] = useState<any>(() => {
@@ -267,6 +268,38 @@ export default function HealthRecords() {
     }
   };
 
+  const handleDicomUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files || !e.target.files[0]) return;
+    const file = e.target.files[0];
+    
+    if (!file.name.toLowerCase().endsWith('.dcm')) {
+        toast({ variant: "destructive", title: "Invalid File", description: "Please select a valid .dcm DICOM file." });
+        return;
+    }
+
+    setIsUploading(true);
+    toast({ title: "Uploading Scan", description: "Transmitting to HIPAA-compliant clinical engine..." });
+
+    try {
+      const formData = new FormData();
+      formData.append('dicom', file);
+
+      // This hits PatientService -> which streams to Python DicomService
+      const res: any = await api.post('/upload-scan', formData);
+      
+      toast({ title: "PACS Storage Complete", description: "DICOM scan processed and mapped to FHIR successfully." });
+      
+      // Refresh the list to show the new FHIR ImagingStudy
+      loadData();
+    } catch (error) {
+      console.error("DICOM Upload Error:", error);
+      toast({ variant: "destructive", title: "Processing Failed", description: "Could not parse DICOM metadata." });
+    } finally {
+      setIsUploading(false);
+      if (dicomInputRef.current) dicomInputRef.current.value = "";
+    }
+  };
+
   return (
     <DashboardLayout
       title="Health Records"
@@ -354,6 +387,26 @@ export default function HealthRecords() {
                       )}
                       Upload Record
                     </Button>
+                    <div className="flex items-center gap-2">
+                    <Badge variant="outline" className="bg-blue-100 text-blue-700 border-blue-200 hidden sm:flex">
+                      AES-256
+                    </Badge>
+
+                    {/* EXISTING BUTTON */}
+                    <Button size="sm" variant="outline" onClick={() => vaultInputRef.current?.click()} disabled={isUploading}>
+                      {isUploading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Plus className="h-4 w-4 mr-2" />}
+                      Add Document
+                    </Button>
+
+                    {/* 🟢 NEW DICOM BUTTON */}
+                    <Button size="sm" onClick={() => dicomInputRef.current?.click()} disabled={isUploading} className="bg-indigo-600 hover:bg-indigo-700">
+                      {isUploading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <ScanLine className="h-4 w-4 mr-2" />}
+                      Upload DICOM
+                    </Button>
+
+                    <input type="file" ref={vaultInputRef} className="hidden" onChange={handleVaultUpload} />
+                    <input type="file" ref={dicomInputRef} className="hidden" accept=".dcm" onChange={handleDicomUpload} />
+                  </div>
 
                     {/* 🟢 HIDDEN INPUT FOR VAULT */}
                     <input
