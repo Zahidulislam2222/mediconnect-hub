@@ -8,7 +8,6 @@ const CONFIG = {
 function getServiceConfig(endpoint: string) {
     const userRegion = localStorage.getItem('userRegion') || 'US';
     
-    // 🟢 PROFESSIONAL FIX: Extract role correctly from the serialized user object
     let userRole = '';
     try {
         const userStr = localStorage.getItem('user');
@@ -20,22 +19,32 @@ function getServiceConfig(endpoint: string) {
     }
 
     const isEU = userRegion === 'EU';
+    const isDoctorRole = userRole.toLowerCase() === 'doctor' || userRole.toLowerCase() === 'practitioner';
 
     let primary = '';
     let backup = '';
 
-    // 1. Patient & IoT Service
-    if (
+    // 🟢 1. SHARED UPLOAD ROUTE (Decision based on Role)
+    if (endpoint.startsWith('/upload-scan')) {
+        if (isDoctorRole) {
+            primary = isEU ? import.meta.env.VITE_DOCTOR_SERVICE_URL_EU : import.meta.env.VITE_DOCTOR_SERVICE_URL_US;
+            backup = isEU ? import.meta.env.VITE_DOCTOR_SERVICE_URL_EU_BACKUP : import.meta.env.VITE_DOCTOR_SERVICE_URL_US_BACKUP;
+        } else {
+            primary = isEU ? import.meta.env.VITE_PATIENT_SERVICE_URL_EU : import.meta.env.VITE_PATIENT_SERVICE_URL_US;
+            backup = isEU ? import.meta.env.VITE_PATIENT_SERVICE_URL_EU_BACKUP : import.meta.env.VITE_PATIENT_SERVICE_URL_US_BACKUP;
+        }
+    }
+    // 2. Patient & IoT Service
+    else if (
         endpoint.startsWith('/patients') || 
         endpoint.startsWith('/register-patient') ||
         endpoint.startsWith('/public') ||
-        endpoint.startsWith('/vitals') || endpoint.startsWith('/emergency') || endpoint.startsWith('/stats') || endpoint.startsWith('/search') ||
-        endpoint.startsWith('/upload-scan')
+        endpoint.startsWith('/vitals') || endpoint.startsWith('/emergency') || endpoint.startsWith('/stats') || endpoint.startsWith('/search')
     ) {
         primary = isEU ? import.meta.env.VITE_PATIENT_SERVICE_URL_EU : import.meta.env.VITE_PATIENT_SERVICE_URL_US;
         backup = isEU ? import.meta.env.VITE_PATIENT_SERVICE_URL_EU_BACKUP : import.meta.env.VITE_PATIENT_SERVICE_URL_US_BACKUP;
     }
-    // 2. Doctor & Clinical Service
+    // 3. Doctor & Clinical Service
     else if (
         endpoint.startsWith('/doctors') || 
         endpoint.startsWith('/register-doctor') ||
@@ -45,7 +54,7 @@ function getServiceConfig(endpoint: string) {
         primary = isEU ? import.meta.env.VITE_DOCTOR_SERVICE_URL_EU : import.meta.env.VITE_DOCTOR_SERVICE_URL_US;
         backup = isEU ? import.meta.env.VITE_DOCTOR_SERVICE_URL_EU_BACKUP : import.meta.env.VITE_DOCTOR_SERVICE_URL_US_BACKUP;
     }
-    // 3. Booking & Billing Service
+    // 4. Booking & Billing Service
     else if (
         endpoint.startsWith('/appointments') || endpoint.startsWith('/book-appointment') ||
         endpoint.startsWith('/analytics') || endpoint.startsWith('/billing') || endpoint.startsWith('/system')
@@ -53,7 +62,7 @@ function getServiceConfig(endpoint: string) {
         primary = isEU ? import.meta.env.VITE_BOOKING_SERVICE_URL_EU : import.meta.env.VITE_BOOKING_SERVICE_URL_US;
         backup = isEU ? import.meta.env.VITE_BOOKING_SERVICE_URL_EU_BACKUP : import.meta.env.VITE_BOOKING_SERVICE_URL_US_BACKUP;
     }
-    // 4. Communication & AI Service
+    // 5. Communication & AI Service
     else if (
         endpoint.startsWith('/chat') || endpoint.startsWith('/video') ||
         endpoint.startsWith('/ai') || endpoint.startsWith('/analyze-image') || endpoint.startsWith('/predict-health')

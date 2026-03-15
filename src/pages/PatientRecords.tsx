@@ -5,7 +5,7 @@ import {
     Search, FileText, Activity, Calendar, Clock,
     Save, Loader2, Brain, Thermometer, Heart,
     AlertTriangle, CheckCircle2, TrendingUp, User, ChevronLeft,
-    Image as ImageIcon, Plus, Server, Eye, Database, Upload, Lock
+    Image as ImageIcon, Plus, Server, Eye, Database, Upload, Lock,ScanLine
 } from "lucide-react";
 
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
@@ -55,6 +55,7 @@ export default function PatientRecords() {
     const [isUploading, setIsUploading] = useState(false);
     const vaultInputRef = useRef<HTMLInputElement>(null);
     const [noteTitle, setNoteTitle] = useState("");
+    const dicomInputRef = useRef<HTMLInputElement>(null);
 
     const [selectedNote, setSelectedNote] = useState<any>(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -294,6 +295,30 @@ export default function PatientRecords() {
         if (r === "CRITICAL" || r === "HIGH") return "bg-red-500 hover:bg-red-600";
         if (r === "MODERATE") return "bg-orange-500 hover:bg-orange-600";
         return "bg-green-500 hover:bg-green-600";
+    };
+
+    const handleDicomUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files || !e.target.files[0] || !selectedPatientId) return;
+    const file = e.target.files[0];
+    
+    setIsUploading(true);
+    toast({ title: "Clinical Upload", description: "Processing scan via DICOM engine..." });
+
+    try {
+        const formData = new FormData();
+        formData.append('dicom', file);
+
+        // 🟢 Routed to Doctor Service via updated api.ts
+        await api.post('/upload-scan', formData);
+
+        toast({ title: "Success", description: "Imaging study added to patient EHR." });
+        loadPatientDetails(selectedPatientId);
+    } catch (error) {
+        toast({ variant: "destructive", title: "Error", description: "Scan processing failed." });
+    } finally {
+        setIsUploading(false);
+        if (dicomInputRef.current) dicomInputRef.current.value = "";
+    }
     };
 
     // 🟢 ADD THIS FUNCTION:
@@ -553,6 +578,24 @@ export default function PatientRecords() {
                                                         Upload File
                                                     </Button>
                                                 </div>
+                                                <div>
+    <input type="file" ref={vaultInputRef} className="hidden" onChange={handleDoctorUpload} />
+    {/* 🟢 NEW DICOM INPUT */}
+    <input type="file" ref={dicomInputRef} className="hidden" accept=".dcm" onChange={handleDicomUpload} />
+    
+    <div className="flex gap-2">
+        <Button size="sm" variant="outline" onClick={() => vaultInputRef.current?.click()} disabled={isUploading}>
+            {isUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4 mr-2" />}
+            Add Document
+        </Button>
+
+        {/* 🟢 NEW DICOM BUTTON */}
+        <Button size="sm" onClick={() => dicomInputRef.current?.click()} disabled={isUploading} className="bg-indigo-600">
+            {isUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ScanLine className="h-4 w-4 mr-2" />}
+            Upload Scan
+        </Button>
+    </div>
+</div>
                                             </CardHeader>
                                             <CardContent>
                                                 {records.length === 0 ? (
@@ -586,22 +629,17 @@ export default function PatientRecords() {
                                                                 <div
                                                                     className="absolute inset-0 bg-black/5 rounded-xl opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity cursor-pointer"
                                                                     onClick={() => {
-                                                                        if (doc.type === 'NOTE') {
-                                                                            setSelectedNote(doc); 
-                                                                            setIsModalOpen(true);
-                                                                        } else if (doc.type === 'IMAGING_STUDY') {
-                                                                            // 🟢 NEW: View DICOM Thumbnail from FHIR Resource
-                                                                            // The Python script saves the S3 URL in endpoint[1]
-                                                                            const thumbUrl = doc.resource?.endpoint?.[1]?.reference;
-                                                                            if (thumbUrl) {
-                                                                                window.open(thumbUrl, '_blank');
-                                                                            } else {
-                                                                                toast({ variant: "destructive", title: "Not Found", description: "Thumbnail generation failed for this scan." });
-                                                                            }
-                                                                        } else if (doc.s3Url) {
-                                                                            window.open(doc.s3Url, '_blank');
-                                                                        }
-                                                                    }}
+    if (doc.type === 'NOTE') {
+        setSelectedNote(doc);
+        setIsModalOpen(true);
+    } else if (doc.type === 'IMAGING_STUDY') {
+        // 🟢 Open the JPEG thumbnail extracted by Python
+        const thumbUrl = doc.resource?.endpoint?.[1]?.reference;
+        if (thumbUrl) window.open(thumbUrl, '_blank');
+    } else if (doc.s3Url) {
+        window.open(doc.s3Url, '_blank');
+    }
+}}
                                                                 >
                                                                     {isApproved ? (
                                                                         <Button variant="secondary" size="icon" className="h-8 w-8 rounded-full shadow-sm">
