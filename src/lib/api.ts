@@ -1,18 +1,20 @@
 import { fetchAuthSession } from 'aws-amplify/auth';
+import { getUser } from './secure-storage';
 
 const CONFIG = {
-    PRIMARY_TIMEOUT_MS: 5000, 
+    PRIMARY_TIMEOUT_MS: 5000,
     BACKUP_TIMEOUT_MS: 15000, // Longer timeout for Cloud Run "Cold Starts"
 };
 
 function getServiceConfig(endpoint: string) {
     const userRegion = localStorage.getItem('userRegion') || 'US';
-    
+
+    // ─── SECURE STORAGE FIX: Read user role from encrypted storage ───
     let userRole = '';
     try {
-        const userStr = localStorage.getItem('user');
-        if (userStr) {
-            userRole = JSON.parse(userStr).role || '';
+        const user = getUser();
+        if (user) {
+            userRole = user.role || '';
         }
     } catch (e) {
         console.error("Failed to parse user session for routing");
@@ -36,9 +38,9 @@ function getServiceConfig(endpoint: string) {
     }
     // 2. Patient & IoT Service
     else if (
-        endpoint.startsWith('/patients') || 
+        endpoint.startsWith('/patients') ||
         endpoint.startsWith('/register-patient') ||
-        endpoint.startsWith('/public') ||
+        endpoint.startsWith('/public') || endpoint.startsWith('/me') ||
         endpoint.startsWith('/vitals') || endpoint.startsWith('/emergency') || endpoint.startsWith('/stats') || endpoint.startsWith('/search')
     ) {
         primary = isEU ? import.meta.env.VITE_PATIENT_SERVICE_URL_EU : import.meta.env.VITE_PATIENT_SERVICE_URL_US;
@@ -65,10 +67,23 @@ function getServiceConfig(endpoint: string) {
     // 5. Communication & AI Service
     else if (
         endpoint.startsWith('/chat') || endpoint.startsWith('/video') ||
-        endpoint.startsWith('/ai') || endpoint.startsWith('/analyze-image') || endpoint.startsWith('/predict-health')
+        endpoint.startsWith('/ai')
     ) {
         primary = isEU ? import.meta.env.VITE_COMMUNICATION_SERVICE_URL_EU : import.meta.env.VITE_COMMUNICATION_SERVICE_URL_US;
         backup = isEU ? import.meta.env.VITE_COMMUNICATION_SERVICE_URL_EU_BACKUP : import.meta.env.VITE_COMMUNICATION_SERVICE_URL_US_BACKUP;
+    }
+    // 6. Admin Service
+    else if (endpoint.startsWith('/api/v1/admin')) {
+        primary = isEU ? import.meta.env.VITE_ADMIN_SERVICE_URL_EU : import.meta.env.VITE_ADMIN_SERVICE_URL_US;
+        backup = isEU ? import.meta.env.VITE_ADMIN_SERVICE_URL_EU_BACKUP : import.meta.env.VITE_ADMIN_SERVICE_URL_US_BACKUP;
+    }
+    // 7. Staff Service
+    else if (
+        endpoint.startsWith('/shifts') || endpoint.startsWith('/tasks') ||
+        endpoint.startsWith('/announcements') || endpoint.startsWith('/directory')
+    ) {
+        primary = isEU ? import.meta.env.VITE_STAFF_SERVICE_URL_EU : import.meta.env.VITE_STAFF_SERVICE_URL_US;
+        backup = isEU ? import.meta.env.VITE_STAFF_SERVICE_URL_EU_BACKUP : import.meta.env.VITE_STAFF_SERVICE_URL_US_BACKUP;
     }
     // Fallback
     else {
@@ -123,7 +138,7 @@ async function request(endpoint: string, method: string, body?: any) {
     const cleanEndpoint = endpoint.replace(/^\//, '');
     const primaryUrl = `${primary.replace(/\/$/, '')}/${cleanEndpoint}`;
     
-    const isAiRoute = endpoint.startsWith('/ai') || endpoint.startsWith('/analyze-image') || endpoint.startsWith('/upload-scan');
+    const isAiRoute = endpoint.startsWith('/ai') || endpoint.startsWith('/upload-scan');
     const primaryTimeout = isAiRoute ? 30000 : CONFIG.PRIMARY_TIMEOUT_MS; // 🟢 Increased timeout for heavy DICOMs
 
     const fetchOptions = {
@@ -171,9 +186,10 @@ async function handleResponse(response: Response) {
         if (response.status === 404) throw new Error("404_NOT_FOUND");
         
         if (response.status === 401) throw new Error("401 Unauthorized");
-        if (response.status === 403) throw new Error("403 Forbidden");
 
-        throw new Error(errorData.message || `API Error: ${response.status}`);
+        if (response.status === 403) throw new Error(errorData.error || errorData.message || "403 Forbidden");
+
+        throw new Error(errorData.error || errorData.message || `API Error: ${response.status}`);
     }
     return await response.json();
 }

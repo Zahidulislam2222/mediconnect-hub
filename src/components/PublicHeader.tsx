@@ -2,6 +2,7 @@ import { useNavigate } from "react-router-dom";
 import { Stethoscope } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { getCurrentUser } from 'aws-amplify/auth'; // 1. Import Amplify Auth
+import { getUser } from "@/lib/secure-storage";
 
 export function PublicHeader() {
     const navigate = useNavigate();
@@ -14,8 +15,10 @@ export function PublicHeader() {
 
             // If the above line doesn't throw an error, a user is logged in.
             // Now, check their role from the profile saved in localStorage.
-            const savedUser = localStorage.getItem('user');
-            const profile = savedUser ? JSON.parse(savedUser) : null;
+            // ─── SECURE STORAGE FIX ───
+            // ORIGINAL: const savedUser = localStorage.getItem('user');
+            // ORIGINAL: const profile = savedUser ? JSON.parse(savedUser) : null;
+            const profile = getUser();
 
             // Check if the role is doctor or provider (case-insensitive)
             if (profile && ['doctor', 'provider'].includes((profile.role || '').toLowerCase())) {

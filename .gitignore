@@ -90,9 +90,20 @@ typings/
 .DS_Store
 Thumbs.db
 
+# IDE
+.vscode/
+.idea/
+
 # Build output
 dist
 dist-ssr
+
+# Firebase
+.firebase/
+
+# Secrets & Keys
+*.pem
+*.key
 
 # Capacitor
 android/app/build

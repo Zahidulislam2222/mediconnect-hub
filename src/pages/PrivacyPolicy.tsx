@@ -59,6 +59,42 @@ export default function PrivacyPolicy() {
                             We do not share your personal information with third parties except as described in this privacy policy, such as with healthcare providers you choose to consult with, or when required by law.
                         </p>
                     </section>
+
+                    <section>
+                        <h2 className="text-xl font-semibold mb-3">5. Your GDPR Rights (EU Residents)</h2>
+                        <p className="text-muted-foreground mb-2">Under the General Data Protection Regulation (GDPR), you have the right to:</p>
+                        <ul className="list-disc pl-6 text-muted-foreground space-y-1">
+                            <li><strong>Access</strong> — Request a copy of all personal data we hold about you.</li>
+                            <li><strong>Rectification</strong> — Request correction of inaccurate personal data.</li>
+                            <li><strong>Erasure ("Right to be Forgotten")</strong> — Request deletion of your personal data, subject to legal retention requirements.</li>
+                            <li><strong>Data Portability</strong> — Receive your data in a structured, machine-readable format (JSON/FHIR R4).</li>
+                            <li><strong>Restrict Processing</strong> — Request limitation of how we process your data.</li>
+                            <li><strong>Withdraw Consent</strong> — Withdraw previously given consent at any time via your account settings.</li>
+                        </ul>
+                        <p className="text-muted-foreground mt-2">
+                            You can exercise your data export and deletion rights directly from your <strong>Account Settings</strong> page, or by contacting our Data Protection Officer.
+                        </p>
+                    </section>
+
+                    <section>
+                        <h2 className="text-xl font-semibold mb-3">6. Data Retention</h2>
+                        <p className="text-muted-foreground">
+                            We retain your personal data only for as long as necessary to provide our services and comply with legal obligations.
+                            Medical records and audit logs are retained for a minimum of 7 years as required by HIPAA.
+                            Upon account deletion, personal identifiers are erased and clinical data is anonymized.
+                        </p>
+                    </section>
+
+                    <section className="p-6 border rounded-xl bg-card">
+                        <h2 className="text-xl font-semibold mb-3">Data Protection Officer (DPO)</h2>
+                        <p className="text-muted-foreground mb-2">
+                            For any privacy-related inquiries, data access requests, or to exercise your GDPR rights, contact our DPO:
+                        </p>
+                        <div className="text-muted-foreground space-y-1">
+                            <p><strong>Email:</strong> <a href="mailto:dpo@mediconnect.health" className="text-primary underline">dpo@mediconnect.health</a></p>
+                            <p><strong>Response Time:</strong> Within 30 days as required by GDPR Art. 12</p>
+                        </div>
+                    </section>
                 </div>
             </main>
 

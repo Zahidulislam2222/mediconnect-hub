@@ -12,6 +12,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { api } from "@/lib/api";
+import { getUser, setUser as setStoredUser, clearAllSensitive } from "@/lib/secure-storage";
 
 const COLORS = ['#8884d8', '#00C49F', '#FFBB28', '#FF8042'];
 
@@ -23,8 +24,10 @@ export default function Analytics() {
     const [isLoading, setIsLoading] = useState(true);
     const [period, setPeriod] = useState("6m");
     const [doctorProfile, setDoctorProfile] = useState(() => {
-        const saved = localStorage.getItem('user');
-        return saved ? JSON.parse(saved) : { name: "Doctor", avatar: null, role: "doctor" };
+        // ─── SECURE STORAGE FIX ───
+        // ORIGINAL: const saved = localStorage.getItem('user'); return saved ? JSON.parse(saved) : ...
+        const saved = getUser();
+        return saved || { name: "Doctor", avatar: null, role: "doctor" };
     });
 
     const [metrics, setMetrics] = useState({
@@ -73,7 +76,9 @@ export default function Analytics() {
                 if (myProfile) {
                     const updated = { ...doctorProfile, ...myProfile };
                     setDoctorProfile(updated);
-                    localStorage.setItem('user', JSON.stringify(updated));
+                    // ─── SECURE STORAGE FIX ───
+                    // ORIGINAL: localStorage.setItem('user', JSON.stringify(updated));
+                    setStoredUser(updated);
                 }
             }
 
@@ -99,10 +104,15 @@ export default function Analytics() {
         } catch (err: any) {
     console.error("Auth/Load Error:", err);
     const msg = err?.message || String(err);
-    if (msg.includes('401') || msg.includes('403') || msg.includes('404')) {
-        localStorage.clear();
-        navigate("/auth");
-    }
+    if (msg.includes('401')) {
+    // ─── SECURE STORAGE FIX ───
+    // ORIGINAL: localStorage.clear();
+    clearAllSensitive();
+    navigate("/auth");
+} else {
+
+    toast({ variant: "destructive", title: "Error", description: msg });
+}
 } finally {
             setIsLoading(false);
         }
@@ -114,7 +124,9 @@ export default function Analytics() {
 
     const handleLogout = async () => {
         await signOut();
-        localStorage.removeItem('user');
+        // ─── SECURE STORAGE FIX ───
+        // ORIGINAL: localStorage.removeItem('user');
+        clearAllSensitive();
         navigate("/auth");
     };
 

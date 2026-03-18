@@ -32,6 +32,7 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { getCurrentUser, signOut, fetchAuthSession } from 'aws-amplify/auth'; // 🟢 Added fetchAuthSession
 import { api } from "@/lib/api";
+import { getUser, clearAllSensitive } from "@/lib/secure-storage";
 import { io } from "socket.io-client";
 
 // --- TYPES ---
@@ -82,8 +83,10 @@ export default function LiveMonitoring() {
     // --- STATE ---
     // Doctor Profile
     const [doctorProfile] = useState(() => {
-        const saved = localStorage.getItem('user');
-        return saved ? JSON.parse(saved) : { name: "Doctor", avatar: null, role: "doctor" };
+        // ─── SECURE STORAGE FIX ───
+        // ORIGINAL: const saved = localStorage.getItem('user'); return saved ? JSON.parse(saved) : ...
+        const saved = getUser();
+        return saved || { name: "Doctor", avatar: null, role: "doctor" };
     });
 
     // --- REAL DATA STATE ---
@@ -103,14 +106,12 @@ export default function LiveMonitoring() {
                 // Use the ID from Amplify, which is safer than localStorage
                 const doctorId = currentUser.userId || currentUser.username;
 
-                console.log("🔍 Fetching list for Doctor:", doctorId);
+                // Fetching patient list for monitoring
 
                 // 3. Fetch with Headers (The Fix)
-                const data: any = await api.get(`/doctor-appointments?doctorId=${doctorId}`);
+                const data: any = await api.get(`/appointments?doctorId=${doctorId}`);
 
                 if (data) {
-                    console.log("📦 API Data:", data);
-
                     // 4. Extract 'existingBookings' (Confirmed by your Lambda Code)
                     const bookingList = data.existingBookings || [];
 
@@ -230,7 +231,9 @@ useEffect(() => {
 
     const handleLogout = async () => {
         await signOut();
-        localStorage.removeItem('user');
+        // ─── SECURE STORAGE FIX ───
+        // ORIGINAL: localStorage.removeItem('user');
+        clearAllSensitive();
         navigate("/");
     };
 

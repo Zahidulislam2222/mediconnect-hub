@@ -19,6 +19,7 @@ import { cn } from "@/lib/utils";
 
 import { useCheckout } from "@/context/CheckoutContext";
 import { api } from "@/lib/api";
+import { getUser, setUser as setStoredUser, clearAllSensitive } from "@/lib/secure-storage";
 
 export default function Billing() {
     return <BillingContent />;
@@ -31,8 +32,10 @@ function BillingContent() {
 
     // --- STATE ---
     const [userProfile, setUserProfile] = useState(() => {
-        const stored = localStorage.getItem('user');
-        return stored ? JSON.parse(stored) : { name: "Patient", avatar: "", id: "" };
+        // ─── SECURE STORAGE FIX ───
+        // ORIGINAL: const stored = localStorage.getItem('user'); return stored ? JSON.parse(stored) : ...
+        const stored = getUser();
+        return stored || { name: "Patient", avatar: "", id: "" };
     });
 
     const [loadingBilling, setLoadingBilling] = useState(true);
@@ -83,8 +86,11 @@ function BillingContent() {
                 setUserProfile(freshProfile);
                 
                 // Sync to local storage for persistence
-                const currentLocal = JSON.parse(localStorage.getItem('user') || '{}');
-                localStorage.setItem('user', JSON.stringify({ ...currentLocal, ...freshProfile }));
+                // ─── SECURE STORAGE FIX ───
+                // ORIGINAL: const currentLocal = JSON.parse(localStorage.getItem('user') || '{}');
+                // ORIGINAL: localStorage.setItem('user', JSON.stringify({ ...currentLocal, ...freshProfile }));
+                const currentLocal = getUser() || {};
+                setStoredUser({ ...currentLocal, ...freshProfile });
             }
 
             // 2. Update Billing Data
@@ -100,10 +106,15 @@ function BillingContent() {
     console.error("Auth/Load Error", e);
     const msg = e?.message || String(e);
     // Logic: Only logout if user is actually deleted/banned
-    if (msg.includes('401') || msg.includes('403') || msg.includes('404')) {
-        localStorage.clear();
-        navigate("/auth");
-    }
+    if (msg.includes('401')) {
+    // ─── SECURE STORAGE FIX ───
+    // ORIGINAL: localStorage.clear();
+    clearAllSensitive();
+    navigate("/auth");
+} else {
+
+    toast({ variant: "destructive", title: "Error", description: msg });
+}
 } finally {
     setLoadingBilling(false);
 }
@@ -118,7 +129,9 @@ function BillingContent() {
     const handleLogout = async () => {
         try {
             await signOut();
-            localStorage.clear();
+            // ─── SECURE STORAGE FIX ───
+            // ORIGINAL: localStorage.clear();
+            clearAllSensitive();
             navigate("/auth");
         } catch (error) {
             console.error("Error signing out:", error);

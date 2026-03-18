@@ -19,6 +19,13 @@ import {
   Shield,
   Brain,
   Activity,
+  ShieldCheck,
+  ClipboardList,
+  Server,
+  ScrollText,
+  Clock,
+  Megaphone,
+  Contact,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 // 🟢 ADDED AvatarImage HERE
@@ -28,7 +35,7 @@ import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 
 interface SidebarProps {
-  userRole: "patient" | "doctor";
+  userRole: "patient" | "doctor" | "admin" | "staff";
   userName: string;
   userAvatar: string;
   onLogout: () => void;
@@ -59,11 +66,31 @@ const doctorNavItems = [
   { icon: BookOpen, label: "Knowledge Base", path: "/knowledge" },
 ];
 
+const adminNavItems = [
+  { icon: LayoutDashboard, label: "Dashboard", path: "/admin/dashboard" },
+  { icon: Users, label: "User Management", path: "/admin/users" },
+  { icon: ScrollText, label: "Audit Logs", path: "/admin/audit-logs" },
+  { icon: Server, label: "System Health", path: "/admin/system" },
+];
+
+const staffNavItems = [
+  { icon: LayoutDashboard, label: "Dashboard", path: "/staff/dashboard" },
+  { icon: Clock, label: "Shift Schedule", path: "/staff/schedule" },
+  { icon: ClipboardList, label: "Tasks", path: "/staff/tasks" },
+  { icon: Contact, label: "Directory", path: "/staff/directory" },
+];
+
 export function Sidebar({ userRole, userName, userAvatar, onLogout, className }: SidebarProps) {
   const [collapsed, setCollapsed] = useState(false);
   const location = useLocation();
 
-  const navItems = userRole === "patient" ? patientNavItems : doctorNavItems;
+  const navItemsMap = {
+    patient: patientNavItems,
+    doctor: doctorNavItems,
+    admin: adminNavItems,
+    staff: staffNavItems,
+  };
+  const navItems = navItemsMap[userRole] || patientNavItems;
 
   return (
     <aside
@@ -110,13 +137,17 @@ export function Sidebar({ userRole, userName, userAvatar, onLogout, className }:
             variant="secondary"
             className={cn(
               "w-full justify-center py-1.5 text-xs font-medium",
-              userRole === "doctor"
-                ? "bg-primary/10 text-primary border-primary/20"
+              userRole === "doctor" ? "bg-primary/10 text-primary border-primary/20"
+                : userRole === "admin" ? "bg-red-500/10 text-red-600 border-red-500/20"
+                : userRole === "staff" ? "bg-amber-500/10 text-amber-600 border-amber-500/20"
                 : "bg-accent/10 text-accent border-accent/20"
             )}
           >
-            <Shield className="mr-1.5 h-3 w-3" />
-            {userRole === "doctor" ? "Doctor Portal" : "Patient Portal"}
+            {userRole === "admin" ? <ShieldCheck className="mr-1.5 h-3 w-3" /> : <Shield className="mr-1.5 h-3 w-3" />}
+            {userRole === "doctor" ? "Doctor Portal"
+              : userRole === "admin" ? "Admin Portal"
+              : userRole === "staff" ? "Staff Portal"
+              : "Patient Portal"}
           </Badge>
         </div>
       )}
@@ -149,17 +180,19 @@ export function Sidebar({ userRole, userName, userAvatar, onLogout, className }:
 
       {/* Settings & User */}
       <div className="p-3">
-        <NavLink
-          to={userRole === 'doctor' ? "/doctor/settings" : "/patient/settings"}
-          className={cn(
-            "nav-item",
-            location.pathname === "/settings" ? "nav-item-active" : "nav-item-inactive",
-            collapsed && "justify-center px-2"
-          )}
-        >
-          <Settings className="h-5 w-5 flex-shrink-0" />
-          {!collapsed && <span>Settings</span>}
-        </NavLink>
+        {(userRole === "patient" || userRole === "doctor") && (
+          <NavLink
+            to={userRole === 'doctor' ? "/doctor/settings" : "/patient/settings"}
+            className={cn(
+              "nav-item",
+              location.pathname.includes("/settings") ? "nav-item-active" : "nav-item-inactive",
+              collapsed && "justify-center px-2"
+            )}
+          >
+            <Settings className="h-5 w-5 flex-shrink-0" />
+            {!collapsed && <span>Settings</span>}
+          </NavLink>
+        )}
       </div>
 
       <Separator className="bg-sidebar-border" />
@@ -188,7 +221,7 @@ export function Sidebar({ userRole, userName, userAvatar, onLogout, className }:
                 {userName}
               </p>
               <p className="truncate text-xs text-sidebar-foreground/60">
-                {userRole === "doctor" ? "Doctor" : "Patient"}
+                {userRole === "doctor" ? "Doctor" : userRole === "admin" ? "Administrator" : userRole === "staff" ? "Staff" : "Patient"}
               </p>
             </div>
           )}

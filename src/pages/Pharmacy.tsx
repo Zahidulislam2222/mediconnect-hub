@@ -32,6 +32,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 
 import { api } from "@/lib/api";
+import { getUser, setUser as setStoredUser, clearAllSensitive } from "@/lib/secure-storage";
 import { useCheckout } from "@/context/CheckoutContext";
 
 export default function Pharmacy() {
@@ -41,9 +42,11 @@ export default function Pharmacy() {
 
   // --- STATE ---
   const [user, setUser] = useState<any>(() => {
+    // ─── SECURE STORAGE FIX ───
+    // ORIGINAL: const saved = localStorage.getItem('user'); return saved ? JSON.parse(saved) : ...
     try {
-      const saved = localStorage.getItem('user');
-      return saved ? JSON.parse(saved) : { name: "Patient", id: "", avatar: null };
+      const saved = getUser();
+      return saved || { name: "Patient", id: "", avatar: null };
     } catch (e) { return { name: "Patient", id: "", avatar: null }; }
   });
   const [prescriptions, setPrescriptions] = useState<any[]>([]);
@@ -73,7 +76,9 @@ export default function Pharmacy() {
         const profile: any = profileData;
         const userData = { name: profile.name || "Patient", id: authUser.userId, avatar: profile.avatar };
         setUser(userData);
-        localStorage.setItem('user', JSON.stringify({ ...user, ...userData }));
+        // ─── SECURE STORAGE FIX ───
+        // ORIGINAL: localStorage.setItem('user', JSON.stringify({ ...user, ...userData }));
+        setStoredUser({ ...user, ...userData });
       }
 
       if (rxData) {
@@ -84,7 +89,9 @@ export default function Pharmacy() {
       console.error("Failed to load pharmacy data:", error);
       const msg = error?.message || String(error);
       if (msg.includes('401') || msg.includes('403') || msg.includes('404')) {
-          localStorage.clear();
+          // ─── SECURE STORAGE FIX ───
+          // ORIGINAL: localStorage.clear();
+          clearAllSensitive();
           navigate("/auth");
       } else {
           toast({

@@ -32,6 +32,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { api } from "@/lib/api";
+import { getUser, setUser as setStoredUser, clearAllSensitive } from "@/lib/secure-storage";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 
 // --- DEMO FALLBACK FOR AI QUOTA LIMITS ---
@@ -51,9 +52,11 @@ export default function HealthRecords() {
 
   // --- STATE ---
   const [user, setUser] = useState<any>(() => {
+    // ─── SECURE STORAGE FIX ───
+    // ORIGINAL: const saved = localStorage.getItem('user'); return saved ? JSON.parse(saved) : ...
     try {
-      const saved = localStorage.getItem('user');
-      return saved ? JSON.parse(saved) : { name: "Patient", id: "", avatar: null };
+      const saved = getUser();
+      return saved || { name: "Patient", id: "", avatar: null };
     } catch (e) { return { name: "Patient", id: "", avatar: null }; }
   });
   const [records, setRecords] = useState<any[]>([]);
@@ -86,9 +89,11 @@ export default function HealthRecords() {
 
         setUser(userData);
 
-        // 🟢 Update Storage Safely
-        const currentLocal = JSON.parse(localStorage.getItem('user') || '{}');
-        localStorage.setItem('user', JSON.stringify({ ...currentLocal, ...userData }));
+        // ─── SECURE STORAGE FIX ───
+        // ORIGINAL: const currentLocal = JSON.parse(localStorage.getItem('user') || '{}');
+        // ORIGINAL: localStorage.setItem('user', JSON.stringify({ ...currentLocal, ...userData }));
+        const currentLocal = getUser() || {};
+        setStoredUser({ ...currentLocal, ...userData });
       } catch (e) { /* ignore profile load error */ }
 
       // B. Fetch Document Vault (Using POST-RPC Pattern)

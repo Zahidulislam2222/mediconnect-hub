@@ -8,7 +8,7 @@ interface DashboardLayoutProps {
   children: ReactNode;
   title: string;
   subtitle?: string;
-  userRole: "patient" | "doctor";
+  userRole: "patient" | "doctor" | "admin" | "staff";
   userName: string;
   userAvatar: string;
   onLogout: () => void;

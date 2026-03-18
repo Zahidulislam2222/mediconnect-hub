@@ -10,6 +10,7 @@ import { Stethoscope, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { PublicHeader } from "@/components/PublicHeader";
 import { api } from "@/lib/api";
+import { setUser, getUser, markAuthenticated, clearAllSensitive } from "@/lib/secure-storage";
 import { getRegionalResources } from "../aws-config";
 
 // 🟢 CHILD COMPONENTS
@@ -96,9 +97,9 @@ export default function Auth() {
     checkSession();
   }, []);
 
+  // ─── SECURE STORAGE FIX: Use encrypted storage, no raw token ───
   const clearAuthData = () => {
-    localStorage.removeItem('user');
-    localStorage.removeItem('access_token');
+    clearAllSensitive();
   };
 
   async function checkSession(isFreshLogin: boolean = false) {
@@ -181,7 +182,7 @@ export default function Auth() {
                
            } catch (err: any) {
                if (err.message && err.message.includes('409')) {
-                   console.log("Doctor profile already exists...");
+                   // Doctor profile already exists — proceed with login
                } else {
                    toast({ variant: "destructive", title: "Registration Error", description: "Failed to create profile." });
                    return false; 
@@ -194,14 +195,17 @@ export default function Auth() {
 
       if (!profile) return false;
 
-      // 🟢 FIX: Save Token and User Data IMMEDIATELY to stop the infinite bounce loop
-      localStorage.setItem('user', JSON.stringify({
+      // ─── SECURE STORAGE FIX: Encrypted user data, no raw token ───
+      // ORIGINAL: Stored plaintext user JSON + raw access_token in localStorage.
+      // FIX: User data encrypted via secure-storage. Token NOT stored at all —
+      // fetched fresh from Amplify's fetchAuthSession() on each API call.
+      setUser({
         name: profile.name || userEmail.split('@')[0],
         email: profile.email || userEmail,
         role: roleKey,
         ...profile
-      }));
-      localStorage.setItem('access_token', token);
+      });
+      markAuthenticated();
       localStorage.setItem('gdpr_consent', 'true');
 
       // NOW we check if they need Identity Verification
@@ -224,7 +228,6 @@ export default function Auth() {
         }
       }
 
-      console.log("Login sequence complete. Redirecting...");
       navigate(roleKey === 'doctor' ? "/doctor-dashboard" : "/patient-dashboard");
       return true;
 
@@ -401,9 +404,9 @@ export default function Auth() {
 
       if (data.verified) {
         setVerificationStatus("success");
-        const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+        const currentUser = getUser() || {};
         currentUser.isIdentityVerified = true;
-        localStorage.setItem('user', JSON.stringify(currentUser));
+        setUser(currentUser);
         toast({ title: "Verified", description: "Biometrics match." });
         setTimeout(() => { userType === 'provider' ? setAuthStep("diploma-upload") : navigate("/patient-dashboard"); }, 1500);
       } else {
@@ -494,15 +497,16 @@ export default function Auth() {
     }
 
     const role = userType === 'provider' ? 'doctor' : 'patient';
-    localStorage.setItem('user', JSON.stringify({ 
-        name: name || "Demo User", 
-        email: email || "demo@local", 
-        role, 
-        isIdentityVerified: true, 
-        identityStatus: 'VERIFIED', 
-        verificationStatus: 'APPROVED' 
-    }));
-    localStorage.setItem('access_token', 'demo-token-bypass');
+    // ─── SECURE STORAGE FIX: Demo mode uses encrypted storage, no raw token ───
+    setUser({
+        name: name || "Demo User",
+        email: email || "demo@local",
+        role,
+        isIdentityVerified: true,
+        identityStatus: 'VERIFIED',
+        verificationStatus: 'APPROVED'
+    });
+    markAuthenticated();
     role === 'doctor' ? navigate("/doctor-dashboard") : navigate("/patient-dashboard");
     toast({ title: "Demo Mode", description: "Verification bypassed." });
   };

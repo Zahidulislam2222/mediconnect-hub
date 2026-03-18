@@ -28,6 +28,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { api } from "@/lib/api";
+import { getUser, setUser as setStoredUser, clearAllSensitive } from "@/lib/secure-storage";
 
 // Helper: Smart Initials
 const getInitials = (name: string) => {
@@ -48,8 +49,10 @@ export default function DoctorDashboard() {
   const [isLoading, setIsLoading] = useState(true);
 
   const [doctorProfile, setDoctorProfile] = useState(() => {
-    const saved = localStorage.getItem('user');
-    return saved ? JSON.parse(saved) : { name: "Doctor", role: "doctor" };
+    // ─── SECURE STORAGE FIX: Read from encrypted storage ───
+    // ORIGINAL: const saved = localStorage.getItem('user'); return saved ? JSON.parse(saved) : ...
+    const saved = getUser();
+    return saved || { name: "Doctor", role: "doctor" };
   });
 
   useEffect(() => {
@@ -80,8 +83,11 @@ export default function DoctorDashboard() {
         
         if (myProfile && myProfile.name) {
           setDoctorProfile(prev => ({ ...prev, ...myProfile }));
-          const currentLocal = JSON.parse(localStorage.getItem('user') || '{}');
-          localStorage.setItem('user', JSON.stringify({ ...currentLocal, ...myProfile }));
+          // ─── SECURE STORAGE FIX ───
+          // ORIGINAL: const currentLocal = JSON.parse(localStorage.getItem('user') || '{}');
+          // ORIGINAL: localStorage.setItem('user', JSON.stringify({ ...currentLocal, ...myProfile }));
+          const currentLocal = getUser() || {};
+          setStoredUser({ ...currentLocal, ...myProfile });
         }
       }
 
@@ -147,10 +153,15 @@ export default function DoctorDashboard() {
         const msg = error?.message || String(error);
         
         // ONLY log out if the backend explicitly says you are unauthorized/deleted
-        if (msg.includes('401') || msg.includes('403') || msg.includes('404')) {
-            localStorage.clear();
-            navigate("/auth");
-        }
+        if (msg.includes('401')) {
+    // ─── SECURE STORAGE FIX ───
+    // ORIGINAL: localStorage.clear();
+    clearAllSensitive();
+    navigate("/auth");
+} else {
+
+    toast({ variant: "destructive", title: "Error", description: msg });
+}
     } finally {
       setIsLoading(false);
     }
@@ -195,7 +206,9 @@ export default function DoctorDashboard() {
       userAvatar={doctorProfile.avatar}
       onLogout={async () => {
         await signOut();
-        localStorage.clear();
+        // ─── SECURE STORAGE FIX ───
+        // ORIGINAL: localStorage.clear();
+        clearAllSensitive();
         window.location.href = "/";
       }}
     >

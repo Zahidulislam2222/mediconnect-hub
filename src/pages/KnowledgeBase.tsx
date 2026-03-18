@@ -52,9 +52,6 @@ export default function KnowledgeBase({ role = "patient" }: KnowledgeBaseProps) 
         setIsLoading(true);
         const response: any = await api.get('/public/knowledge');
 
-        // 1. DEBUG: Look at your Browser Console (F12) to see this!
-        console.log("RAW API DATA:", response);
-
         // 2. ROBUST EXTRACTION: Handle direct array, .articles, or DynamoDB .Items
         const rawList = Array.isArray(response)
           ? response

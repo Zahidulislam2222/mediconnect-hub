@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { api } from "@/lib/api";
+import { getUser, clearAllSensitive } from "@/lib/secure-storage";
 
 // Extracted Components
 import { AppointmentBookingForm } from "@/components/appointments/AppointmentBookingForm";
@@ -18,9 +19,10 @@ export default function Appointments() {
     const { toast } = useToast();
 
     const [user, setUser] = useState<any>(() => {
+        // ─── SECURE STORAGE FIX ───
+        // ORIGINAL: const saved = localStorage.getItem('user'); return saved ? JSON.parse(saved) : null;
         try {
-            const saved = localStorage.getItem('user');
-            return saved ? JSON.parse(saved) : null;
+            return getUser() || null;
         } catch (e) { return null; }
     });
 
@@ -45,9 +47,14 @@ export default function Appointments() {
             setAppointments(prev => isLoadMore ? [...prev, ...newList] : newList);
             setLastEvaluatedKey(data.lastEvaluatedKey || null);
         } catch (error: any) {
-            if (error?.message?.includes('401') || error?.message?.includes('403')) {
-                localStorage.clear();
+            // 🟢 FIX: ONLY kick the user out if it is specifically a 401 Unauthorized (Expired Token)
+            if (error?.message?.includes('401')) {
+                // ─── SECURE STORAGE FIX ───
+                // ORIGINAL: localStorage.clear();
+                clearAllSensitive();
                 navigate("/auth");
+            } else {
+                toast({ variant: "destructive", title: "Appointments Error", description: error?.message || "Failed to load appointments" });
             }
         } finally {
             setLoadingAppointments(false);
@@ -67,16 +74,33 @@ export default function Appointments() {
                 else if (Array.isArray(docsRes)) setDoctors(docsRes);
 
                 let u = { id: attr.sub, name: attr.name || attr.email, avatar: "" };
+
+                // 🟢 FIX: Fetch the Patient's profile so their Avatar appears in the Sidebar!
+                try {
+                    const profileRes: any = await api.get(`/patients/${attr.sub}`);
+                    const profileData = profileRes.Item || profileRes;
+                    if (profileData.avatar) u.avatar = profileData.avatar;
+                    if (profileData.name) u.name = profileData.name;
+                } catch (err) {
+                    // No custom profile found — using Cognito defaults
+                }
+
                 setUser(u);
                 await fetchAppointments(u.id);
-            } catch (e) {
-                console.error("Session Error", e);
-                localStorage.clear();
-                navigate("/auth");
+            } catch (error: any) {
+                console.error("Session Error", error);
+                if (error?.message?.includes('401')) {
+                    // ─── SECURE STORAGE FIX ───
+                    // ORIGINAL: localStorage.clear();
+                    clearAllSensitive();
+                    navigate("/auth");
+                } else {
+                    toast({ variant: "destructive", title: "API Error", description: error?.message || "Failed to load data." });
+                }
             }
         }
         init();
-    }, [navigate]); 
+    }, [navigate]);
 
     const handleCancel = async (appointmentId: string) => {
         if (!confirm("Are you sure? This will refund your payment.")) return;

@@ -6,7 +6,7 @@ export const getAwsConfig = (): ResourcesConfig => {
   const region = localStorage.getItem('userRegion') || 'US';
   const isEU = region === 'EU';
 
-  console.log(`🌍 Initializing AWS Amplify for Region: ${region}`);
+  // Amplify configured for region: US or EU
 
   return {
     Auth: {

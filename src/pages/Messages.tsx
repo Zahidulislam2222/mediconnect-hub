@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { getCurrentUser } from 'aws-amplify/auth';
+import { getCurrentUser, fetchAuthSession } from 'aws-amplify/auth';
 import {
     Send, Search, Video,
     Loader2, User, Paperclip, CheckCheck, ChevronLeft, Lock
@@ -13,6 +13,7 @@ import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import { api } from "@/lib/api";
+import { getUser, setUser, clearAllSensitive } from "@/lib/secure-storage";
 import { useToast } from "@/hooks/use-toast";
 
 // Interface for our Clean Contact List
@@ -34,16 +35,14 @@ interface Message {
     isOptimistic?: boolean; 
 }
 
-// Helper to get raw JWT for WebSocket
-const getAuthToken = () => {
-    for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i);
-        if (key && key.includes("idToken")) {
-            const token = localStorage.getItem(key);
-            return (token && token !== "null") ? token : null;
-        }
+// Helper to get JWT securely via Amplify (not localStorage)
+const getAuthTokenAsync = async (): Promise<string | null> => {
+    try {
+        const session = await fetchAuthSession();
+        return session.tokens?.idToken?.toString() || null;
+    } catch {
+        return null;
     }
-    return null;
 };
 
 export default function Messages() {
@@ -71,7 +70,7 @@ export default function Messages() {
         const init = async () => {
             try {
                 const authUser = await getCurrentUser();
-                const storedUser = JSON.parse(localStorage.getItem('user') || '{}');
+                const storedUser = getUser() || {};
                 const currentRole = storedUser.role || 'patient';
                 const isDoctor = currentRole === 'doctor';
 
@@ -80,7 +79,7 @@ export default function Messages() {
 
                 // 1. Fetch Appointments to build contact list
                 const paramKey = isDoctor ? 'doctorId' : 'patientId';
-                const res: any = await api.get(`/doctor-appointments?${paramKey}=${authUser.userId}`);
+                const res: any = await api.get(`/appointments?${paramKey}=${authUser.userId}`);
                 const rawList = res.existingBookings || (Array.isArray(res) ? res : []);
                 
                 const uniqueMap = new Map<string, Contact>();
@@ -149,7 +148,7 @@ export default function Messages() {
                     msg.includes('403') || 
                     msg.includes('The user is not authenticated') 
                 ) {
-                    localStorage.clear();
+                    clearAllSensitive();
                     navigate("/auth");
                 }
             } finally {
@@ -164,64 +163,48 @@ export default function Messages() {
         // 1. Safety Guard
         if (!currentUser || !selectedRecipientId) return;
 
-        // 🟢 FIX: REGIONAL LOGIC (Matches ConsultationRoom.tsx)
-        const userRegion = localStorage.getItem('userRegion') || 'US';
-        const wsBaseUrl = userRegion === 'EU' 
-            ? import.meta.env.VITE_COMMUNICATION_WS_URL_EU 
-            : import.meta.env.VITE_COMMUNICATION_WS_URL_US;
+        let socket: WebSocket | null = null;
+        let cancelled = false;
 
-        const token = getAuthToken();
+        const connectWebSocket = async () => {
+            // 🟢 FIX: REGIONAL LOGIC (Matches ConsultationRoom.tsx)
+            const userRegion = localStorage.getItem('userRegion') || 'US';
+            const wsBaseUrl = userRegion === 'EU'
+                ? import.meta.env.VITE_COMMUNICATION_WS_URL_EU
+                : import.meta.env.VITE_COMMUNICATION_WS_URL_US;
 
-        // 2. Security Guard
-        if (!token) {
-            console.warn("⚠️ WebSocket: Auth token not found. Real-time messaging is disabled.");
-            return;
-        }
+            // 🟢 SECURITY FIX: Get token via Amplify, not localStorage scan
+            const token = await getAuthTokenAsync();
 
-        if (!wsBaseUrl) {
-            console.error("❌ WebSocket: Endpoint URL is missing in .env configuration.");
-            return;
-        }
+            if (!token || cancelled) return;
+            if (!wsBaseUrl) return;
 
-        console.log(`📡 Attempting Secure WebSocket Connection [${userRegion}]...`);
-        const socket = new WebSocket(`${wsBaseUrl}?token=${token}`);
+            socket = new WebSocket(`${wsBaseUrl}?token=${token}`);
 
-        socket.onopen = () => {
-            console.log("✅ Secure WebSocket Connected");
-        };
+            socket.onmessage = (event) => {
+                try {
+                    const data = JSON.parse(event.data);
 
-        socket.onmessage = (event) => {
-            try {
-                const data = JSON.parse(event.data);
-                
-                // 🟢 HIPAA Logic: Only display if the message belongs to current view
-                if (data.type === "message" && data.senderId === selectedRecipientId) {
-                    setMessages(prev => {
-                        // Dedup based on timestamp + text
-                        const isDuplicate = prev.some(m => m.timestamp === data.timestamp && m.text === data.text);
-                        if (isDuplicate) return prev;
-                        return [...prev, data];
-                    });
+                    // 🟢 HIPAA Logic: Only display if the message belongs to current view
+                    if (data.type === "message" && data.senderId === selectedRecipientId) {
+                        setMessages(prev => {
+                            // Dedup based on timestamp + text
+                            const isDuplicate = prev.some(m => m.timestamp === data.timestamp && m.text === data.text);
+                            if (isDuplicate) return prev;
+                            return [...prev, data];
+                        });
+                    }
+                } catch {
+                    // Message parsing failed
                 }
-            } catch (err) {
-                console.error("❌ WS Message Parsing Error:", err);
-            }
+            };
         };
 
-        socket.onerror = (error) => {
-            console.error("❌ WebSocket Security/Network Error:", error);
-        };
-
-        socket.onclose = (event) => {
-            if (event.code === 1008) {
-                console.error("❌ WebSocket: Policy Violation. Token likely expired.");
-            } else {
-                console.log("❌ WebSocket Connection Closed.");
-            }
-        };
+        connectWebSocket();
 
         return () => {
-            if (socket.readyState === WebSocket.OPEN) {
+            cancelled = true;
+            if (socket && socket.readyState === WebSocket.OPEN) {
                 socket.close();
             }
         };

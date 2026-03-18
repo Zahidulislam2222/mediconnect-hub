@@ -17,6 +17,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { api } from "@/lib/api";
+import { getUser, setUser, clearAllSensitive } from "@/lib/secure-storage";
+import { useToast } from "@/hooks/use-toast";
 
 // --- AUTH HELPER ---
 const getAuthToken = async () => {
@@ -38,14 +40,14 @@ const getInitials = (name: string) => {
 
 export default function PatientDashboard() {
   const navigate = useNavigate();
+  const { toast } = useToast();
 
   // --- STATE ---
   const [hasToday, setHasToday] = useState(false);
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState<any>(() => {
     try {
-      const saved = localStorage.getItem('user');
-      return saved ? JSON.parse(saved) : null;
+      return getUser();
     } catch (e) { return null; }
   });
 
@@ -70,7 +72,7 @@ export default function PatientDashboard() {
         userId = user.userId;
       } catch (authError) {
         console.warn("Invalid AWS Session. Purging demo state and logging out.");
-        localStorage.clear();
+        clearAllSensitive();
         navigate("/auth");
         return;
       }
@@ -101,8 +103,8 @@ export default function PatientDashboard() {
         if (userData) {
           setProfile(userData);
           // Update local storage so Header doesn't flicker next time
-          const currentLocal = JSON.parse(localStorage.getItem('user') || '{}');
-          localStorage.setItem('user', JSON.stringify({ ...currentLocal, ...userData }));
+          const currentLocal = getUser() || {};
+          setUser({ ...currentLocal, ...userData });
         }
       }
 
@@ -169,10 +171,13 @@ export default function PatientDashboard() {
         const msg = error?.message || String(error);
         
         // ONLY log out if the backend explicitly says you are unauthorized/deleted
-        if (msg.includes('401') || msg.includes('403') || msg.includes('404')) {
-            localStorage.clear();
-            navigate("/auth");
-        }
+        if (msg.includes('401')) {
+    clearAllSensitive();
+    navigate("/auth");
+} else {
+
+    toast({ variant: "destructive", title: "Error", description: msg });
+}
     } finally {
       setLoading(false);
     }
@@ -220,7 +225,7 @@ if (avatarUrl && !avatarUrl.startsWith('http')) {
       userAvatar={profile?.avatar || ""}
       onLogout={async () => {
         await signOut();
-        localStorage.clear();
+        clearAllSensitive();
         window.location.href = "/";
       }}
     >

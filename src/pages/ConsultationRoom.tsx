@@ -30,6 +30,7 @@ import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { api } from "@/lib/api";
+import { getUser, clearAllSensitive } from "@/lib/secure-storage";
 
 export default function ConsultationRoom() {
   const navigate = useNavigate();
@@ -84,7 +85,7 @@ export default function ConsultationRoom() {
         ws = new WebSocket(wsUrl);
         socketRef.current = ws;
 
-        ws.onopen = () => console.log("Secure Chat Connected");
+        ws.onopen = () => { /* Chat connected */ };
 
         ws.onmessage = (event) => {
           try {
@@ -95,7 +96,7 @@ export default function ConsultationRoom() {
           }
         };
 
-        ws.onclose = () => console.log("Chat Disconnected");
+        ws.onclose = () => { /* Chat disconnected */ };
 
       } catch (error) {
         console.error("WebSocket Connection Failed:", error);
@@ -177,7 +178,9 @@ export default function ConsultationRoom() {
     leaveMeeting();
 
     // 3. Navigate immediately (Prevent lobby flash)
-    const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+    // ─── SECURE STORAGE FIX ───
+    // ORIGINAL: const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+    const currentUser = getUser() || {};
     navigate(currentUser.role === 'doctor' ? '/patient-queue' : '/appointments');
   };
 
@@ -333,7 +336,9 @@ export default function ConsultationRoom() {
       
       // 🟢 ADDED AUTH RULE
       if (msg.includes('401') || msg.includes('403') || msg.includes('The user is not authenticated')) {
-        localStorage.clear();
+        // ─── SECURE STORAGE FIX ───
+        // ORIGINAL: localStorage.clear();
+        clearAllSensitive();
         navigate("/auth");
         return;
       }
@@ -540,7 +545,9 @@ export default function ConsultationRoom() {
                               
                               // 🟢 ADDED AUTH RULE
                               if (msg.includes('401') || msg.includes('403')) {
-                                localStorage.clear();
+                                // ─── SECURE STORAGE FIX ───
+                                // ORIGINAL: localStorage.clear();
+                                clearAllSensitive();
                                 navigate("/auth");
                                 return;
                               }

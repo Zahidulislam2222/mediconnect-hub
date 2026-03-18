@@ -20,6 +20,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 
 import { api } from "@/lib/api";
+import { clearAllSensitive } from "@/lib/secure-storage";
 
 export default function Prescriptions() {
     const navigate = useNavigate();
@@ -62,7 +63,7 @@ export default function Prescriptions() {
 
             const [profileData, appointmentsData, rxData] = await Promise.all([
                 api.get(`/register-doctor?id=${userId}`).catch(() => null),
-                api.get(`/doctor-appointments?doctorId=${userId}`).catch(() => null),
+                api.get(`/appointments?doctorId=${userId}`).catch(() => null),
                 api.get(`/prescription?doctorId=${userId}`).catch(() => null)
             ]);
 
@@ -122,7 +123,9 @@ export default function Prescriptions() {
             console.error("Load Error", e);
             const msg = e?.message || String(e);
             if (msg.includes('401') || msg.includes('403') || msg.includes('404')) {
-                localStorage.clear();
+                // ─── SECURE STORAGE FIX ───
+                // ORIGINAL: localStorage.clear();
+                clearAllSensitive();
                 navigate("/auth");
             } else {
                 toast({ variant: "destructive", title: "Error", description: "Failed to load clinic data." });

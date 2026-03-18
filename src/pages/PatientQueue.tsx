@@ -7,6 +7,7 @@ import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { api } from "@/lib/api";
+import { clearAllSensitive } from "@/lib/secure-storage";
 
 // Sub-components & Utils (Added in previous step)
 import { getAptTime } from "@/components/patient-queue/utils";
@@ -124,10 +125,16 @@ export default function PatientQueue() {
                 setStats({ waiting: todayList.length, completed: completedToday.length, avgWait: `${avgMins}m` });
             }
         } catch (error: any) {
-            if (error?.message?.includes('401') || error?.message?.includes('403')) {
-                localStorage.clear();
-                navigate("/auth");
-            }
+    const msg = error?.message || String(error);
+            if (msg.includes('401')) {
+    // ─── SECURE STORAGE FIX ───
+    // ORIGINAL: localStorage.clear();
+    clearAllSensitive();
+    navigate("/auth");
+} else {
+
+    toast({ variant: "destructive", title: "Error", description: msg });
+}
         } finally {
             if (!silent) setIsLoading(false);
         }

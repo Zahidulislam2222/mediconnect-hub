@@ -54,9 +54,28 @@ export default function HipaaCompliance() {
                     </div>
                 </div>
 
+                <div className="grid gap-8 md:grid-cols-2 mb-12">
+                    <div className="p-6 border rounded-xl bg-card">
+                        <h3 className="text-lg font-semibold mb-2">HIPAA Privacy Officer</h3>
+                        <p className="text-sm text-muted-foreground mb-2">
+                            For questions about how your Protected Health Information (PHI) is used, disclosed, or accessed:
+                        </p>
+                        <p className="text-sm"><strong>Email:</strong> <a href="mailto:hipaa@mediconnect.health" className="text-primary underline">hipaa@mediconnect.health</a></p>
+                        <p className="text-sm"><strong>Response Time:</strong> Within 30 days</p>
+                    </div>
+                    <div className="p-6 border rounded-xl bg-card">
+                        <h3 className="text-lg font-semibold mb-2">Data Protection Officer (GDPR)</h3>
+                        <p className="text-sm text-muted-foreground mb-2">
+                            For EU residents — data access, rectification, erasure, or portability requests:
+                        </p>
+                        <p className="text-sm"><strong>Email:</strong> <a href="mailto:dpo@mediconnect.health" className="text-primary underline">dpo@mediconnect.health</a></p>
+                        <p className="text-sm"><strong>Response Time:</strong> Within 30 days (GDPR Art. 12)</p>
+                    </div>
+                </div>
+
                 <div className="text-center">
                     <p className="text-sm text-muted-foreground mb-4">
-                        If you have any questions about our security practices or HIPAA compliance, please contact our Data Protection Officer.
+                        For general security inquiries, breach reports, or compliance questions, contact our security team directly.
                     </p>
                     <Button variant="outline" onClick={() => navigate("/contact")}>Contact Security Team</Button>
                 </div>

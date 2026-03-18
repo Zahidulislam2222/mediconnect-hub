@@ -144,7 +144,6 @@ export const CheckoutProvider = ({ children }: { children: ReactNode }) => {
 
     // 🟢 ARCHITECTURE #2 FIX: Load Stripe only when this provider is actually used
     const stripePromise = useMemo(() => {
-        console.log("💳 Stripe Initialized for Secure Session");
         return loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
     }, []);
 

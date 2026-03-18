@@ -20,6 +20,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { api } from "@/lib/api";
+import { getUser, setUser as setStoredUser } from "@/lib/secure-storage";
 
 // --- DEMO FALLBACK DATA (For when AWS Limit is Reached) ---
 const DEMO_TEXT_RESPONSE = {
@@ -36,9 +37,11 @@ export default function SymptomChecker() {
 
   // --- STATE ---
   const [user, setUser] = useState<any>(() => {
+    // ─── SECURE STORAGE FIX ───
+    // ORIGINAL: const saved = localStorage.getItem('user'); return saved ? JSON.parse(saved) : ...
     try {
-      const saved = localStorage.getItem('user');
-      return saved ? JSON.parse(saved) : { name: "Patient", id: "guest", avatar: null };
+      const saved = getUser();
+      return saved || { name: "Patient", id: "guest", avatar: null };
     } catch (e) { return { name: "Patient", id: "guest", avatar: null }; }
   });
   const [messages, setMessages] = useState<any[]>([
@@ -65,9 +68,11 @@ export default function SymptomChecker() {
         };
         setUser(userData);
 
-        // 🟢 FIX: Update Storage Safely
-        const currentLocal = JSON.parse(localStorage.getItem('user') || '{}');
-        localStorage.setItem('user', JSON.stringify({ ...currentLocal, ...userData }));
+        // ─── SECURE STORAGE FIX ───
+        // ORIGINAL: const currentLocal = JSON.parse(localStorage.getItem('user') || '{}');
+        // ORIGINAL: localStorage.setItem('user', JSON.stringify({ ...currentLocal, ...userData }));
+        const currentLocal = getUser() || {};
+        setStoredUser({ ...currentLocal, ...userData });
       } catch (err) {
         console.warn("Auth load failed, using guest mode");
       }

@@ -82,7 +82,7 @@ export default function PatientRecords() {
             }
 
             // B. Fetch Appointments
-            const scheduleRes: any = await api.get(`/doctor-appointments?doctorId=${user.userId}`);
+            const scheduleRes: any = await api.get(`/appointments?doctorId=${user.userId}`);
 
             // Prepare the list
             const data = scheduleRes || {};
