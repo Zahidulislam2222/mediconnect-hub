@@ -1,69 +1,154 @@
 import { useNavigate } from "react-router-dom";
-import { Stethoscope } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Stethoscope, Menu, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { getCurrentUser } from 'aws-amplify/auth'; // 1. Import Amplify Auth
+import { getCurrentUser } from 'aws-amplify/auth';
 import { getUser } from "@/lib/secure-storage";
+import { cn } from "@/lib/utils";
 
 export function PublicHeader() {
-    const navigate = useNavigate();
+  const navigate = useNavigate();
+  const [scrolled, setScrolled] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
 
-    // 2. Create the "Smart Redirect" function
-    const handleGetStarted = async () => {
-        try {
-            // Check if there is an active session
-            await getCurrentUser();
+  useEffect(() => {
+    const handleScroll = () => setScrolled(window.scrollY > 20);
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
 
-            // If the above line doesn't throw an error, a user is logged in.
-            // Now, check their role from the profile saved in localStorage.
-            // ─── SECURE STORAGE FIX ───
-            // ORIGINAL: const savedUser = localStorage.getItem('user');
-            // ORIGINAL: const profile = savedUser ? JSON.parse(savedUser) : null;
-            const profile = getUser();
+  const handleGetStarted = async () => {
+    try {
+      await getCurrentUser();
+      const profile = getUser();
+      if (profile && ['doctor', 'provider'].includes((profile.role || '').toLowerCase())) {
+        navigate('/doctor-dashboard');
+      } else if (profile && ['admin'].includes((profile.role || '').toLowerCase())) {
+        navigate('/admin/dashboard');
+      } else if (profile && ['staff'].includes((profile.role || '').toLowerCase())) {
+        navigate('/staff/dashboard');
+      } else {
+        navigate('/patient-dashboard');
+      }
+    } catch {
+      navigate('/auth');
+    }
+  };
 
-            // Check if the role is doctor or provider (case-insensitive)
-            if (profile && ['doctor', 'provider'].includes((profile.role || '').toLowerCase())) {
-                navigate('/doctor-dashboard'); // Go to Doctor Portal
-            } else {
-                navigate('/patient-dashboard'); // Default to Patient Portal
-            }
-        } catch (error) {
-            // This error means no user is signed in (Guest).
-            navigate('/auth'); // Go to the Login/Sign Up page
-        }
-    };
+  const navLinks = [
+    { label: "Features", href: "/#features" },
+    { label: "How It Works", href: "/#how-it-works" },
+    { label: "Knowledge Base", action: () => navigate("/knowledge") },
+  ];
 
-    return (
-        <nav className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-lg border-b border-border">
-            <div className="container mx-auto px-6 h-16 flex items-center justify-between">
-                <div className="flex items-center gap-3" onClick={() => navigate("/")} style={{ cursor: 'pointer' }}>
-                    <div className="flex h-9 w-9 items-center justify-center rounded-xl medical-gradient">
-                        <Stethoscope className="h-5 w-5 text-white" />
-                    </div>
-                    <span className="text-xl font-bold">MediConnect</span>
-                </div>
-
-                <div className="hidden md:flex items-center gap-8">
-                    <a href="/#features" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-                        Features
-                    </a>
-                    <a href="/#how-it-works" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-                        How It Works
-                    </a>
-                    <a href="/#testimonials" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-                        Testimonials
-                    </a>
-                    <button onClick={() => navigate("/knowledge")} className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-                        Knowledge Base
-                    </button>
-                </div>
-
-                <div className="flex items-center gap-3">
-                    {/* 3. Update the onClick handler to use the new smart function */}
-                    <Button onClick={handleGetStarted} className="bg-primary hover:bg-primary/90">
-                        Get Started
-                    </Button>
-                </div>
+  return (
+    <>
+      <nav className={cn(
+        "fixed top-0 left-0 right-0 z-50 transition-all duration-300 safe-top",
+        scrolled
+          ? "bg-background/85 backdrop-blur-xl border-b border-border shadow-soft"
+          : "bg-transparent border-b border-transparent"
+      )}>
+        <div className="container mx-auto px-6 h-16 flex items-center justify-between">
+          {/* Logo */}
+          <div
+            className="flex items-center gap-2.5 cursor-pointer group"
+            onClick={() => navigate("/")}
+          >
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl medical-gradient shadow-sm group-hover:shadow-glow transition-shadow duration-300">
+              <Stethoscope className="h-[18px] w-[18px] text-white" />
             </div>
-        </nav>
-    );
+            <span className="font-display text-lg font-bold text-foreground">MediConnect</span>
+          </div>
+
+          {/* Desktop Nav */}
+          <div className="hidden md:flex items-center gap-8">
+            {navLinks.map((link) => (
+              link.action ? (
+                <button
+                  key={link.label}
+                  onClick={link.action}
+                  className="text-sm text-muted-foreground hover:text-foreground transition-colors duration-200"
+                >
+                  {link.label}
+                </button>
+              ) : (
+                <a
+                  key={link.label}
+                  href={link.href}
+                  className="text-sm text-muted-foreground hover:text-foreground transition-colors duration-200"
+                >
+                  {link.label}
+                </a>
+              )
+            ))}
+          </div>
+
+          {/* Actions */}
+          <div className="flex items-center gap-3">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => navigate("/admin-auth")}
+              className="hidden md:inline-flex text-muted-foreground hover:text-foreground text-sm"
+            >
+              Staff Portal
+            </Button>
+            <Button
+              onClick={handleGetStarted}
+              size="sm"
+              className="medical-gradient text-white border-0 rounded-lg shadow-sm hover:shadow-glow transition-all duration-300"
+            >
+              Get Started
+            </Button>
+
+            {/* Mobile menu toggle */}
+            <button
+              className="md:hidden p-2 text-muted-foreground hover:text-foreground"
+              onClick={() => setMobileOpen(!mobileOpen)}
+            >
+              {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+            </button>
+          </div>
+        </div>
+      </nav>
+
+      {/* Mobile menu */}
+      {mobileOpen && (
+        <div className="fixed inset-0 z-40 md:hidden">
+          <div className="fixed inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setMobileOpen(false)} />
+          <div className="fixed top-16 left-0 right-0 bg-background border-b border-border shadow-elevated p-6 space-y-4 animate-fade-in z-50">
+            {navLinks.map((link) => (
+              <div key={link.label}>
+                {link.action ? (
+                  <button
+                    onClick={() => { link.action(); setMobileOpen(false); }}
+                    className="block w-full text-left text-base font-medium text-foreground py-2"
+                  >
+                    {link.label}
+                  </button>
+                ) : (
+                  <a
+                    href={link.href}
+                    onClick={() => setMobileOpen(false)}
+                    className="block text-base font-medium text-foreground py-2"
+                  >
+                    {link.label}
+                  </a>
+                )}
+              </div>
+            ))}
+            <div className="pt-2 border-t border-border">
+              <button
+                onClick={() => { navigate("/admin-auth"); setMobileOpen(false); }}
+                className="block w-full text-left text-sm text-muted-foreground py-2"
+              >
+                Staff & Admin Portal
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
 }

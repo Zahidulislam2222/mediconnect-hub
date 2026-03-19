@@ -31,6 +31,7 @@ import PrivacyPolicy from "./pages/PrivacyPolicy";
 import TermsOfService from "./pages/TermsOfService";
 import HipaaCompliance from "./pages/HipaaCompliance";
 import Contact from "./pages/Contact";
+import AdminStaffAuth from "./pages/AdminStaffAuth";
 import NotFound from "./pages/NotFound";
 import Billing from "./pages/Billing";
 import PatientRecords from "./pages/PatientRecords";
@@ -90,42 +91,44 @@ const GdprBanner = () => {
   };
 
   return (
-    <div className="fixed bottom-0 w-full bg-slate-900 text-white p-4 z-[9999] shadow-lg">
-      <div className="max-w-4xl mx-auto">
-        <p className="text-sm mb-3">
-          We use cookies and process data strictly in your region to comply with GDPR & HIPAA.
-          See our <a href="/privacy-policy" className="underline text-blue-300">Privacy Policy</a>.
-        </p>
-        {showCustomize ? (
-          <div className="space-y-2 mb-3">
-            <label className="flex items-center gap-2 text-sm">
-              <input type="checkbox" checked disabled className="rounded" />
-              <span>Essential (required for the app to function)</span>
-            </label>
-            <label className="flex items-center gap-2 text-sm cursor-pointer">
-              <input type="checkbox" checked={functional} onChange={(e) => setFunctional(e.target.checked)} className="rounded" />
-              <span>Functional (push notifications, real-time features)</span>
-            </label>
-            <label className="flex items-center gap-2 text-sm cursor-pointer">
-              <input type="checkbox" checked={analytics} onChange={(e) => setAnalytics(e.target.checked)} className="rounded" />
-              <span>Analytics (anonymized usage data to improve the platform)</span>
-            </label>
+    <div className="fixed bottom-0 w-full z-[9999]">
+      <div className="mx-4 mb-4 sm:mx-6 sm:mb-6 max-w-2xl sm:ml-auto">
+        <div className="rounded-2xl bg-foreground/95 backdrop-blur-xl text-background p-5 shadow-elevated border border-white/10">
+          <p className="text-sm mb-4 text-background/80 leading-relaxed">
+            We use cookies and process data strictly in your region to comply with GDPR & HIPAA.
+            See our <a href="/privacy-policy" className="underline text-primary-foreground/90 hover:text-primary-foreground">Privacy Policy</a>.
+          </p>
+          {showCustomize ? (
+            <div className="space-y-2.5 mb-4">
+              <label className="flex items-center gap-2.5 text-sm">
+                <input type="checkbox" checked disabled className="rounded accent-primary" />
+                <span className="text-background/70">Essential (required for the app to function)</span>
+              </label>
+              <label className="flex items-center gap-2.5 text-sm cursor-pointer">
+                <input type="checkbox" checked={functional} onChange={(e) => setFunctional(e.target.checked)} className="rounded accent-primary" />
+                <span className="text-background/70">Functional (push notifications, real-time features)</span>
+              </label>
+              <label className="flex items-center gap-2.5 text-sm cursor-pointer">
+                <input type="checkbox" checked={analytics} onChange={(e) => setAnalytics(e.target.checked)} className="rounded accent-primary" />
+                <span className="text-background/70">Analytics (anonymized usage data)</span>
+              </label>
+            </div>
+          ) : null}
+          <div className="flex flex-col sm:flex-row gap-2">
+            {!showCustomize && (
+              <button onClick={() => setShowCustomize(true)} className="text-background/50 hover:text-background/80 text-sm font-medium mr-4 transition-colors">
+                Customize
+              </button>
+            )}
+            {showCustomize && (
+              <button onClick={() => saveConsent(functional, analytics)} className="bg-background/10 hover:bg-background/20 px-5 py-2.5 rounded-xl font-semibold text-sm transition-colors text-background">
+                Accept Selected
+              </button>
+            )}
+            <button onClick={() => saveConsent(true, true)} className="medical-gradient px-5 py-2.5 rounded-xl font-semibold text-sm text-white shadow-sm hover:shadow-glow transition-all">
+              Accept All
+            </button>
           </div>
-        ) : null}
-        <div className="flex flex-col sm:flex-row gap-2">
-          {!showCustomize && (
-            <button onClick={() => setShowCustomize(true)} className="text-blue-300 hover:text-blue-200 text-sm underline mr-4">
-              Customize
-            </button>
-          )}
-          {showCustomize && (
-            <button onClick={() => saveConsent(functional, analytics)} className="bg-slate-700 hover:bg-slate-600 px-6 py-2 rounded-md font-semibold text-sm transition-colors">
-              Accept Selected
-            </button>
-          )}
-          <button onClick={() => saveConsent(true, true)} className="bg-blue-600 hover:bg-blue-500 px-6 py-2 rounded-md font-semibold text-sm transition-colors">
-            Accept All
-          </button>
         </div>
       </div>
     </div>
@@ -279,6 +282,7 @@ const AppContent = () => {
       {/* PUBLIC ZONE — no HIPAA guard needed */}
       <Route path="/" element={<Index />} />
       <Route path="/auth" element={<Auth />} />
+      <Route path="/admin-auth" element={<AdminStaffAuth />} />
       <Route path="/knowledge" element={<KnowledgeBase role="patient" />} />
       <Route path="/knowledge/:slug" element={<KnowledgeBasePost role="patient" />} />
       <Route path="/privacy-policy" element={<PrivacyPolicy />} />

@@ -511,27 +511,62 @@ export default function Auth() {
     toast({ title: "Demo Mode", description: "Verification bypassed." });
   };
 
-  if (isCheckingSession) return <div className="min-h-screen flex items-center justify-center bg-background"><Loader2 className="h-12 w-12 animate-spin text-primary" /></div>;
+  if (isCheckingSession) return (
+    <div className="min-h-screen flex items-center justify-center bg-background">
+      <div className="flex flex-col items-center gap-4">
+        <div className="relative">
+          <div className="h-14 w-14 rounded-2xl medical-gradient flex items-center justify-center shadow-glow">
+            <Stethoscope className="h-7 w-7 text-white" />
+          </div>
+          <div className="absolute inset-0 rounded-2xl medical-gradient animate-ping opacity-20" />
+        </div>
+        <Loader2 className="h-6 w-6 animate-spin text-primary" />
+      </div>
+    </div>
+  );
 
   return (
     <div className="min-h-screen flex">
       {!['identity', 'diploma-upload'].includes(authStep) && <PublicHeader />}
-      
-      <div className="hidden lg:flex lg:w-1/2 medical-gradient p-24 flex-col justify-between">
-        <div>
-          <div className="flex items-center gap-3 mb-12">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-white/20">
-              <Stethoscope className="h-7 w-7 text-white" />
+
+      {/* Left Panel — Brand Visual */}
+      <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden">
+        <div className="absolute inset-0 medical-gradient" />
+        <div className="absolute inset-0 grain" />
+        <div className="absolute top-0 right-0 w-96 h-96 bg-white/5 rounded-full blur-3xl -translate-y-1/3 translate-x-1/4" />
+        <div className="absolute bottom-0 left-0 w-80 h-80 bg-white/5 rounded-full blur-3xl translate-y-1/4 -translate-x-1/4" />
+
+        <div className="relative z-10 p-16 xl:p-24 flex flex-col justify-between w-full">
+          <div>
+            <div className="flex items-center gap-3 mb-16">
+              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-white/15 backdrop-blur-sm border border-white/10">
+                <Stethoscope className="h-7 w-7 text-white" />
+              </div>
+              <span className="font-display text-2xl font-bold text-white">MediConnect</span>
             </div>
-            <span className="text-2xl font-bold text-white">MediConnect</span>
+            <h1 className="font-display text-4xl xl:text-5xl font-bold text-white mb-6 leading-[1.15]">
+              Healthcare at
+              <br />Your Fingertips
+            </h1>
+            <p className="text-lg text-white/70 max-w-md leading-relaxed">
+              Connect with world-class healthcare providers from anywhere. Secure, private, and fully HIPAA-compliant.
+            </p>
           </div>
-          <h1 className="text-4xl font-bold text-white mb-6">Healthcare at Your Fingertips</h1>
-          <p className="text-xl text-white/80 max-w-md">Connect with world-class healthcare providers from anywhere. Secure, private, and HIPAA-compliant.</p>
+
+          <div className="flex items-center gap-6 text-sm text-white/40">
+            <span>HIPAA Compliant</span>
+            <span className="h-1 w-1 rounded-full bg-white/30" />
+            <span>GDPR Ready</span>
+            <span className="h-1 w-1 rounded-full bg-white/30" />
+            <span>AES-256</span>
+          </div>
         </div>
       </div>
 
-      <div className="flex-1 flex items-center justify-center p-6 bg-background">
-        <div className="w-full max-w-md">
+      {/* Right Panel — Auth Forms */}
+      <div className="flex-1 flex items-center justify-center p-6 bg-background relative">
+        <div className="absolute top-0 right-0 w-80 h-80 bg-primary/3 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3" />
+        <div className="w-full max-w-md relative z-10">
           {authStep === "login" && (
             <LoginCard userType={userType} setUserType={setUserType} selectedRegion={selectedRegion} setSelectedRegion={setSelectedRegion} email={email} setEmail={setEmail} password={password} setPassword={setPassword} loading={loading} handleLogin={handleLogin} setAuthStep={setAuthStep} />
           )}

@@ -16,7 +16,6 @@ import {
   Stethoscope,
   Users,
   BarChart3,
-  Shield,
   Brain,
   Activity,
   ShieldCheck,
@@ -28,11 +27,8 @@ import {
   Contact,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-// 🟢 ADDED AvatarImage HERE
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
-import { Badge } from "@/components/ui/badge";
 
 interface SidebarProps {
   userRole: "patient" | "doctor" | "admin" | "staff";
@@ -80,17 +76,20 @@ const staffNavItems = [
   { icon: Contact, label: "Directory", path: "/staff/directory" },
 ];
 
+const roleConfig = {
+  patient: { label: "Patient Portal", color: "bg-primary/10 text-primary border-primary/15", icon: null },
+  doctor: { label: "Doctor Portal", color: "bg-primary/10 text-primary border-primary/15", icon: null },
+  admin: { label: "Admin Portal", color: "bg-rose-500/10 text-rose-600 border-rose-500/15", icon: ShieldCheck },
+  staff: { label: "Staff Portal", color: "bg-amber-500/10 text-amber-600 border-amber-500/15", icon: null },
+};
+
 export function Sidebar({ userRole, userName, userAvatar, onLogout, className }: SidebarProps) {
   const [collapsed, setCollapsed] = useState(false);
   const location = useLocation();
 
-  const navItemsMap = {
-    patient: patientNavItems,
-    doctor: doctorNavItems,
-    admin: adminNavItems,
-    staff: staffNavItems,
-  };
+  const navItemsMap = { patient: patientNavItems, doctor: doctorNavItems, admin: adminNavItems, staff: staffNavItems };
   const navItems = navItemsMap[userRole] || patientNavItems;
+  const config = roleConfig[userRole];
 
   return (
     <aside
@@ -103,58 +102,50 @@ export function Sidebar({ userRole, userName, userAvatar, onLogout, className }:
       {/* Logo */}
       <div className="flex h-16 items-center justify-between px-4">
         {!collapsed && (
-          <div className="flex items-center gap-2">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl medical-gradient">
-              <Stethoscope className="h-5 w-5 text-white" />
+          <div className="flex items-center gap-2.5">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl medical-gradient shadow-sm">
+              <Stethoscope className="h-[18px] w-[18px] text-white" />
             </div>
-            <span className="text-lg font-bold text-sidebar-foreground">MediConnect</span>
+            <span className="font-display text-lg font-bold text-sidebar-foreground">MediConnect</span>
           </div>
         )}
         {collapsed && (
-          <div className="mx-auto flex h-9 w-9 items-center justify-center rounded-xl medical-gradient">
-            <Stethoscope className="h-5 w-5 text-white" />
+          <div className="mx-auto flex h-9 w-9 items-center justify-center rounded-xl medical-gradient shadow-sm">
+            <Stethoscope className="h-[18px] w-[18px] text-white" />
           </div>
         )}
         <Button
           variant="ghost"
           size="icon"
           className={cn(
-            "h-8 w-8 rounded-lg text-sidebar-foreground/60 hover:bg-sidebar-accent hover:text-sidebar-foreground",
-            collapsed && "absolute -right-3 top-6 bg-card shadow-md border"
+            "h-7 w-7 rounded-lg text-sidebar-foreground/40 hover:bg-sidebar-accent hover:text-sidebar-foreground",
+            collapsed && "absolute -right-3.5 top-6 bg-card shadow-md border border-border h-7 w-7"
           )}
           onClick={() => setCollapsed(!collapsed)}
         >
-          {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
+          {collapsed ? <ChevronRight className="h-3.5 w-3.5" /> : <ChevronLeft className="h-3.5 w-3.5" />}
         </Button>
       </div>
 
-      <Separator className="bg-sidebar-border" />
+      {/* Divider */}
+      <div className="mx-3 h-px bg-sidebar-border" />
 
       {/* Role Badge */}
       {!collapsed && (
-        <div className="px-4 py-3">
-          <Badge
-            variant="secondary"
-            className={cn(
-              "w-full justify-center py-1.5 text-xs font-medium",
-              userRole === "doctor" ? "bg-primary/10 text-primary border-primary/20"
-                : userRole === "admin" ? "bg-red-500/10 text-red-600 border-red-500/20"
-                : userRole === "staff" ? "bg-amber-500/10 text-amber-600 border-amber-500/20"
-                : "bg-accent/10 text-accent border-accent/20"
-            )}
-          >
-            {userRole === "admin" ? <ShieldCheck className="mr-1.5 h-3 w-3" /> : <Shield className="mr-1.5 h-3 w-3" />}
-            {userRole === "doctor" ? "Doctor Portal"
-              : userRole === "admin" ? "Admin Portal"
-              : userRole === "staff" ? "Staff Portal"
-              : "Patient Portal"}
-          </Badge>
+        <div className="px-3 py-3">
+          <div className={cn(
+            "flex items-center justify-center gap-1.5 rounded-xl border py-2 text-xs font-medium",
+            config.color
+          )}>
+            {config.icon && <config.icon className="h-3.5 w-3.5" />}
+            {config.label}
+          </div>
         </div>
       )}
 
       {/* Navigation */}
-      <nav className="flex-1 overflow-y-auto p-3 scrollbar-thin">
-        <ul className="space-y-1">
+      <nav className="flex-1 overflow-y-auto px-3 py-1 scrollbar-thin">
+        <ul className="space-y-0.5">
           {navItems.map((item) => {
             const isActive = location.pathname === item.path;
             return (
@@ -167,7 +158,7 @@ export function Sidebar({ userRole, userName, userAvatar, onLogout, className }:
                     collapsed && "justify-center px-2"
                   )}
                 >
-                  <item.icon className={cn("h-5 w-5 flex-shrink-0", isActive && "text-primary")} />
+                  <item.icon className={cn("h-[18px] w-[18px] flex-shrink-0", isActive && "text-primary")} />
                   {!collapsed && <span>{item.label}</span>}
                 </NavLink>
               </li>
@@ -176,10 +167,11 @@ export function Sidebar({ userRole, userName, userAvatar, onLogout, className }:
         </ul>
       </nav>
 
-      <Separator className="bg-sidebar-border" />
+      {/* Divider */}
+      <div className="mx-3 h-px bg-sidebar-border" />
 
-      {/* Settings & User */}
-      <div className="p-3">
+      {/* Settings */}
+      <div className="px-3 py-2">
         {(userRole === "patient" || userRole === "doctor") && (
           <NavLink
             to={userRole === 'doctor' ? "/doctor/settings" : "/patient/settings"}
@@ -189,38 +181,32 @@ export function Sidebar({ userRole, userName, userAvatar, onLogout, className }:
               collapsed && "justify-center px-2"
             )}
           >
-            <Settings className="h-5 w-5 flex-shrink-0" />
+            <Settings className="h-[18px] w-[18px] flex-shrink-0" />
             {!collapsed && <span>Settings</span>}
           </NavLink>
         )}
       </div>
 
-      <Separator className="bg-sidebar-border" />
+      {/* Divider */}
+      <div className="mx-3 h-px bg-sidebar-border" />
 
       {/* User Profile */}
       <div className={cn("p-3", collapsed && "px-2")}>
-        <div
-          className={cn(
-            "flex items-center gap-3 rounded-lg p-2 transition-colors hover:bg-sidebar-accent",
-            collapsed && "justify-center"
-          )}
-        >
-          <Avatar className="h-9 w-9 border-2 border-primary/20">
-            {/* 🟢 1. Try to load the S3 Photo URL */}
-            <AvatarImage src={userAvatar} alt={userName} className="object-cover" />
-
-            {/* 🟢 2. If no photo, use initials (but ensure we don't print a URL string) */}
-            <AvatarFallback className="bg-primary/10 text-primary text-sm font-medium">
+        <div className={cn(
+          "flex items-center gap-3 rounded-xl p-2.5 transition-colors hover:bg-sidebar-accent",
+          collapsed && "justify-center"
+        )}>
+          <Avatar className="h-9 w-9 border-2 border-primary/15 rounded-xl">
+            <AvatarImage src={userAvatar} alt={userName} className="object-cover rounded-xl" />
+            <AvatarFallback className="bg-primary/8 text-primary text-sm font-medium rounded-xl">
               {(userName || "User").substring(0, 2).toUpperCase()}
             </AvatarFallback>
           </Avatar>
 
           {!collapsed && (
             <div className="flex-1 overflow-hidden">
-              <p className="truncate text-sm font-medium text-sidebar-foreground">
-                {userName}
-              </p>
-              <p className="truncate text-xs text-sidebar-foreground/60">
+              <p className="truncate text-sm font-medium text-sidebar-foreground">{userName}</p>
+              <p className="truncate text-xs text-sidebar-foreground/50">
                 {userRole === "doctor" ? "Doctor" : userRole === "admin" ? "Administrator" : userRole === "staff" ? "Staff" : "Patient"}
               </p>
             </div>
@@ -229,7 +215,7 @@ export function Sidebar({ userRole, userName, userAvatar, onLogout, className }:
             <Button
               variant="ghost"
               size="icon"
-              className="h-8 w-8 text-sidebar-foreground/60 hover:bg-destructive/10 hover:text-destructive"
+              className="h-8 w-8 rounded-lg text-sidebar-foreground/40 hover:bg-destructive/10 hover:text-destructive"
               onClick={onLogout}
             >
               <LogOut className="h-4 w-4" />

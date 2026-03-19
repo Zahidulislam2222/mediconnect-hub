@@ -22,29 +22,29 @@ export function Header({ title, subtitle }: HeaderProps) {
   const unreadCount = notifications.filter((n) => !n.read).length;
 
   return (
-    <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 px-6">
+    <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-border bg-background/80 backdrop-blur-xl px-6">
       <div>
-        <h1 className="text-xl font-semibold text-foreground">{title}</h1>
+        <h1 className="font-display text-xl font-semibold text-foreground">{title}</h1>
         {subtitle && (
           <p className="text-sm text-muted-foreground">{subtitle}</p>
         )}
       </div>
 
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-2">
         {/* Search */}
         <div className="relative hidden md:block">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground/50" />
           <Input
             type="search"
             placeholder="Search..."
-            className="w-64 pl-9 bg-secondary/50 border-0 focus-visible:ring-1"
+            className="w-56 lg:w-64 pl-9 h-9 rounded-xl bg-secondary/50 border-border/50 focus-visible:ring-1 focus-visible:ring-primary/30 text-sm"
           />
         </div>
 
         {/* Messages */}
-        <Button variant="ghost" size="icon" className="relative">
-          <MessageSquare className="h-5 w-5 text-muted-foreground" />
-          <span className="absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[10px] font-medium text-primary-foreground">
+        <Button variant="ghost" size="icon" className="relative h-9 w-9 rounded-xl hover:bg-secondary">
+          <MessageSquare className="h-[18px] w-[18px] text-muted-foreground" />
+          <span className="absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[9px] font-bold text-primary-foreground shadow-sm">
             3
           </span>
         </Button>
@@ -52,19 +52,19 @@ export function Header({ title, subtitle }: HeaderProps) {
         {/* Notifications */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="relative">
-              <Bell className="h-5 w-5 text-muted-foreground" />
+            <Button variant="ghost" size="icon" className="relative h-9 w-9 rounded-xl hover:bg-secondary">
+              <Bell className="h-[18px] w-[18px] text-muted-foreground" />
               {unreadCount > 0 && (
-                <span className="absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-destructive text-[10px] font-medium text-destructive-foreground">
+                <span className="absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-accent text-[9px] font-bold text-accent-foreground shadow-sm">
                   {unreadCount}
                 </span>
               )}
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-80">
+          <DropdownMenuContent align="end" className="w-80 rounded-xl">
             <DropdownMenuLabel className="flex items-center justify-between">
-              <span>Notifications</span>
-              <Badge variant="secondary" className="text-xs">
+              <span className="font-display">Notifications</span>
+              <Badge variant="secondary" className="text-xs rounded-lg">
                 {unreadCount} new
               </Badge>
             </DropdownMenuLabel>
@@ -73,26 +73,26 @@ export function Header({ title, subtitle }: HeaderProps) {
               <DropdownMenuItem
                 key={notification.id}
                 className={cn(
-                  "flex flex-col items-start gap-1 p-3 cursor-pointer",
-                  !notification.read && "bg-primary/5"
+                  "flex flex-col items-start gap-1 p-3 cursor-pointer rounded-lg",
+                  !notification.read && "bg-primary/3"
                 )}
               >
                 <div className="flex items-center gap-2">
                   {!notification.read && (
-                    <span className="h-2 w-2 rounded-full bg-primary" />
+                    <span className="h-1.5 w-1.5 rounded-full bg-primary" />
                   )}
                   <span className="font-medium text-sm">{notification.title}</span>
                 </div>
                 <p className="text-xs text-muted-foreground line-clamp-2">
                   {notification.message}
                 </p>
-                <span className="text-xs text-muted-foreground/60">
+                <span className="text-xs text-muted-foreground/50">
                   {notification.time}
                 </span>
               </DropdownMenuItem>
             ))}
             <DropdownMenuSeparator />
-            <DropdownMenuItem className="justify-center text-primary cursor-pointer">
+            <DropdownMenuItem className="justify-center text-primary cursor-pointer rounded-lg font-medium text-sm">
               View all notifications
             </DropdownMenuItem>
           </DropdownMenuContent>

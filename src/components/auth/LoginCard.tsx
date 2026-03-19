@@ -1,17 +1,16 @@
 import React from "react";
-import { User, Building2, ArrowRight, Loader2, Globe } from "lucide-react"; // 🟢 Added Globe
+import { User, Building2, ArrowRight, Loader2, Globe } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
-type Region = "US" | "EU"; // 🟢 Added Type
+type Region = "US" | "EU";
 
 interface LoginCardProps {
   userType: "patient" | "provider";
   setUserType: (val: "patient" | "provider") => void;
-  // 🟢 ADDED: Region Props
   selectedRegion: Region;
   setSelectedRegion: (val: Region) => void;
   email: string;
@@ -26,7 +25,6 @@ interface LoginCardProps {
 export const LoginCard: React.FC<LoginCardProps> = ({
   userType,
   setUserType,
-  // 🟢 Destructure new props
   selectedRegion,
   setSelectedRegion,
   email,
@@ -38,38 +36,38 @@ export const LoginCard: React.FC<LoginCardProps> = ({
   setAuthStep
 }) => {
   return (
-    <div className="space-y-6 animate-in fade-in zoom-in duration-300">
-      {/* 🟢 ADDED: Region Selector (Same as SignupCard for consistency) */}
-      <div className="bg-slate-50 border border-slate-200 rounded-lg p-2 flex items-center justify-between shadow-sm">
-        <div className="flex items-center gap-2 text-sm font-medium text-slate-600 pl-2">
-          <Globe className="h-4 w-4 text-primary" /> 
-          <span>Login Region</span>
+    <div className="space-y-5 animate-fade-in">
+      {/* Region Selector */}
+      <div className="flex items-center justify-between rounded-xl border border-border bg-secondary/50 p-2.5 px-4">
+        <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+          <Globe className="h-4 w-4 text-primary" />
+          <span>Region</span>
         </div>
-        <Tabs value={selectedRegion} onValueChange={(v) => setSelectedRegion(v as Region)} className="w-[140px]">
-          <TabsList className="grid w-full grid-cols-2 h-8">
-            <TabsTrigger value="US" className="text-xs">US</TabsTrigger>
-            <TabsTrigger value="EU" className="text-xs">EU</TabsTrigger>
+        <Tabs value={selectedRegion} onValueChange={(v) => setSelectedRegion(v as Region)} className="w-[130px]">
+          <TabsList className="grid w-full grid-cols-2 h-8 rounded-lg bg-background">
+            <TabsTrigger value="US" className="text-xs rounded-md data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">US</TabsTrigger>
+            <TabsTrigger value="EU" className="text-xs rounded-md data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">EU</TabsTrigger>
           </TabsList>
         </Tabs>
       </div>
 
-      <Card className="shadow-elevated border-border/50">
-        <CardHeader className="text-center pb-2">
-          <CardTitle className="text-2xl font-bold tracking-tight">Welcome Back</CardTitle>
-          <CardDescription>Sign in to your secure medical account</CardDescription>
+      <Card className="shadow-elevated border-border/60 rounded-2xl overflow-hidden">
+        <CardHeader className="text-center pb-2 pt-8">
+          <CardTitle className="font-display text-2xl font-bold tracking-tight">Welcome Back</CardTitle>
+          <CardDescription className="text-muted-foreground">Sign in to your secure medical account</CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="px-7 pb-8">
           {/* Role Selector */}
-          <Tabs 
-            value={userType} 
-            onValueChange={(v) => setUserType(v as any)} 
+          <Tabs
+            value={userType}
+            onValueChange={(v) => setUserType(v as any)}
             className="mb-6"
           >
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="patient" className="gap-2">
+            <TabsList className="grid w-full grid-cols-2 rounded-xl h-11 bg-secondary/70">
+              <TabsTrigger value="patient" className="gap-2 rounded-lg text-sm data-[state=active]:bg-card data-[state=active]:shadow-sm">
                 <User className="h-4 w-4" /> Patient
               </TabsTrigger>
-              <TabsTrigger value="provider" className="gap-2">
+              <TabsTrigger value="provider" className="gap-2 rounded-lg text-sm data-[state=active]:bg-card data-[state=active]:shadow-sm">
                 <Building2 className="h-4 w-4" /> Doctor
               </TabsTrigger>
             </TabsList>
@@ -77,42 +75,42 @@ export const LoginCard: React.FC<LoginCardProps> = ({
 
           <form onSubmit={handleLogin} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="email">Email Address</Label>
-              <Input 
+              <Label htmlFor="email" className="text-sm font-medium">Email Address</Label>
+              <Input
                 id="email"
-                type="email" 
+                type="email"
                 placeholder="name@example.com"
-                value={email} 
-                onChange={e => setEmail(e.target.value)} 
-                required 
-                className="bg-slate-50/50"
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+                required
+                className="h-11 rounded-xl bg-secondary/30 border-border focus-visible:ring-primary/30 focus-visible:border-primary/50 transition-colors"
               />
             </div>
-            
+
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <Label htmlFor="password">Password</Label>
-                <button 
-                  type="button" 
-                  onClick={() => setAuthStep('forgot-password')} 
-                  className="text-xs text-primary hover:underline font-medium"
+                <Label htmlFor="password" className="text-sm font-medium">Password</Label>
+                <button
+                  type="button"
+                  onClick={() => setAuthStep('forgot-password')}
+                  className="text-xs text-primary hover:text-primary/80 font-medium transition-colors"
                 >
                   Forgot Password?
                 </button>
               </div>
-              <Input 
+              <Input
                 id="password"
-                type="password" 
-                value={password} 
-                onChange={e => setPassword(e.target.value)} 
-                required 
-                className="bg-slate-50/50"
+                type="password"
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                required
+                className="h-11 rounded-xl bg-secondary/30 border-border focus-visible:ring-primary/30 focus-visible:border-primary/50 transition-colors"
               />
             </div>
 
-            <Button 
-              type="submit" 
-              className="w-full bg-primary hover:bg-primary/90 shadow-md transition-all active:scale-[0.98]" 
+            <Button
+              type="submit"
+              className="w-full h-12 rounded-xl medical-gradient text-white border-0 shadow-sm hover:shadow-glow transition-all duration-300 active:scale-[0.98] text-sm font-semibold"
               disabled={loading}
             >
               {loading ? (
@@ -125,9 +123,9 @@ export const LoginCard: React.FC<LoginCardProps> = ({
 
           <div className="mt-6 text-center text-sm text-muted-foreground">
             Don't have an account?{" "}
-            <button 
-              onClick={() => setAuthStep("signup")} 
-              className="text-primary font-semibold hover:underline"
+            <button
+              onClick={() => setAuthStep("signup")}
+              className="text-primary font-semibold hover:text-primary/80 transition-colors"
             >
               Create one now
             </button>
