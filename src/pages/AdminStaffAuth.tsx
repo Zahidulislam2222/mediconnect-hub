@@ -38,22 +38,33 @@ export default function AdminStaffAuth() {
   const [password, setPassword] = useState("");
   const [otpValue, setOtpValue] = useState("");
 
-  // Configure Amplify for admin/staff
+  // Configure Amplify for admin/staff with dedicated client IDs
   useEffect(() => {
     localStorage.setItem('userRegion', selectedRegion);
     const isEU = selectedRegion === 'EU';
+
+    // Use admin or staff client ID based on selected portal type
+    const getClientId = () => {
+      if (portalType === 'admin') {
+        return isEU
+          ? import.meta.env.VITE_COGNITO_CLIENT_ADMIN_EU
+          : import.meta.env.VITE_COGNITO_CLIENT_ADMIN_US;
+      }
+      return isEU
+        ? import.meta.env.VITE_COGNITO_CLIENT_STAFF_EU
+        : import.meta.env.VITE_COGNITO_CLIENT_STAFF_US;
+    };
+
     Amplify.configure({
       Auth: {
         Cognito: {
           userPoolId: isEU ? import.meta.env.VITE_COGNITO_USER_POOL_ID_EU : import.meta.env.VITE_COGNITO_USER_POOL_ID_US,
-          userPoolClientId: isEU
-            ? import.meta.env.VITE_COGNITO_CLIENT_PATIENT_EU
-            : import.meta.env.VITE_COGNITO_CLIENT_PATIENT_US,
+          userPoolClientId: getClientId(),
           identityPoolId: isEU ? import.meta.env.VITE_COGNITO_IDENTITY_POOL_ID_EU : import.meta.env.VITE_COGNITO_IDENTITY_POOL_ID_US,
         }
       }
     });
-  }, [selectedRegion]);
+  }, [selectedRegion, portalType]);
 
   // Check existing session
   useEffect(() => {

@@ -53,6 +53,7 @@ export default function Settings() {
     );
     const [userId, setUserId] = useState("");
     const [calendarConnected, setCalendarConnected] = useState(false);
+    const [closureStatus, setClosureStatus] = useState<string | null>(null);
 
     const [formData, setFormData] = useState({
         name: localUser.name || "",
@@ -109,6 +110,7 @@ export default function Settings() {
                     }));
                     setRawAvatarKey(profileData.avatar || "");
                     if (profileData.preferences) setPreferences(profileData.preferences);
+                    if (profileData.closureStatus) setClosureStatus(profileData.closureStatus);
                 }
             }
 
@@ -329,21 +331,38 @@ export default function Settings() {
     };
 
     const handleDeleteAccount = async () => {
-        const confirm = window.confirm("Are you absolutely sure? This cannot be undone.");
-        if (!confirm) return;
-
-        try {
-            if (userRole === 'patient') {
+        if (userRole === 'patient') {
+            const confirm = window.confirm("Are you absolutely sure? This cannot be undone.");
+            if (!confirm) return;
+            try {
                 await api.delete('/me');
                 toast({ title: "Account Deleted", description: "Your identity has been erased." });
-                handleLogout(); 
-            } else {
-                // 🟢 PROFESSIONAL FIX: Actually call the backend to trigger the SNS Email!
-                await api.post(`/doctors/${userId}/request-closure`, {});
-                toast({ title: "Request Sent", description: "Admin will review your closure request." });
+                handleLogout();
+            } catch (e) {
+                toast({ variant: "destructive", title: "Error", description: "Could not complete deletion." });
             }
-        } catch (e) {
-            toast({ variant: "destructive", title: "Error", description: "Could not complete deletion." });
+        } else if (closureStatus === "APPROVED_FOR_DELETION") {
+            const confirm = window.confirm(
+                "FINAL WARNING: This will permanently erase your identity, anonymize all records, and delete your Cognito account. This cannot be undone."
+            );
+            if (!confirm) return;
+            try {
+                await api.delete(`/doctors/${userId}`);
+                toast({ title: "Account Deleted", description: "Your identity has been permanently erased." });
+                handleLogout();
+            } catch (e: any) {
+                toast({ variant: "destructive", title: "Error", description: e?.message || "Could not complete deletion." });
+            }
+        } else {
+            const confirm = window.confirm("Request account closure? An admin will review before deletion is allowed.");
+            if (!confirm) return;
+            try {
+                await api.post(`/doctors/${userId}/request-closure`, {});
+                setClosureStatus("PENDING_CLOSURE");
+                toast({ title: "Request Sent", description: "Admin will review your closure request." });
+            } catch (e) {
+                toast({ variant: "destructive", title: "Error", description: "Could not submit closure request." });
+            }
         }
     };
 
@@ -412,16 +431,66 @@ export default function Settings() {
 
                     <div className="mt-12 p-6 border border-red-200 rounded-xl bg-red-50/30">
                         <h3 className="text-lg font-bold text-red-700">Danger Zone</h3>
+
+                        {userRole === 'doctor' && closureStatus === "PENDING_CLOSURE" && (
+                            <div className="flex items-start gap-2 p-3 rounded-lg bg-amber-50 border border-amber-200 mb-4">
+                                <Loader2 className="h-4 w-4 text-amber-600 mt-0.5 flex-shrink-0 animate-spin" />
+                                <div>
+                                    <p className="text-sm font-medium text-amber-800">Closure Request Pending</p>
+                                    <p className="text-xs text-amber-700">
+                                        Your account closure request is being reviewed by an administrator.
+                                        You can still log in and manage existing appointments during this time.
+                                    </p>
+                                </div>
+                            </div>
+                        )}
+
+                        {userRole === 'doctor' && closureStatus === "APPROVED_FOR_DELETION" && (
+                            <div className="flex items-start gap-2 p-3 rounded-lg bg-green-50 border border-green-200 mb-4">
+                                <Save className="h-4 w-4 text-green-600 mt-0.5 flex-shrink-0" />
+                                <div>
+                                    <p className="text-sm font-medium text-green-800">Closure Approved</p>
+                                    <p className="text-xs text-green-700">
+                                        An administrator has approved your closure request. You may now finalize
+                                        your account deletion. This action is permanent and cannot be undone.
+                                    </p>
+                                </div>
+                            </div>
+                        )}
+
+                        {userRole === 'doctor' && closureStatus === "REJECTED" && (
+                            <div className="flex items-start gap-2 p-3 rounded-lg bg-blue-50 border border-blue-200 mb-4">
+                                <Save className="h-4 w-4 text-blue-600 mt-0.5 flex-shrink-0" />
+                                <div>
+                                    <p className="text-sm font-medium text-blue-800">Closure Request Rejected</p>
+                                    <p className="text-xs text-blue-700">
+                                        An administrator has rejected your previous closure request and reactivated your account.
+                                        You may submit a new request if needed.
+                                    </p>
+                                </div>
+                            </div>
+                        )}
+
                         <p className="text-sm text-gray-600 mb-4">
-                            Once you delete your account, your identity will be erased. 
-                            Medical records will be anonymized per HIPAA/GDPR legal compliance.
+                            {userRole === 'doctor' && closureStatus === "APPROVED_FOR_DELETION"
+                                ? "Your closure has been approved. Click below to permanently erase your identity."
+                                : "Once you delete your account, your identity will be erased. Medical records will be anonymized per HIPAA/GDPR legal compliance."
+                            }
                         </p>
-                        <Button 
-                            variant="destructive" 
+                        <Button
+                            variant="destructive"
                             onClick={handleDeleteAccount}
+                            disabled={closureStatus === "PENDING_CLOSURE"}
                             className="bg-red-600 hover:bg-red-700 shadow-sm"
                         >
-                            {userRole === 'doctor' ? 'Request Account Closure' : 'Delete My Account'}
+                            {userRole === 'patient'
+                                ? 'Delete My Account'
+                                : closureStatus === "APPROVED_FOR_DELETION"
+                                    ? 'Finalize Account Deletion'
+                                    : closureStatus === "PENDING_CLOSURE"
+                                        ? 'Awaiting Admin Review...'
+                                        : 'Request Account Closure'
+                            }
                         </Button>
                     </div>
 

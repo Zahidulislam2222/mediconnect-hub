@@ -43,6 +43,7 @@ import AdminDashboard from "./pages/admin/AdminDashboard";
 import AdminUsers from "./pages/admin/AdminUsers";
 import AdminAuditLogs from "./pages/admin/AdminAuditLogs";
 import AdminSystemHealth from "./pages/admin/AdminSystemHealth";
+import AdminClosures from "./pages/admin/AdminClosures";
 
 // Staff Pages
 import StaffDashboard from "./pages/staff/StaffDashboard";
@@ -319,6 +320,7 @@ const AppContent = () => {
         {/* Admin Features */}
         <Route path="/admin/dashboard" element={<RoleGuard allowedRoles={['admin']}><AdminDashboard /></RoleGuard>} />
         <Route path="/admin/users" element={<RoleGuard allowedRoles={['admin']}><AdminUsers /></RoleGuard>} />
+        <Route path="/admin/closures" element={<RoleGuard allowedRoles={['admin']}><AdminClosures /></RoleGuard>} />
         <Route path="/admin/audit-logs" element={<RoleGuard allowedRoles={['admin']}><AdminAuditLogs /></RoleGuard>} />
         <Route path="/admin/system" element={<RoleGuard allowedRoles={['admin']}><AdminSystemHealth /></RoleGuard>} />
 

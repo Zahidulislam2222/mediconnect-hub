@@ -65,6 +65,7 @@ const doctorNavItems = [
 const adminNavItems = [
   { icon: LayoutDashboard, label: "Dashboard", path: "/admin/dashboard" },
   { icon: Users, label: "User Management", path: "/admin/users" },
+  { icon: ShieldCheck, label: "Closure Requests", path: "/admin/closures" },
   { icon: ScrollText, label: "Audit Logs", path: "/admin/audit-logs" },
   { icon: Server, label: "System Health", path: "/admin/system" },
 ];
