@@ -1,131 +1,197 @@
-# 🏥 MediConnect V2: Enterprise Multi-Cloud Telemedicine Ecosystem
+# MediConnect — Patient & Provider Portal
 
-![License](https://img.shields.io/badge/License-MIT-blue.svg)
-![Security](https://img.shields.io/badge/Security-HIPAA%20Compliant-green.svg)
-![Compliance](https://img.shields.io/badge/Compliance-GDPR%20Ready-blue.svg)
-![Architecture](https://img.shields.io/badge/Architecture-Zero--Cost%20Idle-orange.svg)
-![IaC](https://img.shields.io/badge/IaC-Terraform-623CE4.svg)
-![Standard](https://img.shields.io/badge/Standard-HL7%20FHIR%20R4-red)
+<div align="center">
 
-> **Architected by [Zahidul Islam](https://zahidul-islam.vercel.app/)**
+![React](https://img.shields.io/badge/React-18.3-61DAFB?logo=react&logoColor=white)
+![TypeScript](https://img.shields.io/badge/TypeScript-5.8-3178C6?logo=typescript&logoColor=white)
+![Vite](https://img.shields.io/badge/Vite-5.4-646CFF?logo=vite&logoColor=white)
+![Tailwind](https://img.shields.io/badge/Tailwind-3.4-06B6D4?logo=tailwindcss&logoColor=white)
+![Capacitor](https://img.shields.io/badge/Capacitor-8.0-119EFF?logo=capacitor&logoColor=white)
+![HIPAA](https://img.shields.io/badge/HIPAA-Compliant-22C55E)
+![GDPR](https://img.shields.io/badge/GDPR-Compliant-3B82F6)
 
-**MediConnect V2** is a state-of-the-art healthcare platform engineered for maximum security, regulatory compliance, and extreme cost-efficiency. By leveraging a **Triple-Cloud Strategy (AWS, GCP, Azure)** orchestrated via **Terraform**, the system achieves a **"Zero-Cost Idle"** state, scaling down to zero compute consumption when not in use.
+**Production-grade telemedicine frontend with multi-region support, encrypted storage, and mobile-first design.**
 
----
+[Live Demo](https://askme-82f72.web.app) · [Backend Repo](https://github.com/Zahidulislam2222/mediconnect-infrastructure-production) · [Author](https://zahidul-islam.vercel.app)
 
-## 🌐 The "Triple-Cloud" Zero-Cost Architecture
-
-MediConnect strategically splits workloads across the "Big Three" cloud providers to maximize Free Tier offerings, leverage specialized medical AI services, and ensure disaster recovery.
-
-| Provider | Role | Key Components | Zero-Cost Logic |
-| :--- | :--- | :--- | :--- |
-| **AWS** | **Security & Identity Hub** | Cognito, DynamoDB, SSM, KMS | Free Tier (50k MAU) + On-Demand Database Billing |
-| **GCP** | **Relational Heart** | Cloud Run, Cloud SQL (Postgres) | **Scale-to-Zero** Containers + Auto-Pause Database |
-| **Azure** | **Clinical Intelligence** | Container Apps, Cosmos DB | **Scale-to-Zero** Replicas + Serverless Request Mode |
+</div>
 
 ---
 
-## 🛡️ Compliance, Security & Interoperability
+## Overview
 
-This platform is "Secure by Design," satisfying strict international data laws for PHI (Protected Health Information).
+MediConnect Hub is the React frontend for the MediConnect telemedicine platform. It serves four user roles — **patients**, **doctors**, **admins**, and **staff** — each with dedicated dashboards, workflows, and route-level access control.
 
-### 🩺 HIPAA (Health Insurance Portability and Accountability Act)
-*   **Immutable Audit Logs:** A custom middleware intercepts every request and writes a "Write-Once-Read-Many" log to DynamoDB, tracking *who* accessed *what* record and *when*.
-*   **Recursive PII Scrubbing:** All server logs pass through a sanitizer engine that regex-matches and masks SSNs, Emails, and Credit Card numbers before logging.
-*   **Encryption:** 
-    *   **At Rest:** AES-256 encryption enforced on all databases (AWS/GCP/Azure).
-    *   **In Transit:** Strict TLS 1.3 enforcement for all cross-cloud API communication.
-*   **Digital Signatures:** E-Prescriptions are cryptographically signed using **AWS KMS**, creating a tamper-proof legal seal.
-
-### 🇪🇺 GDPR (General Data Protection Regulation)
-*   **Right to be Forgotten:** Automated workflows allow for "Soft Deletion" where PII is anonymized (e.g., `User_123` becomes `Deleted_User_X`), preserving statistical integrity while respecting user privacy.
-
-### 🏥 HL7 FHIR R4 Interoperability
-*   **Standardized Data:** All backend services map internal data models to **HL7 FHIR R4** resources (`Patient`, `Appointment`, `DiagnosticReport`), ensuring the platform can natively integrate with hospital EHR systems (Epic, Cerner).
+The application connects to 7 backend microservices via an intelligent API layer that handles multi-region routing, primary-to-backup failover, and automatic auth token injection.
 
 ---
 
-## 🛠️ Infrastructure as Code (Terraform)
+## Tech Stack
 
-The entire ecosystem is provisioned using **Terraform**, ensuring the multi-cloud environment is reproducible, version-controlled, and disaster-proof.
-
-*   **Multi-Provider Orchestration:** A single `terraform apply` manages resources across AWS, GCP, and Azure simultaneously.
-*   **Modular Design:** Networking, Compute, and Database layers are decoupled for independent scaling.
-*   **Secret Management:** Terraform automates the provisioning of the **AWS SSM Parameter Store**, creating a centralized, encrypted vault for all API keys and database credentials. No `.env` files are used in production.
-
----
-
-## 💻 Tech Stack & Microservices
-
-### 🧩 Microservices Architecture
-1.  **Patient Service (GCP Cloud Run):** Handles identity verification, appointment booking, and real-time IoT Vital ingestion.
-2.  **Doctor Service (Azure Container Apps):** Manages credentialing, officer approvals, and doctor availability schedules.
-3.  **Communication Hub (Serverless):** Manages secure Video Consultations (WebRTC) and AI-powered Chat.
-
-### ⚙️ Core Technologies
-*   **IaC:** Terraform
-*   **Backend:** Node.js (TypeScript), Express, Python (AI Agents)
-*   **Frontend:** React (Vite), Tailwind CSS, Shadcn UI
-*   **Mobile:** Capacitor (Cross-platform iOS/Android)
-*   **AI/ML:** AWS Bedrock (Claude), Google Vertex AI (Gemini), Azure OpenAI
-*   **DevOps:** Docker, GitHub Actions, Google Cloud Build
+| Layer | Technology |
+|-------|-----------|
+| Framework | React 18, TypeScript, Vite 5 (SWC compiler) |
+| Styling | Tailwind CSS 3, shadcn/ui (Radix), Framer Motion |
+| Auth | AWS Amplify (Cognito), role-based guards |
+| Payments | Stripe Elements, server-confirmed PaymentIntents |
+| Video | Amazon Chime SDK (WebRTC) |
+| Messaging | Socket.io (real-time chat) |
+| Charts | Recharts |
+| Mobile | Capacitor (Android/iOS), push notifications |
+| Hosting | Firebase Hosting (web), Capacitor (native) |
+| Data | TanStack React Query, React Hook Form + Zod |
 
 ---
 
-## 🚀 The Migration Story
+## Architecture
 
-MediConnect represents a successful migration from a legacy monolith to a modern distributed system using the **Strangler Fig Pattern**.
+### Multi-Service API Routing (`src/lib/api.ts`)
 
-*   **From:** High-cost, static architecture (AWS EKS + RDS Always-On). **Cost: ~$300/mo.**
-*   **To:** Event-driven, serverless ecosystem. **Cost: $0.00/mo (Idle).**
-*   **The Bridge:** A custom Python migration container moved terabytes of data from legacy DynamoDB tables to GCP PostgreSQL and Azure Cosmos DB with zero downtime.
+All backend calls go through a unified API client that routes requests by URL prefix:
+
+```
+/patients, /vitals, /public  →  Patient Service (8081)
+/doctors, /prescriptions      →  Doctor Service (8082)
+/appointments, /billing       →  Booking Service (8083)
+/chat, /video, /ai            →  Communication Service (8084)
+/api/v1/admin                 →  Admin Service (8085)
+/shifts, /tasks               →  Staff Service (8086)
+```
+
+Every request includes a Cognito Bearer token and `x-user-region` header. On 5xx or timeout (5s), the client automatically retries against the backup URL.
+
+### Security
+
+| Guard | Purpose |
+|-------|---------|
+| **ProtectedRoute** | Redirects unauthenticated users to `/auth` |
+| **RoleGuard** | Prevents cross-role access (patient can't reach admin routes) |
+| **HipaaGuard** | 15-minute inactivity auto-logout, 12px blur on tab switch |
+| **GdprBanner** | Granular cookie consent (essential/functional/analytics) |
+| **Encrypted Storage** | AES-GCM 256-bit via Web Crypto API — no raw JWT tokens stored |
+
+### Multi-Region
+
+- US patients route to `us-east-1`, EU patients to `eu-central-1`
+- Knowledge Base aggregates articles from **both** regions globally
+- Region stored in `localStorage.userRegion`, sent as `x-user-region` header
 
 ---
 
-## 📂 Project Structure
+## Role-Based Dashboards
+
+### Patient
+Appointments, video consultations, symptom checker (AI), health records, pharmacy (with barcode scanner), billing & payments, messaging, settings.
+
+### Doctor
+Patient queue, live monitoring (IoT vitals), patient records (EHR), prescriptions, analytics, knowledge base publishing, messaging, schedule management.
+
+### Admin
+User management, HIPAA audit log viewer, system health monitoring, platform analytics.
+
+### Staff
+Shift scheduling, task management, staff directory, announcements.
+
+---
+
+## Getting Started
+
+### Prerequisites
+
+- Node.js 18+
+- npm 9+
+
+### Development
 
 ```bash
-mediconnect-v2/
-├── terraform/               # IaC Configuration
-│   ├── main.tf              # Multi-cloud provider setup
-│   ├── aws/                 # AWS Modules (Cognito, DynamoDB)
-│   ├── gcp/                 # GCP Modules (Cloud Run, SQL)
-│   └── azure/               # Azure Modules (Container Apps)
-├── backend/
-│   ├── patient-service/     # Node.js/TypeScript
-│   ├── doctor-service/      # Node.js/TypeScript
-│   └── shared/              # HIPAA Logger & FHIR Mappers
-├── frontend/                # React + Vite + Capacitor
-├── scripts/
-│   ├── deploy_gcp.sh        # Deployment orchestration
-│   └── deploy_azure.sh
-└── docker-compose.yml       # Local development orchestration
-
-👨‍💻 Getting Started
-Prerequisites
-Node.js v18+
-Docker & Docker Compose
-Terraform CLI
-AWS/GCP/Azure CLI tools installed
-1. Infrastructure Provisioning
-code Bash
-downloadcontent_copy
-expand_less
-cd terraform
-terraform init
-terraform plan
-terraform apply
-2. Local Development
-code Bash
-downloadcontent_copy
-expand_less
-# Install dependencies
 npm install
-
-# Start the local development cluster (Hot Reloading)
-npm run dev
+npm run dev          # Starts on http://localhost:8080
 ```
-📄 License & Contact
-This project is open-source and licensed under the MIT License.
-Architected by Muhammad Zahidul Islam
-LinkedIn Profile | GitHub Profile
+
+### Build
+
+```bash
+npm run build        # Production build → dist/
+npm run preview      # Preview built output
+```
+
+### Mobile (Android)
+
+```bash
+npm run build
+npx cap sync
+npx cap open android
+```
+
+### Type Check
+
+```bash
+npx tsc --noEmit
+```
+
+---
+
+## Environment Variables
+
+All prefixed with `VITE_`. Create a `.env` file:
+
+```env
+# Cognito (US + EU)
+VITE_COGNITO_USER_POOL_ID_US=
+VITE_COGNITO_USER_POOL_ID_EU=
+VITE_COGNITO_CLIENT_PATIENT_US=
+VITE_COGNITO_CLIENT_PATIENT_EU=
+VITE_COGNITO_CLIENT_DOCTOR_US=
+VITE_COGNITO_CLIENT_DOCTOR_EU=
+
+# Service URLs (primary + backup, US + EU)
+VITE_PATIENT_SERVICE_URL_US=
+VITE_PATIENT_SERVICE_URL_EU=
+VITE_PATIENT_SERVICE_URL_US_BACKUP=
+VITE_PATIENT_SERVICE_URL_EU_BACKUP=
+# ... same pattern for DOCTOR, BOOKING, COMMUNICATION, ADMIN, STAFF
+
+# Stripe
+VITE_STRIPE_PUBLISHABLE_KEY=
+
+# Encryption
+VITE_STORAGE_CIPHER_KEY=
+```
+
+---
+
+## Deployment
+
+**Web:** Firebase Hosting (`firebase deploy`). SPA rewrite to `/index.html`.
+
+**Mobile:** Capacitor builds. Android scheme: HTTPS. Push notifications via FCM.
+
+---
+
+## Design System
+
+| Element | Choice |
+|---------|--------|
+| Display font | Sora (headings) |
+| Body font | DM Sans |
+| Primary color | Deep teal (`hsl(166, 72%, 29%)`) |
+| Accent color | Coral rose (`hsl(347, 77%, 50%)`) |
+| Background | Warm stone (`hsl(40, 20%, 98%)`) |
+| Border radius | `rounded-2xl` (cards), `rounded-xl` (buttons) |
+| Shadows | `shadow-card`, `shadow-elevated`, `shadow-soft` |
+
+---
+
+## Author
+
+**Zahidul Islam** — Hybrid Cloud Architect & Full Stack Engineer
+
+[Portfolio](https://zahidul-islam.vercel.app) · [GitHub](https://github.com/Zahidulislam2222) · [Email](mailto:muhammadzahidulislam2222@gmail.com)
+
+---
+
+<div align="center">
+
+*Built with precision. Secured by design. Compliant by default.*
+
+</div>

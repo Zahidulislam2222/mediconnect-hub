@@ -110,3 +110,6 @@ android/app/build
 android/.gradle
 ios/App/App/public
 google-services.json
+
+# Claude Code
+CLAUDE.md
