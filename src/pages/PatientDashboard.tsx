@@ -258,7 +258,7 @@ if (avatarUrl && !avatarUrl.startsWith('http')) {
           </div>
 
           {/* Billing Widget */}
-          <Card className="shadow-card border-border/50 bg-white h-full flex flex-col justify-between">
+          <Card className="shadow-card border-border bg-card h-full flex flex-col justify-between rounded-2xl">
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                 <CreditCard className="h-4 w-4" /> Billing Status
@@ -266,17 +266,17 @@ if (avatarUrl && !avatarUrl.startsWith('http')) {
             </CardHeader>
             <CardContent>
               {loading ? (
-                <div className="flex justify-center py-4"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+                <div className="flex justify-center py-4"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground/30" /></div>
               ) : (
                 <div>
-                  <div className="text-3xl font-bold text-foreground mb-1">
+                  <div className="font-display text-3xl font-bold text-foreground mb-1">
                     ${billing?.outstandingBalance?.toFixed(2) || "0.00"}
                   </div>
                   <p className="text-xs text-muted-foreground mb-4">Outstanding Balance</p>
 
                   <button
                     onClick={() => navigate("/billing")}
-                    className="w-full text-xs bg-primary text-primary-foreground py-2.5 rounded-md hover:bg-primary/90 transition-colors font-medium"
+                    className="w-full text-xs medical-gradient text-white py-2.5 rounded-xl hover:shadow-glow transition-all font-semibold"
                   >
                     View Billing History
                   </button>
@@ -328,28 +328,28 @@ if (avatarUrl && !avatarUrl.startsWith('http')) {
                   return (
                     <div
                       key={apt.appointmentId}
-                      className="flex items-center justify-between p-4 rounded-xl border border-border bg-card mb-3 shadow-sm hover:shadow-md transition-all"
+                      className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-2xl border border-border bg-card mb-3 shadow-soft hover:shadow-card transition-all"
                     >
-                      <div className="flex items-center gap-4">
-                        <Avatar className="h-12 w-12 border-2 border-background shadow-sm">
+                      <div className="flex items-center gap-3 sm:gap-4 min-w-0">
+                        <Avatar className="h-11 w-11 sm:h-12 sm:w-12 border-2 border-background shadow-sm flex-shrink-0 rounded-xl">
                           <AvatarImage
                             src={details.avatar || ""}
                             alt={details.name}
-                            className="object-cover"
+                            className="object-cover rounded-xl"
                           />
-                          <AvatarFallback className="bg-primary/10 text-primary font-bold">
+                          <AvatarFallback className="bg-primary/10 text-primary font-bold rounded-xl text-sm">
                             {getInitials(details.name)}
                           </AvatarFallback>
                         </Avatar>
 
-                        <div>
-                          <h4 className="font-semibold text-base text-foreground">{details.name}</h4>
-                          <div className="flex items-center gap-2 text-sm text-muted-foreground mt-0.5">
-                            <span>{details.specialty}</span>
-                            <span className="text-xs mx-1">•</span>
-                            <span className="text-blue-600 font-medium">Video Call</span>
+                        <div className="min-w-0">
+                          <h4 className="font-semibold text-sm sm:text-base text-foreground truncate">{details.name}</h4>
+                          <div className="flex items-center gap-1.5 text-xs sm:text-sm text-muted-foreground mt-0.5">
+                            <span className="truncate">{details.specialty}</span>
+                            <span className="text-xs">·</span>
+                            <span className="text-primary font-medium whitespace-nowrap">Video Call</span>
                           </div>
-                          <div className="text-xs text-muted-foreground mt-1">
+                          <div className="text-xs text-muted-foreground mt-0.5">
                             {dateObj.toLocaleDateString()} at {dateObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                           </div>
                         </div>
@@ -359,7 +359,7 @@ if (avatarUrl && !avatarUrl.startsWith('http')) {
                       <Button
                         size="sm"
                         onClick={() => handleJoin(apt)}
-                        className={uiStatus === 'completed' ? "opacity-50 cursor-not-allowed" : "bg-primary hover:bg-primary/90"}
+                        className={`flex-shrink-0 rounded-xl w-full sm:w-auto ${uiStatus === 'completed' ? "opacity-50 cursor-not-allowed" : "medical-gradient text-white border-0 shadow-sm hover:shadow-glow"}`}
                         disabled={uiStatus === 'completed'}
                       >
                          <Video className="h-4 w-4 mr-2" />

@@ -216,44 +216,44 @@ export default function DoctorDashboard() {
 
         {/* 1. METRICS */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          <Card className="shadow-sm border-border/50">
+          <Card className="shadow-card border-border rounded-2xl">
             <CardContent className="p-6">
               <div className="flex justify-between items-start">
                 <div>
                   <p className="text-sm font-medium text-muted-foreground">Today's Visits</p>
-                  <h3 className="text-2xl font-bold mt-2">{appointments.length}</h3>
+                  <h3 className="text-2xl font-display font-bold mt-2">{appointments.length}</h3>
                 </div>
-                <div className="p-2 bg-blue-50 rounded-lg">
-                  <Users className="h-5 w-5 text-blue-600" />
+                <div className="p-2.5 bg-primary/10 rounded-xl">
+                  <Users className="h-5 w-5 text-primary" />
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          <Card className="shadow-sm border-border/50">
+          <Card className="shadow-card border-border rounded-2xl">
             <CardContent className="p-6">
               <div className="flex justify-between items-start">
                 <div>
                   <p className="text-sm font-medium text-muted-foreground">Patient Satisfaction</p>
-                  <h3 className="text-2xl font-bold mt-2">4.9/5.0</h3>
+                  <h3 className="text-2xl font-display font-bold mt-2">4.9/5.0</h3>
                 </div>
-                <div className="p-2 bg-yellow-50 rounded-lg">
+                <div className="p-2.5 bg-yellow-500/10 rounded-xl">
                   <Star className="h-5 w-5 text-yellow-600" />
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          <Card className="shadow-sm border-border/50">
+          <Card className="shadow-card border-border rounded-2xl">
             <CardContent className="p-6">
               <div className="flex justify-between items-start">
                 <div>
                   <p className="text-sm font-medium text-muted-foreground">Revenue (Est)</p>
-                  <h3 className="text-2xl font-bold mt-2">
+                  <h3 className="text-2xl font-display font-bold mt-2">
                     ${(appointments.length * 50).toLocaleString()}
                   </h3>
                 </div>
-                <div className="p-2 bg-emerald-50 rounded-lg">
+                <div className="p-2.5 bg-emerald-500/10 rounded-xl">
                   <TrendingUp className="h-5 w-5 text-emerald-600" />
                 </div>
               </div>
@@ -265,13 +265,13 @@ export default function DoctorDashboard() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
           {/* LEFT: SCHEDULE */}
-          <Card className="lg:col-span-2 shadow-card border-border/50 h-fit">
+          <Card className="lg:col-span-2 shadow-card border-border rounded-2xl h-fit">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <div className="space-y-1">
-                <CardTitle>Today's Schedule</CardTitle>
+                <CardTitle className="font-display">Today's Schedule</CardTitle>
                 <CardDescription>Your upcoming appointments for today</CardDescription>
               </div>
-              <Button variant="outline" size="sm" onClick={loadDashboardData} disabled={isLoading}>
+              <Button variant="outline" size="sm" className="rounded-xl" onClick={loadDashboardData} disabled={isLoading}>
                 {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Refresh"}
               </Button>
             </CardHeader>
@@ -295,13 +295,13 @@ export default function DoctorDashboard() {
                       <div
                         key={apt.appointmentId}
                         className={cn(
-                          "flex items-center justify-between p-4 rounded-xl border transition-all bg-card group",
+                          "flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-xl border transition-all bg-card group gap-3",
                           apt.patientArrived ? "border-green-500/50 bg-green-50/10" : "border-border hover:shadow-md"
                         )}
                       >
-                        <div className="flex items-center gap-4">
-                          <div className="relative">
-                            <Avatar className="h-12 w-12 border-2 border-background shadow-sm">
+                        <div className="flex items-center gap-3 sm:gap-4 min-w-0">
+                          <div className="relative flex-shrink-0">
+                            <Avatar className="h-10 w-10 sm:h-12 sm:w-12 border-2 border-background shadow-sm">
                               <AvatarImage src={details.avatar} className="object-cover" />
                               <AvatarFallback className="bg-primary/10 text-primary font-bold">
                                 {getInitials(details.name)}
@@ -313,15 +313,15 @@ export default function DoctorDashboard() {
                               <span className="absolute -bottom-1 -right-1 h-4 w-4 bg-green-500 border-2 border-white rounded-full animate-pulse shadow-sm" title="Patient Online" />
                             )}
                           </div>
-                          <div>
-                            <h4 className="font-semibold text-lg group-hover:text-primary transition-colors">{details.name}</h4>
-                            <div className="flex items-center gap-3 text-sm text-muted-foreground mt-1">
+                          <div className="min-w-0">
+                            <h4 className="font-semibold text-base sm:text-lg group-hover:text-primary transition-colors truncate">{details.name}</h4>
+                            <div className="flex flex-wrap items-center gap-2 sm:gap-3 text-sm text-muted-foreground mt-1">
                               <span className="flex items-center gap-1 bg-muted px-2 py-0.5 rounded text-xs font-medium">
                                 <Clock className="h-3 w-3" />
                                 {new Date(timeSlot).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                               </span>
-                              <span className="flex items-center gap-1 text-xs">
-                                <Stethoscope className="h-3 w-3" />
+                              <span className="flex items-center gap-1 text-xs truncate max-w-[120px] sm:max-w-none">
+                                <Stethoscope className="h-3 w-3 flex-shrink-0" />
                                 {details.reason}
                               </span>
                               {apt.paymentStatus === 'paid' && (
@@ -333,17 +333,17 @@ export default function DoctorDashboard() {
                             </div>
                           </div>
                         </div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 sm:flex-shrink-0">
                           <Button
                             size="sm"
                             onClick={() => handleJoinConsultation(apt)}
-                            className={cn("shadow-sm", apt.patientArrived ? "bg-green-600 hover:bg-green-700 animate-pulse" : "bg-blue-600 hover:bg-blue-700")}
+                            className={cn("shadow-sm flex-1 sm:flex-none", apt.patientArrived ? "bg-green-600 hover:bg-green-700 animate-pulse" : "medical-gradient text-white")}
                           >
                             <Video className="h-4 w-4 mr-2" /> {apt.patientArrived ? "Join Now" : "Join"}
                           </Button>
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="icon"><MoreVertical className="h-4 w-4" /></Button>
+                              <Button variant="ghost" size="icon" className="flex-shrink-0"><MoreVertical className="h-4 w-4" /></Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
                               <DropdownMenuItem onClick={() => navigate(`/patient-records`, { state: { patientId: apt.patientId } })}>

@@ -233,31 +233,31 @@ function BillingContent() {
                 <div className="grid grid-cols-1 gap-6">
 
                     {/* BALANCE CARD */}
-                    <Card className="shadow-card border-border/50">
-                        <CardHeader>
-                            <CardTitle className="flex items-center gap-2">
+                    <Card className="shadow-card border-border rounded-2xl overflow-hidden">
+                        <CardHeader className="pb-2">
+                            <CardTitle className="font-display flex items-center gap-2 text-base">
                                 <CreditCard className="h-5 w-5 text-primary" />
                                 Outstanding Balance
                             </CardTitle>
                         </CardHeader>
                         <CardContent>
                             {loadingBilling ? (
-                                <div className="h-32 flex items-center justify-center">
-                                    <Loader2 className="h-8 w-8 animate-spin text-muted-foreground/30" />
+                                <div className="h-28 flex items-center justify-center">
+                                    <Loader2 className="h-7 w-7 animate-spin text-muted-foreground/30" />
                                 </div>
                             ) : (
                                 <>
-                                    <div className="text-4xl font-bold mb-2">
+                                    <div className="font-display text-4xl font-bold mb-1.5 text-foreground">
                                         ${billingData?.outstandingBalance?.toFixed(2) || "0.00"}
                                     </div>
-                                    <p className="text-muted-foreground text-sm mb-6">
+                                    <p className="text-muted-foreground text-sm mb-5">
                                         {billingData?.outstandingBalance > 0
                                             ? "Due immediately. Secure payment processing via Stripe."
                                             : "You are all caught up! No payment due."}
                                     </p>
 
                                     <Button
-                                        className="w-full bg-primary hover:bg-primary/90 transition-all"
+                                        className="w-full h-11 rounded-xl medical-gradient text-white border-0 shadow-sm hover:shadow-glow transition-all"
                                         disabled={!billingData?.outstandingBalance || billingData?.outstandingBalance <= 0 || processingPayment}
                                         onClick={handlePayBill}
                                     >
@@ -279,10 +279,10 @@ function BillingContent() {
                 </div>
 
                 {/* TRANSACTION HISTORY */}
-                <Card className="shadow-card border-border/50">
+                <Card className="shadow-card border-border rounded-2xl">
                     <CardHeader>
-                        <CardTitle className="flex items-center gap-2">
-                            <Clock className="h-5 w-5" /> Transaction History
+                        <CardTitle className="font-display flex items-center gap-2 text-base">
+                            <Clock className="h-5 w-5 text-muted-foreground" /> Transaction History
                         </CardTitle>
                         <CardDescription>Recent invoices, payments, and insurance adjustments</CardDescription>
                     </CardHeader>
@@ -301,27 +301,23 @@ function BillingContent() {
                                         const isUnpaid = tx.status === 'PENDING' || tx.status === 'DUE' || tx.status === 'UNPAID';
                                         
                                         return (
-                                            <div key={i} className="p-4 border rounded-lg flex items-center justify-between bg-white hover:bg-slate-50 transition-colors">
-                                                <div className="flex items-center gap-4">
-                                                    {/* ICON LOGIC: Green for refunds, Slate for charges, Orange for unpaid */}
+                                            <div key={i} className="p-3 sm:p-4 border border-border rounded-2xl flex items-start sm:items-center justify-between gap-3 bg-card hover:bg-secondary/30 transition-colors">
+                                                <div className="flex items-start sm:items-center gap-3 min-w-0 flex-1">
                                                     <div className={cn(
-                                                        "h-10 w-10 rounded-full flex items-center justify-center",
-                                                        isRefund ? "bg-green-100 text-green-600" :
-                                                            isUnpaid ? "bg-orange-100 text-orange-600" : "bg-slate-100 text-slate-600"
+                                                        "h-9 w-9 sm:h-10 sm:w-10 rounded-xl flex items-center justify-center flex-shrink-0",
+                                                        isRefund ? "bg-green-500/10 text-green-600" :
+                                                            isUnpaid ? "bg-orange-500/10 text-orange-600" : "bg-secondary text-muted-foreground"
                                                     )}>
-                                                        {isRefund ? <ArrowUpRight className="h-5 w-5" /> :
-                                                            isUnpaid ? <AlertCircle className="h-5 w-5" /> : <FileText className="h-5 w-5" />}
+                                                        {isRefund ? <ArrowUpRight className="h-4 w-4 sm:h-5 sm:w-5" /> :
+                                                            isUnpaid ? <AlertCircle className="h-4 w-4 sm:h-5 sm:w-5" /> : <FileText className="h-4 w-4 sm:h-5 sm:w-5" />}
                                                     </div>
 
-                                                    <div>
-                                                        <div className="flex items-center gap-2">
-                                                            <p className="font-medium text-slate-900">
+                                                    <div className="min-w-0">
+                                                        <div className="flex flex-wrap items-center gap-1.5">
+                                                            <p className="font-medium text-foreground text-sm sm:text-base leading-snug">
                                                                 {(() => {
                                                                     const desc = tx.description || "";
-
-                                                                    // 🟢 REFUND DETECTION
                                                                     if (desc.includes("User requested cancellation") || tx.amount < 0) {
-                                                                        // Try to find the original consultation name
                                                                         const match = billingData.transactions.find((t: any) =>
                                                                             t.doctorId === tx.doctorId &&
                                                                             t.description?.includes("Consultation with")
@@ -329,41 +325,38 @@ function BillingContent() {
                                                                         const name = match?.description?.split("with ")[1];
                                                                         return name ? `Cancelled Consultation: ${name}` : 'Cancelled Consultation';
                                                                     }
-
                                                                     if (desc.startsWith("Medication:")) {
                                                                         return desc.replace("Medication:", "Prescription Pharmacy:");
                                                                     }
-                                                                    return desc; 
+                                                                    return desc;
                                                                 })()}
                                                             </p>
                                                             {isUnpaid && (
-                                                                <Badge variant="outline" className="text-[10px] h-5 px-1.5 border-orange-200 text-orange-700 bg-orange-50">
+                                                                <Badge variant="outline" className="text-[9px] h-5 px-1.5 border-orange-200 text-orange-700 bg-orange-50 rounded-md">
                                                                     Unpaid
                                                                 </Badge>
                                                             )}
                                                             {isRefund && (
-                                                                <Badge variant="outline" className="text-[10px] h-5 px-1.5 border-green-200 text-green-700 bg-green-50">
+                                                                <Badge variant="outline" className="text-[9px] h-5 px-1.5 border-green-200 text-green-700 bg-green-50 rounded-md">
                                                                     Refunded
                                                                 </Badge>
                                                             )}
                                                         </div>
-                                                        <p className="text-xs text-muted-foreground">
+                                                        <p className="text-xs text-muted-foreground mt-0.5">
                                                             {tx.createdAt ? new Date(tx.createdAt).toLocaleDateString() : new Date().toLocaleDateString()}
-                                                            {' • '}
+                                                            {' · '}
                                                             <span className="font-mono">{tx.billId ? `#${tx.billId.slice(0, 8)}` : ''}</span>
                                                         </p>
                                                     </div>
                                                 </div>
 
-                                                <div className="text-right">
-                                                    {/* AMOUNT LOGIC: Green (+) for refunds, Neutral/Black (-) for charges */}
+                                                <div className="text-right flex-shrink-0">
                                                     <span className={cn(
-                                                        "font-bold block text-lg",
-                                                        isRefund ? "text-green-600" : "text-slate-900"
+                                                        "font-bold block text-base sm:text-lg whitespace-nowrap",
+                                                        isRefund ? "text-green-600" : "text-foreground"
                                                     )}>
                                                         {isRefund ? '+' : '-'}${Math.abs(tx.amount || tx.totalAmount || 0).toFixed(2)}
                                                     </span>
-
                                                     {isUnpaid && processingPayment && (
                                                         <span className="text-[10px] text-muted-foreground flex items-center justify-end gap-1">
                                                             <Loader2 className="h-3 w-3 animate-spin" /> Processing
@@ -386,7 +379,7 @@ function BillingContent() {
                             </div>
                         ) : billingData?.outstandingBalance > 0 ? (
                             // Legacy Data Fallback
-                            <div className="p-4 border rounded-lg flex items-center justify-between bg-white">
+                            <div className="p-4 border border-border rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-card">
                                 <div className="flex items-center gap-3">
                                     <div className="h-10 w-10 rounded-full bg-orange-100 flex items-center justify-center text-orange-600">
                                         <AlertCircle className="h-5 w-5" />

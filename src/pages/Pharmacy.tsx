@@ -233,101 +233,100 @@ export default function Pharmacy() {
 
         {/* STATS */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <Card className="shadow-sm border-slate-200">
+          <Card className="shadow-card border-border rounded-2xl">
             <CardContent className="pt-6 flex items-center gap-4">
-              <div className="bg-blue-50 p-3 rounded-xl"><Pill className="text-blue-600 h-6 w-6" /></div>
+              <div className="bg-primary/10 p-3 rounded-xl"><Pill className="text-primary h-6 w-6" /></div>
               <div>
-                <div className="text-2xl font-bold">{prescriptions.length}</div>
-                <div className="text-xs text-slate-500 font-medium uppercase tracking-wide">Total Meds</div>
+                <div className="text-2xl font-display font-bold">{prescriptions.length}</div>
+                <div className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Total Meds</div>
               </div>
             </CardContent>
           </Card>
-          <Card className="shadow-sm border-slate-200">
+          <Card className="shadow-card border-border rounded-2xl">
             <CardContent className="pt-6 flex items-center gap-4">
-              <div className="bg-orange-50 p-3 rounded-xl"><RefreshCw className="text-orange-600 h-6 w-6" /></div>
+              <div className="bg-orange-500/10 p-3 rounded-xl"><RefreshCw className="text-orange-600 h-6 w-6" /></div>
               <div>
-                <div className="text-2xl font-bold">
+                <div className="text-2xl font-display font-bold">
                   {prescriptions.filter(p => p.status === "REFILL_REQUESTED").length}
                 </div>
-                <div className="text-xs text-slate-500 font-medium uppercase tracking-wide">Pending Approval</div>
+                <div className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Pending Approval</div>
               </div>
             </CardContent>
           </Card>
-          <Card className="shadow-sm border-slate-200">
+          <Card className="shadow-card border-border rounded-2xl">
             <CardContent className="pt-6 flex items-center gap-4">
-              <div className="bg-green-50 p-3 rounded-xl"><CheckCircle2 className="text-green-600 h-6 w-6" /></div>
+              <div className="bg-emerald-500/10 p-3 rounded-xl"><CheckCircle2 className="text-emerald-600 h-6 w-6" /></div>
               <div>
-                <p className="text-2xl font-bold">
+                <p className="text-2xl font-display font-bold">
                   {prescriptions.filter(p => p.status === "READY_FOR_PICKUP").length}
                 </p>
-                <p className="text-xs text-slate-500 font-medium uppercase tracking-wide">Ready for Pickup</p>
+                <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Ready for Pickup</p>
               </div>
             </CardContent>
           </Card>
         </div>
 
         {/* LIST */}
-        <Card className="shadow-sm border-slate-200">
-          <CardHeader className="border-b bg-slate-50/50 pb-3">
+        <Card className="shadow-card border-border rounded-2xl">
+          <CardHeader className="border-b border-border bg-secondary/30 pb-3">
             <div className="flex items-center justify-between">
-              <CardTitle className="text-base font-semibold">Current Medications</CardTitle>
-              <Button variant="ghost" size="sm" onClick={fetchPrescriptions} disabled={loading} className="h-8">
+              <CardTitle className="text-base font-display font-semibold">Current Medications</CardTitle>
+              <Button variant="ghost" size="sm" onClick={fetchPrescriptions} disabled={loading} className="h-8 rounded-xl">
                 <History className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} /> Sync
               </Button>
             </div>
           </CardHeader>
           <CardContent className="p-0">
             {loading ? (
-              <div className="p-8 text-center"><Loader2 className="h-8 w-8 animate-spin mx-auto text-slate-300" /></div>
+              <div className="p-8 text-center"><Loader2 className="h-8 w-8 animate-spin mx-auto text-muted-foreground/30" /></div>
             ) : prescriptions.length === 0 ? (
-              <div className="p-12 text-center text-slate-500">
+              <div className="p-12 text-center text-muted-foreground">
                 <FileWarning className="h-10 w-10 mx-auto mb-3 opacity-20" />
                 <p>No prescriptions found.</p>
               </div>
             ) : (
               <div className="divide-y">
                 {prescriptions.map((rx) => (
-                  <div key={rx.prescriptionId} className="p-4 flex flex-col md:flex-row md:items-center gap-4 hover:bg-slate-50/50 transition-colors">
+                  <div key={rx.prescriptionId} className="p-4 flex flex-col md:flex-row md:items-center gap-4 hover:bg-secondary/30 transition-colors">
 
                     {/* Icon & Name */}
-                    <div className="flex items-start gap-4 flex-1">
-                      <div className="h-10 w-10 rounded-full bg-slate-100 flex items-center justify-center shrink-0">
-                        <Pill className="h-5 w-5 text-slate-500" />
+                    <div className="flex items-start gap-3 sm:gap-4 flex-1 min-w-0">
+                      <div className="h-10 w-10 rounded-xl bg-secondary flex items-center justify-center shrink-0">
+                        <Pill className="h-5 w-5 text-muted-foreground" />
                       </div>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <h4 className="font-semibold text-slate-900">{rx.medication}</h4>
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <h4 className="font-semibold text-foreground">{rx.medication}</h4>
                           {getStatusBadge(rx.status)}
                         </div>
-                        <p className="text-sm text-slate-500 mt-0.5">{rx.dosage} • {rx.instructions || "Follow label instructions"}</p>
-                        {/* 🟢 NEW: PRICE & STOCK INFO */}
-                        <div className="flex items-center gap-4 mt-1">
-                          <span className="text-sm font-bold text-slate-700">
+                        <p className="text-sm text-muted-foreground mt-0.5 truncate">{rx.dosage} · {rx.instructions || "Follow label instructions"}</p>
+                        <div className="flex flex-wrap items-center gap-3 sm:gap-4 mt-1">
+                          <span className="text-sm font-bold text-foreground">
                             Price: ${rx.livePrice}
                           </span>
                           {rx.liveStock === 0 ? (
                             <Badge variant="outline" className="text-red-600 border-red-600 bg-red-50">Out of Stock</Badge>
                           ) : (
-                            <span className="text-xs text-slate-400">{rx.liveStock} in stock</span>
+                            <span className="text-xs text-muted-foreground">{rx.liveStock} in stock</span>
                           )}
                         </div>
-                        <div className="flex items-center gap-3 mt-1 text-xs text-slate-400">
+                        <div className="flex flex-wrap items-center gap-2 sm:gap-3 mt-1 text-xs text-muted-foreground">
                           <span className="flex items-center gap-1"><Clock className="h-3 w-3" /> Issued: {new Date(rx.timestamp).toLocaleDateString()}</span>
-                          <span>ID: #{rx.prescriptionId.substring(0, 6)}</span>
+                          <span className="font-mono">#{rx.prescriptionId.substring(0, 6)}</span>
                         </div>
                       </div>
                     </div>
 
                     {/* Action Buttons */}
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2 md:flex-shrink-0">
 
                       {/* 1. THE PAYMENT DOOR (Shows if NOT paid) */}
                       {rx.status === "ISSUED" && rx.paymentStatus !== "PAID" && (
                         <Button
                           size="sm"
-                          className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                          className="medical-gradient text-white rounded-xl"
                           disabled={rx.liveStock === 0 || processingId === rx.prescriptionId}
-                          onClick={() => handlePayMedication(rx)} // Call our new function
+                          onClick={() => handlePayMedication(rx)}
                         >
                           {processingId === rx.prescriptionId ? (
                             <Loader2 className="h-4 w-4 animate-spin mr-2" />
@@ -343,6 +342,7 @@ export default function Pharmacy() {
                         <Button
                           variant="outline"
                           size="sm"
+                          className="rounded-xl border-border"
                           onClick={() => handleGenerateQR(rx)}
                           disabled={processingId === rx.prescriptionId}
                         >
@@ -358,13 +358,13 @@ export default function Pharmacy() {
                       {/* 3. THE REFILL BUTTON (Always visible for active/ready meds) */}
                       <Button
                         size="sm"
-                        className="bg-primary"
-                        onClick={() => { setSelectedRx(rx); handleRefillRequest(); }} // Update this
+                        className="bg-primary rounded-xl"
+                        onClick={() => { setSelectedRx(rx); handleRefillRequest(); }}
                         disabled={
                           rx.status === "REFILL_REQUESTED" ||
                           rx.status === "READY_FOR_PICKUP" ||
-                          rx.status === "ISSUED" ||   // 🟢 ADD: Cannot refill if just issued
-                          rx.status === "PENDING"     // 🟢 ADD: Cannot refill if not yet paid
+                          rx.status === "ISSUED" ||
+                          rx.status === "PENDING"
                         }
                       >
                         <RefreshCw className="h-3.5 w-3.5 mr-2" />
@@ -381,22 +381,22 @@ export default function Pharmacy() {
 
         {/* STATIC INFO */}
         <div className="grid md:grid-cols-2 gap-4">
-          <Card className="border-slate-200 shadow-sm">
+          <Card className="border-border shadow-card rounded-2xl">
             <CardContent className="p-4 flex gap-4">
-              <div className="bg-purple-50 p-3 rounded-lg"><MapPin className="text-purple-600 h-5 w-5" /></div>
+              <div className="bg-violet-500/10 p-3 rounded-xl"><MapPin className="text-violet-600 h-5 w-5" /></div>
               <div>
                 <h4 className="font-semibold text-sm">Preferred Pharmacy</h4>
-                <p className="text-sm text-slate-600">CVS Pharmacy #4402</p>
-                <p className="text-xs text-slate-400 mt-1">123 Market St • (415) 555-0123</p>
+                <p className="text-sm text-muted-foreground">CVS Pharmacy #4402</p>
+                <p className="text-xs text-muted-foreground/70 mt-1">123 Market St · (415) 555-0123</p>
               </div>
             </CardContent>
           </Card>
-          <Card className="border-slate-200 shadow-sm">
+          <Card className="border-border shadow-card rounded-2xl">
             <CardContent className="p-4 flex gap-4">
-              <div className="bg-red-50 p-3 rounded-lg"><AlertTriangle className="text-red-600 h-5 w-5" /></div>
+              <div className="bg-red-500/10 p-3 rounded-xl"><AlertTriangle className="text-red-600 h-5 w-5" /></div>
               <div>
                 <h4 className="font-semibold text-sm">Interaction Guard™</h4>
-                <p className="text-xs text-slate-600 mt-1">
+                <p className="text-xs text-muted-foreground mt-1">
                   Your prescriptions are automatically screened against known drug interactions by our AI engine.
                 </p>
               </div>
