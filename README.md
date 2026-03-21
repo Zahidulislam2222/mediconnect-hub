@@ -1,4 +1,4 @@
-# MediConnect — Patient & Provider Portal
+# MediConnect Hub — Patient & Provider Portal
 
 <div align="center">
 
@@ -9,8 +9,10 @@
 ![Capacitor](https://img.shields.io/badge/Capacitor-8.0-119EFF?logo=capacitor&logoColor=white)
 ![HIPAA](https://img.shields.io/badge/HIPAA-Compliant-22C55E)
 ![GDPR](https://img.shields.io/badge/GDPR-Compliant-3B82F6)
+![FHIR](https://img.shields.io/badge/FHIR_R4-Compliant-8B5CF6)
+![SMART](https://img.shields.io/badge/SMART_on_FHIR-2.0-06B6D4)
 
-**Production-grade telemedicine frontend with multi-region support, encrypted storage, and mobile-first design.**
+**Production-grade telemedicine frontend with multi-region data residency, AES-256 encrypted storage, HIPAA session management, and cross-platform mobile support.**
 
 [Live Demo](https://askme-82f72.web.app) · [Backend Repo](https://github.com/Zahidulislam2222/mediconnect-infrastructure-production) · [Author](https://zahidul-islam.vercel.app)
 
@@ -18,11 +20,189 @@
 
 ---
 
+## Table of Contents
+
+- [Overview](#overview)
+- [Clinical Features by Role](#clinical-features-by-role)
+- [Architecture](#architecture)
+- [Security & Compliance](#security--compliance)
+- [Tech Stack](#tech-stack)
+- [Design System](#design-system)
+- [Getting Started](#getting-started)
+- [Deployment](#deployment)
+- [Author](#author)
+
+---
+
 ## Overview
 
-MediConnect Hub is the React frontend for the MediConnect telemedicine platform. It serves four user roles — **patients**, **doctors**, **admins**, and **staff** — each with dedicated dashboards, workflows, and route-level access control.
+MediConnect Hub is the React frontend for the MediConnect enterprise telemedicine platform. It serves four user roles — **patients**, **doctors**, **admins**, and **staff** — each with dedicated dashboards, clinical workflows, and route-level access control enforced at both the frontend and API layer.
 
-The application connects to 7 backend microservices via an intelligent API layer that handles multi-region routing, primary-to-backup failover, and automatic auth token injection.
+The application connects to **7 backend microservices** via an intelligent API client that handles multi-region routing (US/EU), primary-to-backup failover with 5-second timeout, and automatic Cognito token injection on every request.
+
+### Key Technical Highlights
+
+| Feature | Implementation |
+|---------|---------------|
+| **Zero Raw Token Storage** | AES-GCM 256-bit encryption via Web Crypto API — no JWT tokens in localStorage |
+| **HIPAA Session Management** | 15-minute inactivity auto-logout + 12px Gaussian blur on tab switch |
+| **GDPR Consent** | Granular cookie consent (essential/functional/analytics) with timestamp tracking |
+| **Multi-Region Routing** | `x-user-region` header routes US→`us-east-1`, EU→`eu-central-1` automatically |
+| **Automatic Failover** | Primary→backup URL failover on 5xx or 5s timeout (15s for Cloud Run cold start) |
+| **Cross-Platform** | Single codebase → Web (Firebase), Android/iOS (Capacitor), PWA-ready |
+| **Role-Based Access** | 4 role zones with route guards, enforced at both frontend and backend |
+
+---
+
+## Clinical Features by Role
+
+### Patient Portal
+
+| Feature | Description |
+|---------|-------------|
+| **Video Consultations** | Amazon Chime SDK WebRTC with real-time audio/video and media recording |
+| **AI Symptom Checker** | Claude 3-powered clinical NLP with PII scrubbing (demo-mode gated) |
+| **Health Records** | FHIR-compliant allergies, immunizations, care plans, vitals history |
+| **Pharmacy** | E-prescription viewer, barcode scanner (Capacitor camera), refill requests, QR fulfillment |
+| **Billing & Payments** | Stripe Elements integration with server-confirmed PaymentIntents |
+| **Messaging** | Real-time Socket.io chat with read receipts |
+| **Blue Button 2.0** | CMS-compliant personal health data export |
+| **GDPR Controls** | View/export personal data (Art 15), request erasure (Art 17), manage consent |
+| **IoT Vitals** | Real-time wearable vitals display (heart rate, SpO2, blood pressure) |
+
+### Doctor Portal
+
+| Feature | Description |
+|---------|-------------|
+| **Patient Queue** | Real-time patient waiting list with priority indicators |
+| **EHR Integration** | ICD-10/ICD-11 diagnosis coding, SNOMED CT clinical terms, LOINC lab codes |
+| **e-Prescriptions** | RxNorm drug search, real-time interaction checking, DEA schedule validation |
+| **Live Monitoring** | IoT vital signs dashboard with critical alert notifications |
+| **Analytics** | Revenue, appointment trends, patient demographics via BigQuery |
+| **Knowledge Base** | Publish/manage medical articles visible to patients globally |
+| **Messaging** | Secure provider-to-patient and provider-to-provider communication |
+| **Clinical Decision Support** | CDS Hooks alerts for drug interactions, recommended screenings |
+
+### Admin Portal
+
+| Feature | Description |
+|---------|-------------|
+| **User Management** | Create, edit, deactivate, delete users across all roles |
+| **HIPAA Audit Logs** | Searchable audit trail viewer with FHIR AuditEvent format |
+| **System Health** | Service status monitoring, DynamoDB table metrics |
+| **Platform Analytics** | User growth, appointment volume, revenue dashboards |
+
+### Staff Portal
+
+| Feature | Description |
+|---------|-------------|
+| **Shift Scheduling** | Weekly/monthly shift management with conflict detection |
+| **Task Management** | Task assignment, status tracking, priority levels |
+| **Staff Directory** | Searchable directory with role filtering |
+| **Announcements** | Organization-wide communication board |
+
+---
+
+## Architecture
+
+### Multi-Service API Routing
+
+All backend calls go through a unified API client (`src/lib/api.ts`) that routes by URL prefix:
+
+```
+/patients, /vitals, /public, /me       →  Patient Service   (8081)
+/doctors, /ehr, /prescriptions          →  Doctor Service    (8082)
+/appointments, /billing, /analytics     →  Booking Service   (8083)
+/chat, /video, /ai                      →  Communication Svc (8084)
+/api/v1/admin                           →  Admin Service     (8085)
+/shifts, /tasks, /announcements         →  Staff Service     (8086)
+```
+
+**Automatic behaviors on every request:**
+- Injects `Authorization: Bearer <Cognito ID token>` header
+- Injects `x-user-region` header for multi-region routing
+- 5s timeout on primary URL, auto-retries on backup (15s for cold start tolerance)
+- 5xx responses trigger automatic failover to backup URL
+- `/ai` and `/upload-scan` routes get 30s timeout for AI processing
+
+### Security Guard Stack
+
+Applied in order around all protected routes:
+
+```
+<ProtectedRoute>           ← Redirect to /auth if not authenticated
+  <CheckoutProvider>       ← Stripe Elements context
+    <HipaaGuard>           ← 15-min inactivity logout + tab blur
+      <RoleGuard>          ← Route-level role enforcement
+        <Page />           ← Actual page component
+      </RoleGuard>
+    </HipaaGuard>
+  </CheckoutProvider>
+</ProtectedRoute>
+```
+
+### Multi-Region Data Flow
+
+```
+User Login → Select Region (US/EU)
+     ↓
+Region stored in localStorage.userRegion
+     ↓
+api.ts reads region → selects US or EU service URLs
+     ↓
+x-user-region header → backend routes to regional DynamoDB/S3/KMS
+     ↓
+US patients → us-east-1 resources
+EU patients → eu-central-1 resources (GDPR Art 44-49 compliant)
+```
+
+### Knowledge Base Cross-Region Aggregation
+
+Medical articles published by doctors are stored in **region-specific** DynamoDB tables. The Knowledge Base aggregates globally:
+- `fetchGlobalKnowledgeBase()` queries **both** US and EU endpoints in parallel
+- Results are merged and deduplicated by article ID
+- Individual articles use `fetchArticleCrossRegion(slug)` — tries user's region first, falls back to the other
+
+---
+
+## Security & Compliance
+
+### HIPAA Controls (Frontend)
+
+| Control | Implementation |
+|---------|---------------|
+| **Session Timeout** | `HipaaGuard` — 15-minute inactivity auto-logout via event listeners (mouse, keyboard, touch, scroll) |
+| **Tab Blur** | 12px Gaussian blur applied on `visibilitychange` event — prevents shoulder surfing |
+| **Encrypted Storage** | AES-GCM 256-bit via Web Crypto API — `secure-storage.ts` with `_mc_auth` and `_mc_user` keys |
+| **Zero Raw Tokens** | JWT tokens never stored — always fetched fresh from `fetchAuthSession()` |
+| **Secure Logout** | `signOut()` (Amplify) + `clearAllSensitive()` — wipes auth + user data, preserves GDPR consent |
+| **Role Guards** | Frontend route guards + backend RBAC — defense in depth |
+
+### GDPR Controls (Frontend)
+
+| Article | Control | Implementation |
+|---------|---------|---------------|
+| Art 7 | Cookie Consent | `GdprBanner` — granular toggles for essential/functional/analytics with timestamps |
+| Art 15 | Right to Access | Patient settings page with data export functionality |
+| Art 17 | Right to Erasure | Account deletion with confirmation flow |
+| Art 25 | Privacy by Design | AES-GCM encrypted storage, no PII in URLs or query params |
+| — | Consent Persistence | `gdpr_consent` survives `clearAllSensitive()` — consent preference is retained |
+| — | Push Notification Consent | Capacitor push notifications blocked without GDPR functional consent |
+
+### Storage Security
+
+```
+┌─────────────────────────────────────────────────┐
+│ Web Crypto API (AES-GCM 256-bit)                │
+├─────────────────────────────────────────────────┤
+│ _mc_auth  → boolean flag (encrypted)            │
+│ _mc_user  → { name, avatar, role, id }          │
+│            encrypted with "aes:" prefix         │
+├─────────────────────────────────────────────────┤
+│ Auto-migration: plaintext → enc: (XOR) → aes:  │
+│ Older formats upgraded on read transparently    │
+└─────────────────────────────────────────────────┘
+```
 
 ---
 
@@ -30,67 +210,50 @@ The application connects to 7 backend microservices via an intelligent API layer
 
 | Layer | Technology |
 |-------|-----------|
-| Framework | React 18, TypeScript, Vite 5 (SWC compiler) |
-| Styling | Tailwind CSS 3, shadcn/ui (Radix), Framer Motion |
-| Auth | AWS Amplify (Cognito), role-based guards |
-| Payments | Stripe Elements, server-confirmed PaymentIntents |
-| Video | Amazon Chime SDK (WebRTC) |
-| Messaging | Socket.io (real-time chat) |
-| Charts | Recharts |
-| Mobile | Capacitor (Android/iOS), push notifications |
-| Hosting | Firebase Hosting (web), Capacitor (native) |
-| Data | TanStack React Query, React Hook Form + Zod |
+| **Framework** | React 18, TypeScript 5.8, Vite 5 (SWC compiler) |
+| **Styling** | Tailwind CSS 3.4, shadcn/ui (Radix primitives), Framer Motion |
+| **State** | TanStack React Query (server state), React Hook Form + Zod (forms) |
+| **Auth** | AWS Amplify v6 (Cognito), role-based guards, encrypted session storage |
+| **Payments** | Stripe Elements, server-confirmed PaymentIntents |
+| **Video** | Amazon Chime SDK (WebRTC, media pipelines) |
+| **Messaging** | Socket.io (real-time bidirectional) |
+| **Charts** | Recharts (responsive, composable) |
+| **Mobile** | Capacitor 8 (Android/iOS), push notifications, camera access |
+| **Hosting** | Firebase Hosting (web), Capacitor (native app stores) |
 
 ---
 
-## Architecture
+## Design System
 
-### Multi-Service API Routing (`src/lib/api.ts`)
+### Typography & Colors
 
-All backend calls go through a unified API client that routes requests by URL prefix:
+| Element | Value |
+|---------|-------|
+| Display font | **Sora** (headings, `font-display` class) |
+| Body font | **DM Sans** (`font-sans` class) |
+| Primary | Deep teal `hsl(166, 72%, 29%)` |
+| Accent | Coral rose `hsl(347, 77%, 50%)` |
+| Background | Warm stone `hsl(40, 20%, 98%)` |
 
-```
-/patients, /vitals, /public  →  Patient Service (8081)
-/doctors, /prescriptions      →  Doctor Service (8082)
-/appointments, /billing       →  Booking Service (8083)
-/chat, /video, /ai            →  Communication Service (8084)
-/api/v1/admin                 →  Admin Service (8085)
-/shifts, /tasks               →  Staff Service (8086)
-```
+### Component Conventions
 
-Every request includes a Cognito Bearer token and `x-user-region` header. On 5xx or timeout (5s), the client automatically retries against the backup URL.
+| Pattern | Usage |
+|---------|-------|
+| `rounded-2xl` | Cards and containers |
+| `rounded-xl` | Buttons, inputs, badges |
+| `shadow-card` / `shadow-elevated` / `shadow-soft` | Elevation hierarchy |
+| `.medical-gradient` | Primary CTA backgrounds |
+| `.grain` | Noise texture overlays for depth |
+| `bg-background` / `text-foreground` / `bg-card` | Design tokens (avoid hardcoded colors) |
 
-### Security
+### Responsive Patterns
 
-| Guard | Purpose |
-|-------|---------|
-| **ProtectedRoute** | Redirects unauthenticated users to `/auth` |
-| **RoleGuard** | Prevents cross-role access (patient can't reach admin routes) |
-| **HipaaGuard** | 15-minute inactivity auto-logout, 12px blur on tab switch |
-| **GdprBanner** | Granular cookie consent (essential/functional/analytics) |
-| **Encrypted Storage** | AES-GCM 256-bit via Web Crypto API — no raw JWT tokens stored |
-
-### Multi-Region
-
-- US patients route to `us-east-1`, EU patients to `eu-central-1`
-- Knowledge Base aggregates articles from **both** regions globally
-- Region stored in `localStorage.userRegion`, sent as `x-user-region` header
-
----
-
-## Role-Based Dashboards
-
-### Patient
-Appointments, video consultations, symptom checker (AI), health records, pharmacy (with barcode scanner), billing & payments, messaging, settings.
-
-### Doctor
-Patient queue, live monitoring (IoT vitals), patient records (EHR), prescriptions, analytics, knowledge base publishing, messaging, schedule management.
-
-### Admin
-User management, HIPAA audit log viewer, system health monitoring, platform analytics.
-
-### Staff
-Shift scheduling, task management, staff directory, announcements.
+| Pattern | Purpose |
+|---------|---------|
+| `flex flex-col sm:flex-row` | Cards stack on mobile, row on desktop |
+| `min-w-0` + `truncate` | Prevent text overflow in flex containers |
+| `flex-1 sm:flex-none` | Full-width buttons on mobile, auto on desktop |
+| `flex-shrink-0` + `whitespace-nowrap` | Fixed-width elements in flex layouts |
 
 ---
 
@@ -98,21 +261,33 @@ Shift scheduling, task management, staff directory, announcements.
 
 ### Prerequisites
 
-- Node.js 18+
+- Node.js 18+ (via nvm)
 - npm 9+
 
 ### Development
 
 ```bash
 npm install
-npm run dev          # Starts on http://localhost:8080
+npm run dev              # Starts on http://localhost:8080
 ```
 
 ### Build
 
 ```bash
-npm run build        # Production build → dist/
-npm run preview      # Preview built output
+npm run build            # Production build → dist/
+npm run preview          # Preview built output
+```
+
+### Type Check
+
+```bash
+npx tsc --noEmit         # TypeScript validation without emit
+```
+
+### Lint
+
+```bash
+npm run lint             # ESLint
 ```
 
 ### Mobile (Android)
@@ -120,13 +295,7 @@ npm run preview      # Preview built output
 ```bash
 npm run build
 npx cap sync
-npx cap open android
-```
-
-### Type Check
-
-```bash
-npx tsc --noEmit
+npx cap open android     # Opens in Android Studio
 ```
 
 ---
@@ -143,6 +312,8 @@ VITE_COGNITO_CLIENT_PATIENT_US=
 VITE_COGNITO_CLIENT_PATIENT_EU=
 VITE_COGNITO_CLIENT_DOCTOR_US=
 VITE_COGNITO_CLIENT_DOCTOR_EU=
+VITE_COGNITO_IDENTITY_POOL_ID_US=
+VITE_COGNITO_IDENTITY_POOL_ID_EU=
 
 # Service URLs (primary + backup, US + EU)
 VITE_PATIENT_SERVICE_URL_US=
@@ -151,10 +322,16 @@ VITE_PATIENT_SERVICE_URL_US_BACKUP=
 VITE_PATIENT_SERVICE_URL_EU_BACKUP=
 # ... same pattern for DOCTOR, BOOKING, COMMUNICATION, ADMIN, STAFF
 
+# S3 Buckets
+VITE_S3_PATIENT_DATA_BUCKET_US=
+VITE_S3_PATIENT_DATA_BUCKET_EU=
+VITE_S3_DOCTOR_DATA_BUCKET_US=
+VITE_S3_DOCTOR_DATA_BUCKET_EU=
+
 # Stripe
 VITE_STRIPE_PUBLISHABLE_KEY=
 
-# Encryption
+# Encryption (AES-GCM key for secure-storage)
 VITE_STORAGE_CIPHER_KEY=
 ```
 
@@ -162,29 +339,33 @@ VITE_STORAGE_CIPHER_KEY=
 
 ## Deployment
 
-**Web:** Firebase Hosting (`firebase deploy`). SPA rewrite to `/index.html`.
+### Web — Firebase Hosting
 
-**Mobile:** Capacitor builds. Android scheme: HTTPS. Push notifications via FCM.
+```bash
+npm run build
+firebase deploy          # SPA rewrite to /index.html
+```
 
----
+### Mobile — Capacitor
 
-## Design System
+```bash
+npm run build
+npx cap sync
+npx cap open android     # Android Studio
+npx cap open ios         # Xcode (macOS only)
+```
 
-| Element | Choice |
-|---------|--------|
-| Display font | Sora (headings) |
-| Body font | DM Sans |
-| Primary color | Deep teal (`hsl(166, 72%, 29%)`) |
-| Accent color | Coral rose (`hsl(347, 77%, 50%)`) |
-| Background | Warm stone (`hsl(40, 20%, 98%)`) |
-| Border radius | `rounded-2xl` (cards), `rounded-xl` (buttons) |
-| Shadows | `shadow-card`, `shadow-elevated`, `shadow-soft` |
+**Capacitor Config:**
+- App ID: `com.mediconnect.app`
+- Web Dir: `dist`
+- Android Scheme: HTTPS
+- Push Notifications: FCM (requires GDPR functional consent)
 
 ---
 
 ## Author
 
-**Zahidul Islam** — Hybrid Cloud Architect & Full Stack Engineer
+**Zahidul Islam** — Hybrid Cloud Architect · Full Stack Engineer · HealthTech Specialist
 
 [Portfolio](https://zahidul-islam.vercel.app) · [GitHub](https://github.com/Zahidulislam2222) · [Email](mailto:muhammadzahidulislam2222@gmail.com)
 
@@ -192,6 +373,9 @@ VITE_STORAGE_CIPHER_KEY=
 
 <div align="center">
 
-*Built with precision. Secured by design. Compliant by default.*
+**MediConnect Hub** — Enterprise-grade healthcare frontend.
+Built with precision. Secured by design. Compliant by default.
+
+*© 2026 Zahidul Islam. All rights reserved.*
 
 </div>
