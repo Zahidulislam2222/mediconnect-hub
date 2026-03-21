@@ -25,6 +25,7 @@ import {
   Clock,
   Megaphone,
   Contact,
+  Beaker,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -59,6 +60,7 @@ const doctorNavItems = [
   { icon: Activity, label: "Live Monitoring", path: "/live-monitoring" },
   { icon: FileText, label: "Patient Records", path: "/patient-records" },
   { icon: Pill, label: "Prescriptions", path: "/prescriptions" },
+  { icon: Beaker, label: "Clinical Tools", path: "/clinical-tools" },
   { icon: BookOpen, label: "Knowledge Base", path: "/knowledge" },
 ];
 

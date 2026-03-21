@@ -36,22 +36,43 @@ function getServiceConfig(endpoint: string) {
             backup = isEU ? import.meta.env.VITE_PATIENT_SERVICE_URL_EU_BACKUP : import.meta.env.VITE_PATIENT_SERVICE_URL_US_BACKUP;
         }
     }
+    // 2a. Public Health ELR → doctor-service
+    else if (endpoint.startsWith('/public-health/elr')) {
+        primary = isEU ? import.meta.env.VITE_DOCTOR_SERVICE_URL_EU : import.meta.env.VITE_DOCTOR_SERVICE_URL_US;
+        backup = isEU ? import.meta.env.VITE_DOCTOR_SERVICE_URL_EU_BACKUP : import.meta.env.VITE_DOCTOR_SERVICE_URL_US_BACKUP;
+    }
+    // 2b. Referrals + Med Reconciliation → doctor-service
+    else if (endpoint.startsWith('/referrals') || endpoint.startsWith('/med-reconciliation')) {
+        primary = isEU ? import.meta.env.VITE_DOCTOR_SERVICE_URL_EU : import.meta.env.VITE_DOCTOR_SERVICE_URL_US;
+        backup = isEU ? import.meta.env.VITE_DOCTOR_SERVICE_URL_EU_BACKUP : import.meta.env.VITE_DOCTOR_SERVICE_URL_US_BACKUP;
+    }
+    // 2c. Prior Auth + Eligibility → booking-service
+    else if (endpoint.startsWith('/prior-auth') || endpoint.startsWith('/eligibility')) {
+        primary = isEU ? import.meta.env.VITE_BOOKING_SERVICE_URL_EU : import.meta.env.VITE_BOOKING_SERVICE_URL_US;
+        backup = isEU ? import.meta.env.VITE_BOOKING_SERVICE_URL_EU_BACKUP : import.meta.env.VITE_BOOKING_SERVICE_URL_US_BACKUP;
+    }
     // 2. Patient & IoT Service
     else if (
         endpoint.startsWith('/patients') ||
         endpoint.startsWith('/register-patient') ||
         endpoint.startsWith('/public') || endpoint.startsWith('/me') ||
-        endpoint.startsWith('/vitals') || endpoint.startsWith('/emergency') || endpoint.startsWith('/stats') || endpoint.startsWith('/search')
+        endpoint.startsWith('/vitals') || endpoint.startsWith('/emergency') || endpoint.startsWith('/stats') || endpoint.startsWith('/search') ||
+        endpoint.startsWith('/hl7') || endpoint.startsWith('/allergies') || endpoint.startsWith('/immunizations') ||
+        endpoint.startsWith('/public-health') ||
+        endpoint.startsWith('/fhir') || endpoint.startsWith('/sdoh') || endpoint.startsWith('/mpi') ||
+        endpoint.startsWith('/care-plans') || endpoint.startsWith('/bluebutton')
     ) {
         primary = isEU ? import.meta.env.VITE_PATIENT_SERVICE_URL_EU : import.meta.env.VITE_PATIENT_SERVICE_URL_US;
         backup = isEU ? import.meta.env.VITE_PATIENT_SERVICE_URL_EU_BACKUP : import.meta.env.VITE_PATIENT_SERVICE_URL_US_BACKUP;
     }
     // 3. Doctor & Clinical Service
     else if (
-        endpoint.startsWith('/doctors') || 
+        endpoint.startsWith('/doctors') ||
         endpoint.startsWith('/register-doctor') ||
-        endpoint.startsWith('/prescription') || endpoint.startsWith('/prescriptions') || 
-        endpoint.startsWith('/pharmacy') || endpoint.startsWith('/ehr') || endpoint.startsWith('/relationships')
+        endpoint.startsWith('/prescription') || endpoint.startsWith('/prescriptions') ||
+        endpoint.startsWith('/pharmacy') || endpoint.startsWith('/ehr') || endpoint.startsWith('/relationships') ||
+        endpoint.startsWith('/drugs') || endpoint.startsWith('/terminology') ||
+        endpoint.startsWith('/cds-hooks') || endpoint.startsWith('/lab')
     ) {
         primary = isEU ? import.meta.env.VITE_DOCTOR_SERVICE_URL_EU : import.meta.env.VITE_DOCTOR_SERVICE_URL_US;
         backup = isEU ? import.meta.env.VITE_DOCTOR_SERVICE_URL_EU_BACKUP : import.meta.env.VITE_DOCTOR_SERVICE_URL_US_BACKUP;

@@ -37,6 +37,7 @@ import Billing from "./pages/Billing";
 import PatientRecords from "./pages/PatientRecords";
 import Prescriptions from "./pages/Prescriptions";
 import LiveMonitoring from "./pages/LiveMonitoring";
+import ClinicalTools from "./pages/ClinicalTools";
 
 // Admin Pages
 import AdminDashboard from "./pages/admin/AdminDashboard";
@@ -314,6 +315,7 @@ const AppContent = () => {
         <Route path="/doctor/settings" element={<RoleGuard allowedRoles={['doctor', 'practitioner']}><Settings /></RoleGuard>} />
         <Route path="/patient-records" element={<RoleGuard allowedRoles={['doctor', 'practitioner']}><PatientRecords /></RoleGuard>} />
         <Route path="/prescriptions" element={<RoleGuard allowedRoles={['doctor', 'practitioner']}><Prescriptions /></RoleGuard>} />
+        <Route path="/clinical-tools" element={<RoleGuard allowedRoles={['doctor', 'practitioner']}><ClinicalTools /></RoleGuard>} />
         <Route path="/doctor/knowledge" element={<RoleGuard allowedRoles={['doctor', 'practitioner']}><KnowledgeBase /></RoleGuard>} />
         <Route path="/doctor/knowledge/:slug" element={<RoleGuard allowedRoles={['doctor', 'practitioner']}><KnowledgeBasePost /></RoleGuard>} />
 
