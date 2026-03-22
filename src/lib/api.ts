@@ -79,7 +79,7 @@ function getServiceConfig(endpoint: string) {
     }
     // 4. Booking & Billing Service
     else if (
-        endpoint.startsWith('/appointments') || endpoint.startsWith('/book-appointment') ||
+        endpoint.startsWith('/appointments') ||
         endpoint.startsWith('/analytics') || endpoint.startsWith('/billing') || endpoint.startsWith('/system')
     ) {
         primary = isEU ? import.meta.env.VITE_BOOKING_SERVICE_URL_EU : import.meta.env.VITE_BOOKING_SERVICE_URL_US;

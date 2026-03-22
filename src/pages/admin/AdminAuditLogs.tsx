@@ -84,7 +84,7 @@ export default function AdminAuditLogs() {
             if (selectedAction) params.set("action", selectedAction);
             if (actorId.trim()) params.set("actor_id", actorId.trim());
             params.set("limit", "50");
-            if (append && lastEvaluatedKey) params.set("lastEvaluatedKey", lastEvaluatedKey);
+            if (append && lastEvaluatedKey) params.set("start_key", lastEvaluatedKey);
 
             const queryString = params.toString();
             const endpoint = `/api/v1/admin/audit/logs${queryString ? `?${queryString}` : ""}`;

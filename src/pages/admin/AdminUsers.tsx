@@ -109,7 +109,7 @@ export default function AdminUsers() {
 
             let url = `/api/v1/admin/users/patients`;
             if (isLoadMore && patientsLastKey) {
-                url += `?startKey=${encodeURIComponent(JSON.stringify(patientsLastKey))}`;
+                url += `?start_key=${encodeURIComponent(JSON.stringify(patientsLastKey))}`;
             }
 
             const data: any = await api.get(url);
@@ -136,7 +136,7 @@ export default function AdminUsers() {
 
             let url = `/api/v1/admin/users/doctors`;
             if (isLoadMore && doctorsLastKey) {
-                url += `?startKey=${encodeURIComponent(JSON.stringify(doctorsLastKey))}`;
+                url += `?start_key=${encodeURIComponent(JSON.stringify(doctorsLastKey))}`;
             }
 
             const data: any = await api.get(url);
