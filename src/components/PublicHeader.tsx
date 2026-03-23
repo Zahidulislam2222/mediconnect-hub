@@ -44,10 +44,10 @@ export function PublicHeader() {
   return (
     <>
       <nav className={cn(
-        "fixed top-0 left-0 right-0 z-50 transition-all duration-300 safe-top",
+        "fixed top-0 left-0 right-0 z-50 transition-all duration-300 safe-top bg-background/80 backdrop-blur-xl",
         scrolled
-          ? "bg-background/85 backdrop-blur-xl border-b border-border shadow-soft"
-          : "bg-transparent border-b border-transparent"
+          ? "border-b border-border shadow-soft"
+          : "border-b border-transparent"
       )}>
         <div className="container mx-auto px-6 h-16 flex items-center justify-between">
           {/* Logo */}

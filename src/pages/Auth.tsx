@@ -526,7 +526,7 @@ export default function Auth() {
   );
 
   return (
-    <div className="min-h-screen flex">
+    <div className="min-h-screen flex overflow-hidden">
       {!['identity', 'diploma-upload'].includes(authStep) && <PublicHeader />}
 
       {/* Left Panel — Brand Visual */}
