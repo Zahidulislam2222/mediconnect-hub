@@ -56,6 +56,7 @@ import StaffDirectory from "./pages/staff/StaffDirectory";
 // Context Provider
 import { CheckoutProvider } from "./context/CheckoutContext";
 import { SubscriptionProvider } from "./context/SubscriptionContext";
+import { ChatWidget } from "./components/chat/ChatWidget";
 
 const Router = Capacitor.isNativePlatform() ? HashRouter : BrowserRouter;
 const queryClient = new QueryClient();
@@ -353,6 +354,7 @@ const App = () => (
       <Sonner />
       <Router>
         <AppContent />
+        <ChatWidget />
       </Router>
     </TooltipProvider>
   </QueryClientProvider>

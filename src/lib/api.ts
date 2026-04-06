@@ -86,10 +86,10 @@ function getServiceConfig(endpoint: string) {
         primary = isEU ? import.meta.env.VITE_BOOKING_SERVICE_URL_EU : import.meta.env.VITE_BOOKING_SERVICE_URL_US;
         backup = isEU ? import.meta.env.VITE_BOOKING_SERVICE_URL_EU_BACKUP : import.meta.env.VITE_BOOKING_SERVICE_URL_US_BACKUP;
     }
-    // 5. Communication & AI Service
+    // 5. Communication, AI & Chatbot Service
     else if (
         endpoint.startsWith('/chat') || endpoint.startsWith('/video') ||
-        endpoint.startsWith('/ai')
+        endpoint.startsWith('/ai') || endpoint.startsWith('/chatbot')
     ) {
         primary = isEU ? import.meta.env.VITE_COMMUNICATION_SERVICE_URL_EU : import.meta.env.VITE_COMMUNICATION_SERVICE_URL_US;
         backup = isEU ? import.meta.env.VITE_COMMUNICATION_SERVICE_URL_EU_BACKUP : import.meta.env.VITE_COMMUNICATION_SERVICE_URL_US_BACKUP;
