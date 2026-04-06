@@ -11,8 +11,10 @@
 ![GDPR](https://img.shields.io/badge/GDPR-Compliant-3B82F6)
 ![FHIR](https://img.shields.io/badge/FHIR_R4-Compliant-8B5CF6)
 ![SMART](https://img.shields.io/badge/SMART_on_FHIR-2.0-06B6D4)
+![Stripe](https://img.shields.io/badge/Stripe-Subscriptions-635BFF?logo=stripe&logoColor=white)
+![AI](https://img.shields.io/badge/AI_Chatbot-LightRAG-FF6B35)
 
-**Production-grade telemedicine frontend with multi-region data residency, AES-256 encrypted storage, HIPAA session management, and cross-platform mobile support.**
+**Production-grade telemedicine frontend with multi-region data residency, AES-256 encrypted storage, HIPAA session management, AI chatbot, subscription billing, and cross-platform mobile support.**
 
 [Live Demo](https://askme-82f72.web.app) · [Backend Repo](https://github.com/Zahidulislam2222/mediconnect-infrastructure-production) · [Author](https://zahidul-islam.vercel.app)
 
@@ -51,6 +53,9 @@ The application connects to **7 backend microservices** via an intelligent API c
 | **Automatic Failover** | Primary→backup URL failover on 5xx or 5s timeout (15s for Cloud Run cold start) |
 | **Cross-Platform** | Single codebase → Web (Firebase), Android/iOS (Capacitor), PWA-ready |
 | **Role-Based Access** | 4 role zones with route guards, enforced at both frontend and backend |
+| **AI Chatbot** | Floating chat bubble on all pages, LightRAG knowledge graph, rate limits per tier, EU AI Act transparent |
+| **Subscription Plans** | 3-tier Discount Pass (Free/Plus/Premium), Stripe Elements checkout, GDPR consent |
+| **Doctor Earnings** | Tier-based revenue splits (80/85/88%), rate management, payout history |
 
 ---
 
