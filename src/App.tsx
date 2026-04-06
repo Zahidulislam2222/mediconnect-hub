@@ -34,6 +34,7 @@ import Contact from "./pages/Contact";
 import AdminStaffAuth from "./pages/AdminStaffAuth";
 import NotFound from "./pages/NotFound";
 import Billing from "./pages/Billing";
+import Subscription from "./pages/Subscription";
 import PatientRecords from "./pages/PatientRecords";
 import Prescriptions from "./pages/Prescriptions";
 import LiveMonitoring from "./pages/LiveMonitoring";
@@ -54,6 +55,7 @@ import StaffDirectory from "./pages/staff/StaffDirectory";
 
 // Context Provider
 import { CheckoutProvider } from "./context/CheckoutContext";
+import { SubscriptionProvider } from "./context/SubscriptionContext";
 
 const Router = Capacitor.isNativePlatform() ? HashRouter : BrowserRouter;
 const queryClient = new QueryClient();
@@ -268,9 +270,11 @@ const ProtectedRoute = () => {
 
   return (
     <CheckoutProvider>
-      <HipaaGuard>
-        <Outlet />
-      </HipaaGuard>
+      <SubscriptionProvider>
+        <HipaaGuard>
+          <Outlet />
+        </HipaaGuard>
+      </SubscriptionProvider>
     </CheckoutProvider>
   );
 };
@@ -297,6 +301,7 @@ const AppContent = () => {
         {/* Patient Features */}
         <Route path="/patient-dashboard" element={<RoleGuard allowedRoles={['patient']}><PatientDashboard /></RoleGuard>} />
         <Route path="/billing" element={<RoleGuard allowedRoles={['patient']}><Billing /></RoleGuard>} />
+        <Route path="/subscription" element={<Subscription />} />
         <Route path="/appointments" element={<Appointments />} />
         <Route path="/consultation" element={<ConsultationRoom />} />
         <Route path="/symptom-checker" element={<RoleGuard allowedRoles={['patient']}><SymptomChecker /></RoleGuard>} />
