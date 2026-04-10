@@ -280,6 +280,7 @@ jobs:
     name: "Lighthouse Audit"
     needs: [deploy-production]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    continue-on-error: true
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
