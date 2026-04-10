@@ -13,6 +13,7 @@
 ![SMART](https://img.shields.io/badge/SMART_on_FHIR-2.0-06B6D4)
 ![Stripe](https://img.shields.io/badge/Stripe-Subscriptions-635BFF?logo=stripe&logoColor=white)
 ![AI](https://img.shields.io/badge/AI_Chatbot-LightRAG-FF6B35)
+![CI/CD](https://img.shields.io/badge/CI%2FCD-GitHub_Actions-2088FF?logo=githubactions&logoColor=white)
 
 **Production-grade telemedicine frontend with multi-region data residency, AES-256 encrypted storage, HIPAA session management, AI chatbot, subscription billing, and cross-platform mobile support.**
 
@@ -30,6 +31,7 @@
 - [Security & Compliance](#security--compliance)
 - [Tech Stack](#tech-stack)
 - [Design System](#design-system)
+- [CI/CD Pipeline](#cicd-pipeline)
 - [Getting Started](#getting-started)
 - [Deployment](#deployment)
 - [Author](#author)
@@ -56,6 +58,8 @@ The application connects to **7 backend microservices** via an intelligent API c
 | **AI Chatbot** | Floating chat bubble on all pages, LightRAG knowledge graph, rate limits per tier, EU AI Act transparent |
 | **Subscription Plans** | 3-tier Discount Pass (Free/Plus/Premium), Stripe Elements checkout, GDPR consent |
 | **Doctor Earnings** | Tier-based revenue splits (80/85/88%), rate management, payout history |
+| **CI/CD Pipeline** | 5-stage GitHub Actions: quality gate, security scan, build, Firebase deploy, Lighthouse audit |
+| **Scroll Animations** | 9 Framer Motion effects: parallax, counting numbers, SVG heartbeat draw, horizontal scroll |
 
 ---
 
@@ -194,6 +198,14 @@ Medical articles published by doctors are stored in **region-specific** DynamoDB
 | — | Consent Persistence | `gdpr_consent` survives `clearAllSensitive()` — consent preference is retained |
 | — | Push Notification Consent | Capacitor push notifications blocked without GDPR functional consent |
 
+### Accessibility (EAA / WCAG 2.2)
+
+| Control | Implementation |
+|---------|---------------|
+| **Reduced Motion** | `@media (prefers-reduced-motion: reduce)` disables all animations globally |
+| **Keyboard Navigation** | Radix UI primitives (shadcn/ui) provide full keyboard support |
+| **Semantic HTML** | Proper heading hierarchy, ARIA labels, focus management |
+
 ### Storage Security
 
 ```
@@ -225,6 +237,7 @@ Medical articles published by doctors are stored in **region-specific** DynamoDB
 | **Charts** | Recharts (responsive, composable) |
 | **Mobile** | Capacitor 8 (Android/iOS), push notifications, camera access |
 | **Hosting** | Firebase Hosting (web), Capacitor (native app stores) |
+| **CI/CD** | GitHub Actions (5-stage pipeline), Firebase deploy |
 
 ---
 
@@ -235,21 +248,42 @@ Medical articles published by doctors are stored in **region-specific** DynamoDB
 | Element | Value |
 |---------|-------|
 | Display font | **Sora** (headings, `font-display` class) |
-| Body font | **DM Sans** (`font-sans` class) |
-| Primary | Deep teal `hsl(166, 72%, 29%)` |
-| Accent | Coral rose `hsl(347, 77%, 50%)` |
-| Background | Warm stone `hsl(40, 20%, 98%)` |
+| Body font | **Inter** (`font-sans` class) |
+| Primary | Deep navy `hsl(222, 47%, 11%)` |
+| Accent | Blue `hsl(221, 83%, 53%)` |
+| Background | Light gray `hsl(210, 20%, 98%)` |
+| Dark mode BG | Near-black `hsl(240, 10%, 4%)` |
+
+### Logo
+
+**HeartPulse** icon from lucide-react, rendered in a `bg-foreground text-background rounded-lg` container. Used consistently across header, sidebar, dashboard layout, and footer.
 
 ### Component Conventions
 
 | Pattern | Usage |
 |---------|-------|
-| `rounded-2xl` | Cards and containers |
-| `rounded-xl` | Buttons, inputs, badges |
-| `shadow-card` / `shadow-elevated` / `shadow-soft` | Elevation hierarchy |
-| `.medical-gradient` | Primary CTA backgrounds |
-| `.grain` | Noise texture overlays for depth |
+| `rounded-xl` | Cards, buttons, inputs, badges |
+| `shadow-soft` / `shadow-card` / `shadow-elevated` | Elevation hierarchy |
+| `bg-accent text-accent-foreground` | Primary CTA buttons |
+| `bg-foreground text-background` | Dark sections, banners, secondary CTAs |
 | `bg-background` / `text-foreground` / `bg-card` | Design tokens (avoid hardcoded colors) |
+| `backdrop-blur-md bg-background/50` | Glass header effect |
+
+### Landing Page Animations (Framer Motion)
+
+| Effect | Technique |
+|--------|-----------|
+| Hero blur-in entrance | Staggered opacity + blur + translateY |
+| Hero parallax | `useScroll` + `useTransform` — text moves faster than mockup |
+| Platform mockup assembly | Browser-chrome dashboard assembles piece by piece with staggered variants |
+| SVG heartbeat line draw | `pathLength` linked to scroll position via `useSpring` |
+| Counting numbers | Spring-physics counter (0→50K+) with clean final display snap |
+| Horizontal scroll features | Feature cards slide left via scroll-linked `useTransform` |
+| Word-by-word text reveal | Each word opacity tied to scroll progress |
+| Trust cards pop-in | Scale 0.8→1 with rotation -5°→0° on viewport entry |
+| CTA entrance | `whileInView` fade-up animation |
+
+All animations respect `@media (prefers-reduced-motion: reduce)`.
 
 ### Responsive Patterns
 
@@ -259,6 +293,44 @@ Medical articles published by doctors are stored in **region-specific** DynamoDB
 | `min-w-0` + `truncate` | Prevent text overflow in flex containers |
 | `flex-1 sm:flex-none` | Full-width buttons on mobile, auto on desktop |
 | `flex-shrink-0` + `whitespace-nowrap` | Fixed-width elements in flex layouts |
+
+---
+
+## CI/CD Pipeline
+
+### `.github/workflows/frontend-deploy.yml`
+
+5-stage pipeline triggered on push to `main` or PR when source files change. Mirrors the backend pipeline pattern.
+
+```
+Push to main
+     │
+┌────▼──────────┐
+│ Quality Gate  │  TypeScript + ESLint + 43 tests + npm audit + build
+│               │  Blocks everything if fails
+└────┬──────────┘
+     │
+┌────▼──────────┐
+│ Security Scan │  Leaked secrets in dist/ + bundle size check
+│               │  Blocks deploy if secrets found
+└────┬──────────┘
+     │
+┌────▼──────────┐
+│ Build         │  vite build → upload dist/ artifact
+└────┬──────────┘
+     │
+┌────▼──────────────────┐
+│ Deploy                │
+│  PR → Preview channel │  (7-day temp URL posted to PR)
+│  main → Firebase live │  (production deploy + health check)
+└────┬──────────────────┘
+     │
+┌────▼──────────┐
+│ Lighthouse CI │  Performance + accessibility audit (non-blocking)
+└───────────────┘
+```
+
+**Required secret:** `FIREBASE_SERVICE_ACCOUNT`
 
 ---
 
@@ -287,6 +359,14 @@ npm run preview          # Preview built output
 
 ```bash
 npx tsc --noEmit         # TypeScript validation without emit
+```
+
+### Testing
+
+```bash
+npm run test             # Vitest unit tests (43 assertions)
+npm run test:watch       # Watch mode
+npm run test:e2e         # Playwright E2E tests (requires dev server)
 ```
 
 ### Lint
@@ -344,7 +424,9 @@ VITE_STORAGE_CIPHER_KEY=
 
 ## Deployment
 
-### Web — Firebase Hosting
+### Web — Firebase Hosting (Automated via CI/CD)
+
+Every push to `main` triggers the CI/CD pipeline which builds and deploys automatically. Manual deploy:
 
 ```bash
 npm run build
