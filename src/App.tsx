@@ -130,7 +130,7 @@ const GdprBanner = () => {
                 Accept Selected
               </button>
             )}
-            <button onClick={() => saveConsent(true, true)} className="medical-gradient px-5 py-2.5 rounded-xl font-semibold text-sm text-white shadow-sm hover:shadow-glow transition-all">
+            <button onClick={() => saveConsent(true, true)} className="bg-accent px-5 py-2.5 rounded-xl font-semibold text-sm text-accent-foreground shadow-sm hover:shadow-md transition-all">
               Accept All
             </button>
           </div>

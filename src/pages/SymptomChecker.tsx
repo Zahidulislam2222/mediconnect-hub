@@ -202,7 +202,7 @@ export default function SymptomChecker() {
         <Card className="shadow-card border-border/50 flex flex-col h-full">
           <CardHeader className="pb-3 border-b flex flex-row items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl medical-gradient">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-accent">
                 <Brain className="h-5 w-5 text-white" />
               </div>
               <div>

@@ -276,7 +276,7 @@ if (avatarUrl && !avatarUrl.startsWith('http')) {
 
                   <button
                     onClick={() => navigate("/billing")}
-                    className="w-full text-xs medical-gradient text-white py-2.5 rounded-xl hover:shadow-glow transition-all font-semibold"
+                    className="w-full text-xs bg-accent text-accent-foreground py-2.5 rounded-xl hover:shadow-md transition-all font-semibold"
                   >
                     View Billing History
                   </button>
@@ -359,7 +359,7 @@ if (avatarUrl && !avatarUrl.startsWith('http')) {
                       <Button
                         size="sm"
                         onClick={() => handleJoin(apt)}
-                        className={`flex-shrink-0 rounded-xl w-full sm:w-auto ${uiStatus === 'completed' ? "opacity-50 cursor-not-allowed" : "medical-gradient text-white border-0 shadow-sm hover:shadow-glow"}`}
+                        className={`flex-shrink-0 rounded-xl w-full sm:w-auto ${uiStatus === 'completed' ? "opacity-50 cursor-not-allowed" : "bg-accent text-accent-foreground shadow-sm hover:shadow-md"}`}
                         disabled={uiStatus === 'completed'}
                       >
                          <Video className="h-4 w-4 mr-2" />
@@ -409,7 +409,7 @@ if (avatarUrl && !avatarUrl.startsWith('http')) {
         </div>
 
         {/* 4. MARKETING BANNER */}
-        <Card className="medical-gradient text-white shadow-elevated border-0 overflow-hidden relative group cursor-pointer"
+        <Card className="bg-foreground text-background shadow-elevated border-0 overflow-hidden relative group cursor-pointer"
           onClick={() => {
             if (profile?.patientId) navigate(`/live-monitoring?patientId=${profile.patientId}`);
           }}

@@ -66,7 +66,7 @@ export function PlanCard({ plan, currentPlanId, onSelect, isLoading }: PlanCardP
                     </Button>
                 ) : (
                     <Button
-                        className={`w-full rounded-xl ${plan.highlighted ? 'medical-gradient text-white' : ''}`}
+                        className={`w-full rounded-xl ${plan.highlighted ? 'bg-accent text-accent-foreground' : ''}`}
                         variant={plan.highlighted ? 'default' : 'outline'}
                         onClick={() => onSelect(plan.id)}
                         disabled={isLoading}

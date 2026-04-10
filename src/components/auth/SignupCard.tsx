@@ -130,7 +130,7 @@ export const SignupCard: React.FC<SignupCardProps> = ({
               </div>
             </div>
 
-            <Button type="submit" className="w-full h-12 rounded-xl medical-gradient text-white border-0 shadow-sm hover:shadow-glow transition-all duration-300 active:scale-[0.98] text-sm font-semibold mt-2" disabled={loading}>
+            <Button type="submit" className="w-full h-12 rounded-xl bg-foreground text-background hover:bg-foreground/90 transition-all duration-200 active:scale-[0.98] text-sm font-semibold mt-2" disabled={loading}>
               {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Create Secure Account"}
             </Button>
           </form>

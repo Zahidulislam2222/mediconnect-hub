@@ -337,7 +337,7 @@ export default function DoctorDashboard() {
                           <Button
                             size="sm"
                             onClick={() => handleJoinConsultation(apt)}
-                            className={cn("shadow-sm flex-1 sm:flex-none", apt.patientArrived ? "bg-green-600 hover:bg-green-700 animate-pulse" : "medical-gradient text-white")}
+                            className={cn("shadow-sm flex-1 sm:flex-none", apt.patientArrived ? "bg-green-600 hover:bg-green-700 animate-pulse" : "bg-accent text-accent-foreground")}
                           >
                             <Video className="h-4 w-4 mr-2" /> {apt.patientArrived ? "Join Now" : "Join"}
                           </Button>
@@ -362,7 +362,7 @@ export default function DoctorDashboard() {
 
           {/* RIGHT: INSIGHTS */}
           <div className="space-y-6">
-            <Card className="medical-gradient text-white border-none shadow-elevated overflow-hidden relative">
+            <Card className="bg-foreground text-background border-none shadow-elevated overflow-hidden relative">
               <CardContent className="p-6 relative z-10">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="font-bold text-lg">Practice Health</h3>

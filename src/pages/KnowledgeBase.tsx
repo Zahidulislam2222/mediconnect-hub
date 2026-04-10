@@ -174,8 +174,7 @@ export default function KnowledgeBase({ role = "patient" }: KnowledgeBaseProps) 
       <div className="max-w-7xl mx-auto p-4 sm:p-6 pt-24 space-y-10">
 
         {/* Search Hero */}
-        <div className="relative rounded-3xl overflow-hidden medical-gradient p-8 sm:p-12 text-center">
-          <div className="absolute inset-0 grain" />
+        <div className="relative rounded-3xl overflow-hidden bg-foreground text-background p-8 sm:p-12 text-center">
           <div className="absolute top-0 right-0 w-72 h-72 bg-white/5 rounded-full blur-3xl -translate-y-1/3 translate-x-1/4" />
 
           <div className="relative z-10 space-y-6 max-w-2xl mx-auto">

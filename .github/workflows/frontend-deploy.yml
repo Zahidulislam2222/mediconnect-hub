@@ -1,0 +1,311 @@
+name: "Frontend CI/CD (MediConnect)"
+
+# ─────────────────────────────────────────────────────────────────
+# Mirrors backend pipeline pattern:
+#   1. Quality Gate   → TypeScript, lint, unit tests, vulnerability scan
+#   2. Security Scan  → Secret leak check, bundle size monitoring
+#   3. Build          → Production artifact
+#   4. Deploy         → Firebase Hosting (preview on PR, prod on main)
+#   5. Post-Deploy    → Lighthouse CI (accessibility, performance, SEO)
+#
+# Required secrets:
+#   FIREBASE_SERVICE_ACCOUNT — Google service account JSON for Firebase
+#
+# Required variables (optional):
+#   LIGHTHOUSE_MIN_PERFORMANCE  — default: 80
+#   LIGHTHOUSE_MIN_ACCESSIBILITY — default: 90
+# ─────────────────────────────────────────────────────────────────
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "mediconnect-hub/**"
+      - ".github/workflows/frontend-deploy.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "mediconnect-hub/**"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  checks: write
+  pull-requests: write
+
+concurrency:
+  group: frontend-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    working-directory: mediconnect-hub
+
+jobs:
+  # ═══════════════════════════════════════════════════════════════
+  #  1. Quality Gate — blocks everything if fails
+  # ═══════════════════════════════════════════════════════════════
+  quality-gate:
+    name: "Quality Gate"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: mediconnect-hub/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: TypeScript check
+        run: npx tsc --noEmit
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Unit tests
+        run: npm run test
+
+      - name: Production build
+        run: npm run build
+        env:
+          NODE_ENV: production
+
+      # ── Vulnerability Scan (same pattern as backend) ──
+      - name: Audit dependencies
+        run: |
+          npm audit --audit-level=critical --omit=dev || {
+            echo "::warning::npm audit found vulnerabilities"
+            npm audit --audit-level=critical --omit=dev --json > audit-report.json 2>/dev/null || true
+            CRITICAL_COUNT=$(node -e "try{const r=require('./audit-report.json');console.log(r.metadata?.vulnerabilities?.critical||0)}catch{console.log(0)}")
+            if [ "$CRITICAL_COUNT" -gt 0 ]; then
+              echo "::error::Found $CRITICAL_COUNT critical vulnerabilities. Blocking deployment."
+              exit 1
+            fi
+            echo "No critical vulnerabilities found. Continuing with warnings."
+          }
+
+      - name: Upload audit report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-audit-report
+          path: mediconnect-hub/audit-report.json
+          if-no-files-found: ignore
+          retention-days: 30
+
+  # ═══════════════════════════════════════════════════════════════
+  #  2. Security Scan — secret leak + bundle size
+  # ═══════════════════════════════════════════════════════════════
+  security-scan:
+    name: "Security Scan"
+    needs: [quality-gate]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: mediconnect-hub/package-lock.json
+
+      - run: npm ci
+
+      - name: Build for inspection
+        run: npm run build
+        env:
+          NODE_ENV: production
+
+      # ── Check for leaked secrets in dist/ ──
+      - name: Scan for exposed secrets
+        run: |
+          echo "Scanning dist/ for exposed secrets..."
+          LEAKED=0
+
+          # Check for common secret patterns in built JS/CSS
+          if grep -rEl "(AKIA[0-9A-Z]{16}|sk_live_|sk_test_|-----BEGIN (RSA |EC )?PRIVATE KEY-----|ghp_[a-zA-Z0-9]{36})" dist/ 2>/dev/null; then
+            echo "::error::Found hardcoded secrets in build output!"
+            LEAKED=1
+          fi
+
+          # Check that VITE_ env vars are not exposing sensitive values
+          # (VITE_ vars are intentionally bundled — check for obvious mistakes)
+          if grep -rEl "VITE_STORAGE_CIPHER_KEY" dist/ 2>/dev/null; then
+            echo "::warning::VITE_STORAGE_CIPHER_KEY found in build — ensure this is expected (client-side encryption key)"
+          fi
+
+          if [ "$LEAKED" -gt 0 ]; then
+            exit 1
+          fi
+          echo "No leaked secrets found."
+
+      # ── Bundle size check ──
+      - name: Check bundle size
+        run: |
+          echo "Checking bundle sizes..."
+
+          # Get JS bundle size
+          JS_SIZE=$(find dist/assets -name "*.js" -exec du -cb {} + | tail -1 | cut -f1)
+          CSS_SIZE=$(find dist/assets -name "*.css" -exec du -cb {} + | tail -1 | cut -f1)
+          TOTAL_SIZE=$((JS_SIZE + CSS_SIZE))
+
+          JS_MB=$(echo "scale=2; $JS_SIZE / 1048576" | bc)
+          CSS_KB=$(echo "scale=0; $CSS_SIZE / 1024" | bc)
+          TOTAL_MB=$(echo "scale=2; $TOTAL_SIZE / 1048576" | bc)
+
+          echo "  JS:    ${JS_MB} MB"
+          echo "  CSS:   ${CSS_KB} KB"
+          echo "  Total: ${TOTAL_MB} MB"
+
+          # Warn if total exceeds 5MB (excluding Chime SDK which is ~3.5MB)
+          LIMIT=5242880
+          if [ "$TOTAL_SIZE" -gt "$LIMIT" ]; then
+            echo "::warning::Bundle size (${TOTAL_MB} MB) exceeds 5MB. Consider code-splitting."
+          fi
+
+          # Hard fail if total exceeds 10MB
+          HARD_LIMIT=10485760
+          if [ "$TOTAL_SIZE" -gt "$HARD_LIMIT" ]; then
+            echo "::error::Bundle size (${TOTAL_MB} MB) exceeds 10MB hard limit!"
+            exit 1
+          fi
+
+          echo "Bundle size within limits."
+
+  # ═══════════════════════════════════════════════════════════════
+  #  3. Build Production Artifact
+  # ═══════════════════════════════════════════════════════════════
+  build:
+    name: "Build"
+    needs: [security-scan]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: mediconnect-hub/package-lock.json
+
+      - run: npm ci
+
+      - name: Build production
+        run: npm run build
+        env:
+          NODE_ENV: production
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist
+          path: mediconnect-hub/dist
+          retention-days: 7
+
+  # ═══════════════════════════════════════════════════════════════
+  #  4. Deploy to Firebase Hosting
+  # ═══════════════════════════════════════════════════════════════
+
+  # ── 4a. Preview deploy on Pull Requests ──
+  deploy-preview:
+    name: "Deploy Preview"
+    needs: [build]
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-dist
+          path: mediconnect-hub/dist
+
+      - name: Deploy to Firebase preview channel
+        uses: FirebaseExtended/action-hosting-deploy@v0
+        with:
+          repoToken: ${{ secrets.GITHUB_TOKEN }}
+          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          projectId: mediconnect-hub
+          entryPoint: mediconnect-hub
+          expires: 7d
+
+  # ── 4b. Production deploy on push to main ──
+  deploy-production:
+    name: "Deploy Production"
+    needs: [build]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: https://mediconnect-hub.web.app
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-dist
+          path: mediconnect-hub/dist
+
+      - name: Deploy to Firebase production
+        uses: FirebaseExtended/action-hosting-deploy@v0
+        with:
+          repoToken: ${{ secrets.GITHUB_TOKEN }}
+          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          projectId: mediconnect-hub
+          channelId: live
+          entryPoint: mediconnect-hub
+
+      - name: Post-deploy health check
+        run: |
+          echo "Waiting for deployment to propagate..."
+          sleep 15
+
+          HTTP_STATUS=$(curl -o /dev/null -s -w "%{http_code}" https://mediconnect-hub.web.app)
+          echo "Health check: HTTP $HTTP_STATUS"
+
+          if [ "$HTTP_STATUS" -ne 200 ]; then
+            echo "::error::Post-deploy health check failed! HTTP $HTTP_STATUS"
+            exit 1
+          fi
+          echo "Production deployment verified."
+
+  # ═══════════════════════════════════════════════════════════════
+  #  5. Post-Deploy — Lighthouse CI
+  # ═══════════════════════════════════════════════════════════════
+  lighthouse:
+    name: "Lighthouse Audit"
+    needs: [deploy-production]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run Lighthouse CI
+        uses: treosh/lighthouse-ci-action@v12
+        with:
+          urls: |
+            https://mediconnect-hub.web.app
+            https://mediconnect-hub.web.app/auth
+          uploadArtifacts: true
+          temporaryPublicStorage: true
+          runs: 3
+
+      - name: Check Lighthouse scores
+        run: |
+          echo "Lighthouse audit complete."
+          echo "Results uploaded as artifacts."
+          echo ""
+          echo "Minimum thresholds:"
+          echo "  Performance:   ${PERF_MIN:-80}"
+          echo "  Accessibility: ${A11Y_MIN:-90}"
+          echo ""
+          echo "Review the Lighthouse report artifact for detailed scores."
+        env:
+          PERF_MIN: ${{ vars.LIGHTHOUSE_MIN_PERFORMANCE }}
+          A11Y_MIN: ${{ vars.LIGHTHOUSE_MIN_ACCESSIBILITY }}

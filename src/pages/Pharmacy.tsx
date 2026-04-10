@@ -324,7 +324,7 @@ export default function Pharmacy() {
                       {rx.status === "ISSUED" && rx.paymentStatus !== "PAID" && (
                         <Button
                           size="sm"
-                          className="medical-gradient text-white rounded-xl"
+                          className="bg-accent text-accent-foreground rounded-xl"
                           disabled={rx.liveStock === 0 || processingId === rx.prescriptionId}
                           onClick={() => handlePayMedication(rx)}
                         >

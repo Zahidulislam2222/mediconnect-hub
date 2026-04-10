@@ -257,7 +257,7 @@ function BillingContent() {
                                     </p>
 
                                     <Button
-                                        className="w-full h-11 rounded-xl medical-gradient text-white border-0 shadow-sm hover:shadow-glow transition-all"
+                                        className="w-full h-11 rounded-xl bg-accent text-accent-foreground shadow-sm hover:shadow-md transition-all"
                                         disabled={!billingData?.outstandingBalance || billingData?.outstandingBalance <= 0 || processingPayment}
                                         onClick={handlePayBill}
                                     >

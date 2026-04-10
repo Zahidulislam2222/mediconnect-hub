@@ -308,11 +308,10 @@ export default function KnowledgeBasePost({ role = "patient" }: KnowledgeBasePos
           {/* Sidebar */}
           <aside className="space-y-6">
             {/* CTA Card */}
-            <Card className="border-0 shadow-elevated medical-gradient rounded-2xl overflow-hidden relative">
+            <Card className="border-0 shadow-elevated bg-foreground text-background rounded-2xl overflow-hidden relative">
               <div className="absolute top-0 right-0 p-4 opacity-10">
                 <MessageSquare className="h-28 w-28 -mr-6 -mt-6" />
               </div>
-              <div className="absolute inset-0 grain" />
               <CardContent className="p-6 sm:p-7 space-y-5 relative z-10">
                 <h4 className="font-display text-xl font-bold text-white leading-tight">Discuss this topic with a doctor?</h4>
                 <p className="text-white/70 text-sm leading-relaxed">

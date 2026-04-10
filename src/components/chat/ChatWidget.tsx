@@ -84,7 +84,7 @@ export function ChatWidget() {
         return (
             <Button
                 onClick={handleOpen}
-                className="fixed bottom-6 right-6 h-14 w-14 rounded-full shadow-elevated medical-gradient text-white z-50 hover:scale-105 transition-transform"
+                className="fixed bottom-6 right-6 h-14 w-14 rounded-full shadow-elevated bg-accent text-accent-foreground z-50 hover:scale-105 transition-transform"
                 size="icon"
             >
                 <MessageCircle className="h-6 w-6" />
@@ -95,7 +95,7 @@ export function ChatWidget() {
     return (
         <Card className="fixed bottom-6 right-6 w-[380px] h-[520px] rounded-2xl shadow-elevated z-50 flex flex-col overflow-hidden border-border">
             {/* Header */}
-            <div className="medical-gradient text-white p-4 flex justify-between items-center flex-shrink-0">
+            <div className="bg-accent text-accent-foreground p-4 flex justify-between items-center flex-shrink-0">
                 <div className="flex items-center gap-2">
                     <Bot className="h-5 w-5" />
                     <div>

@@ -13,7 +13,6 @@ import {
   LogOut,
   ChevronLeft,
   ChevronRight,
-  Stethoscope,
   Users,
   BarChart3,
   Brain,
@@ -26,6 +25,7 @@ import {
   Megaphone,
   Contact,
   Beaker,
+  HeartPulse,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -80,10 +80,10 @@ const staffNavItems = [
 ];
 
 const roleConfig = {
-  patient: { label: "Patient Portal", color: "bg-primary/10 text-primary border-primary/15", icon: null },
-  doctor: { label: "Doctor Portal", color: "bg-primary/10 text-primary border-primary/15", icon: null },
-  admin: { label: "Admin Portal", color: "bg-rose-500/10 text-rose-600 border-rose-500/15", icon: ShieldCheck },
-  staff: { label: "Staff Portal", color: "bg-amber-500/10 text-amber-600 border-amber-500/15", icon: null },
+  patient: { label: "Patient Portal", color: "bg-accent/10 text-accent border-accent/15" },
+  doctor: { label: "Doctor Portal", color: "bg-accent/10 text-accent border-accent/15" },
+  admin: { label: "Admin Portal", color: "bg-destructive/10 text-destructive border-destructive/15" },
+  staff: { label: "Staff Portal", color: "bg-warning/10 text-warning border-warning/15" },
 };
 
 export function Sidebar({ userRole, userName, userAvatar, onLogout, className }: SidebarProps) {
@@ -97,7 +97,7 @@ export function Sidebar({ userRole, userName, userAvatar, onLogout, className }:
   return (
     <aside
       className={cn(
-        "fixed left-0 top-0 z-40 flex h-screen flex-col border-r border-sidebar-border bg-sidebar transition-all duration-300",
+        "fixed left-0 top-0 z-40 flex h-screen flex-col border-r border-sidebar-border bg-sidebar transition-all duration-200",
         collapsed ? "w-[72px]" : "w-64",
         className
       )}
@@ -106,22 +106,22 @@ export function Sidebar({ userRole, userName, userAvatar, onLogout, className }:
       <div className="flex h-16 items-center justify-between px-4">
         {!collapsed && (
           <div className="flex items-center gap-2.5">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl medical-gradient shadow-sm">
-              <Stethoscope className="h-[18px] w-[18px] text-white" />
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-foreground text-background">
+              <HeartPulse className="h-4 w-4" />
             </div>
-            <span className="font-display text-lg font-bold text-sidebar-foreground">MediConnect</span>
+            <span className="font-display text-base font-bold text-sidebar-foreground">MediConnect</span>
           </div>
         )}
         {collapsed && (
-          <div className="mx-auto flex h-9 w-9 items-center justify-center rounded-xl medical-gradient shadow-sm">
-            <Stethoscope className="h-[18px] w-[18px] text-white" />
+          <div className="mx-auto flex h-8 w-8 items-center justify-center rounded-lg bg-foreground text-background">
+            <HeartPulse className="h-4 w-4" />
           </div>
         )}
         <Button
           variant="ghost"
           size="icon"
           className={cn(
-            "h-7 w-7 rounded-lg text-sidebar-foreground/40 hover:bg-sidebar-accent hover:text-sidebar-foreground",
+            "h-7 w-7 rounded-md text-sidebar-foreground/40 hover:bg-sidebar-accent hover:text-sidebar-foreground",
             collapsed && "absolute -right-3.5 top-6 bg-card shadow-md border border-border h-7 w-7"
           )}
           onClick={() => setCollapsed(!collapsed)}
@@ -137,10 +137,9 @@ export function Sidebar({ userRole, userName, userAvatar, onLogout, className }:
       {!collapsed && (
         <div className="px-3 py-3">
           <div className={cn(
-            "flex items-center justify-center gap-1.5 rounded-xl border py-2 text-xs font-medium",
+            "flex items-center justify-center gap-1.5 rounded-lg border py-2 text-xs font-medium",
             config.color
           )}>
-            {config.icon && <config.icon className="h-3.5 w-3.5" />}
             {config.label}
           </div>
         </div>
@@ -161,7 +160,7 @@ export function Sidebar({ userRole, userName, userAvatar, onLogout, className }:
                     collapsed && "justify-center px-2"
                   )}
                 >
-                  <item.icon className={cn("h-[18px] w-[18px] flex-shrink-0", isActive && "text-primary")} />
+                  <item.icon className={cn("h-[18px] w-[18px] flex-shrink-0", isActive && "text-sidebar-primary")} />
                   {!collapsed && <span>{item.label}</span>}
                 </NavLink>
               </li>
@@ -196,12 +195,12 @@ export function Sidebar({ userRole, userName, userAvatar, onLogout, className }:
       {/* User Profile */}
       <div className={cn("p-3", collapsed && "px-2")}>
         <div className={cn(
-          "flex items-center gap-3 rounded-xl p-2.5 transition-colors hover:bg-sidebar-accent",
+          "flex items-center gap-3 rounded-lg p-2.5 transition-colors hover:bg-sidebar-accent",
           collapsed && "justify-center"
         )}>
-          <Avatar className="h-9 w-9 border-2 border-primary/15 rounded-xl">
-            <AvatarImage src={userAvatar} alt={userName} className="object-cover rounded-xl" />
-            <AvatarFallback className="bg-primary/8 text-primary text-sm font-medium rounded-xl">
+          <Avatar className="h-8 w-8 border border-border rounded-lg">
+            <AvatarImage src={userAvatar} alt={userName} className="object-cover rounded-lg" />
+            <AvatarFallback className="bg-accent/10 text-accent text-xs font-medium rounded-lg">
               {(userName || "User").substring(0, 2).toUpperCase()}
             </AvatarFallback>
           </Avatar>
@@ -218,7 +217,7 @@ export function Sidebar({ userRole, userName, userAvatar, onLogout, className }:
             <Button
               variant="ghost"
               size="icon"
-              className="h-8 w-8 rounded-lg text-sidebar-foreground/40 hover:bg-destructive/10 hover:text-destructive"
+              className="h-8 w-8 rounded-md text-sidebar-foreground/40 hover:bg-destructive/10 hover:text-destructive"
               onClick={onLogout}
             >
               <LogOut className="h-4 w-4" />

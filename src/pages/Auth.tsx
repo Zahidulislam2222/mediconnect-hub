@@ -6,7 +6,7 @@ import { signIn, signUp, confirmSignUp, confirmSignIn, getCurrentUser, fetchAuth
 // AWS SDK Imports
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 
-import { Stethoscope, Loader2 } from "lucide-react";
+import { HeartPulse, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { PublicHeader } from "@/components/PublicHeader";
 import { api } from "@/lib/api";
@@ -515,10 +515,10 @@ export default function Auth() {
     <div className="min-h-screen flex items-center justify-center bg-background">
       <div className="flex flex-col items-center gap-4">
         <div className="relative">
-          <div className="h-14 w-14 rounded-2xl medical-gradient flex items-center justify-center shadow-glow">
-            <Stethoscope className="h-7 w-7 text-white" />
+          <div className="h-14 w-14 rounded-2xl bg-foreground flex items-center justify-center shadow-md">
+            <HeartPulse className="h-7 w-7 text-white" />
           </div>
-          <div className="absolute inset-0 rounded-2xl medical-gradient animate-ping opacity-20" />
+          <div className="absolute inset-0 rounded-2xl bg-foreground animate-ping opacity-20" />
         </div>
         <Loader2 className="h-6 w-6 animate-spin text-primary" />
       </div>
@@ -531,16 +531,22 @@ export default function Auth() {
 
       {/* Left Panel — Brand Visual */}
       <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden">
-        <div className="absolute inset-0 medical-gradient" />
-        <div className="absolute inset-0 grain" />
-        <div className="absolute top-0 right-0 w-96 h-96 bg-white/5 rounded-full blur-3xl -translate-y-1/3 translate-x-1/4" />
-        <div className="absolute bottom-0 left-0 w-80 h-80 bg-white/5 rounded-full blur-3xl translate-y-1/4 -translate-x-1/4" />
+        <div className="absolute inset-0 bg-foreground" />
+        <div
+          className="absolute inset-0 opacity-[0.03]"
+          style={{
+            backgroundImage: `linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)`,
+            backgroundSize: '64px 64px',
+          }}
+        />
+        <div className="absolute top-1/4 right-1/4 w-72 h-72 bg-blue-500/15 rounded-full blur-[100px]" />
+        <div className="absolute bottom-1/4 left-1/3 w-60 h-60 bg-blue-400/10 rounded-full blur-[100px]" />
 
         <div className="relative z-10 p-16 xl:p-24 flex flex-col justify-between w-full">
           <div>
             <div className="flex items-center gap-3 mb-16">
               <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-white/15 backdrop-blur-sm border border-white/10">
-                <Stethoscope className="h-7 w-7 text-white" />
+                <HeartPulse className="h-7 w-7 text-white" />
               </div>
               <span className="font-display text-2xl font-bold text-white">MediConnect</span>
             </div>

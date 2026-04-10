@@ -162,7 +162,7 @@ export function SubscriptionCheckout({ planId, isOpen, onClose }: SubscriptionCh
 
                     <Button
                         type="submit"
-                        className="w-full rounded-xl medical-gradient text-white"
+                        className="w-full rounded-xl bg-accent text-accent-foreground"
                         disabled={loading || !stripe || !allConsented || (isEU && !consentRetention)}
                     >
                         {loading ? (

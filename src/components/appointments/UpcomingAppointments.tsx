@@ -59,7 +59,7 @@ export function UpcomingAppointments({ appointments, doctors, loading, onJoin, o
                                 <Button variant="outline" size="sm" className="h-9 rounded-xl text-red-600 border-red-200 hover:bg-red-50 flex-1 sm:flex-none" onClick={() => onCancel(apt.appointmentId)}>
                                     Cancel
                                 </Button>
-                                <Button size="sm" className="h-9 rounded-xl medical-gradient text-white flex-1 sm:flex-none" onClick={() => onJoin(apt)}>
+                                <Button size="sm" className="h-9 rounded-xl bg-accent text-accent-foreground flex-1 sm:flex-none" onClick={() => onJoin(apt)}>
                                     <Video className="h-4 w-4 mr-1" /> Join
                                 </Button>
                             </div>

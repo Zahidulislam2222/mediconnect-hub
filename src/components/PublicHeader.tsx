@@ -1,6 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react";
-import { Stethoscope, Menu, X } from "lucide-react";
+import { Menu, X, HeartPulse } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { getCurrentUser } from 'aws-amplify/auth';
 import { getUser } from "@/lib/secure-storage";
@@ -44,10 +44,10 @@ export function PublicHeader() {
   return (
     <>
       <nav className={cn(
-        "fixed top-0 left-0 right-0 z-50 transition-all duration-300 safe-top bg-background/80 backdrop-blur-xl",
+        "fixed top-0 left-0 right-0 z-50 transition-all duration-300 safe-top",
         scrolled
-          ? "border-b border-border shadow-soft"
-          : "border-b border-transparent"
+          ? "bg-background/80 backdrop-blur-xl border-b border-border/50 shadow-soft"
+          : "bg-background/50 backdrop-blur-md"
       )}>
         <div className="container mx-auto px-6 h-16 flex items-center justify-between">
           {/* Logo */}
@@ -55,8 +55,8 @@ export function PublicHeader() {
             className="flex items-center gap-2.5 cursor-pointer group"
             onClick={() => navigate("/")}
           >
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl medical-gradient shadow-sm group-hover:shadow-glow transition-shadow duration-300">
-              <Stethoscope className="h-[18px] w-[18px] text-white" />
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-foreground text-background transition-transform duration-200 group-hover:scale-105">
+              <HeartPulse className="h-4 w-4" />
             </div>
             <span className="font-display text-lg font-bold text-foreground">MediConnect</span>
           </div>
@@ -97,7 +97,7 @@ export function PublicHeader() {
             <Button
               onClick={handleGetStarted}
               size="sm"
-              className="medical-gradient text-white border-0 rounded-lg shadow-sm hover:shadow-glow transition-all duration-300"
+              className="bg-foreground text-background hover:bg-foreground/90 rounded-lg text-sm font-medium transition-all duration-200"
             >
               Get Started
             </Button>
@@ -116,7 +116,7 @@ export function PublicHeader() {
       {/* Mobile menu */}
       {mobileOpen && (
         <div className="fixed inset-0 z-40 md:hidden">
-          <div className="fixed inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setMobileOpen(false)} />
+          <div className="fixed inset-0 bg-foreground/20 backdrop-blur-sm" onClick={() => setMobileOpen(false)} />
           <div className="fixed top-16 left-0 right-0 bg-background border-b border-border shadow-elevated p-6 space-y-4 animate-fade-in z-50">
             {navLinks.map((link) => (
               <div key={link.label}>
