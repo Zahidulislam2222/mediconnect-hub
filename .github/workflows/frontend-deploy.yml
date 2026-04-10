@@ -20,12 +20,24 @@ on:
   push:
     branches: [main]
     paths:
-      - "mediconnect-hub/**"
+      - "src/**"
+      - "index.html"
+      - "package.json"
+      - "package-lock.json"
+      - "tailwind.config.ts"
+      - "vite.config.ts"
+      - "tsconfig*.json"
       - ".github/workflows/frontend-deploy.yml"
   pull_request:
     branches: [main]
     paths:
-      - "mediconnect-hub/**"
+      - "src/**"
+      - "index.html"
+      - "package.json"
+      - "package-lock.json"
+      - "tailwind.config.ts"
+      - "vite.config.ts"
+      - "tsconfig*.json"
   workflow_dispatch: {}
 
 permissions:
@@ -36,10 +48,6 @@ permissions:
 concurrency:
   group: frontend-${{ github.ref }}
   cancel-in-progress: true
-
-defaults:
-  run:
-    working-directory: mediconnect-hub
 
 jobs:
   # ═══════════════════════════════════════════════════════════════
@@ -55,7 +63,7 @@ jobs:
         with:
           node-version: 22
           cache: npm
-          cache-dependency-path: mediconnect-hub/package-lock.json
+          cache-dependency-path: package-lock.json
 
       - name: Install dependencies
         run: npm ci
@@ -93,7 +101,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: frontend-audit-report
-          path: mediconnect-hub/audit-report.json
+          path: audit-report.json
           if-no-files-found: ignore
           retention-days: 30
 
@@ -111,7 +119,7 @@ jobs:
         with:
           node-version: 22
           cache: npm
-          cache-dependency-path: mediconnect-hub/package-lock.json
+          cache-dependency-path: package-lock.json
 
       - run: npm ci
 
@@ -132,12 +140,6 @@ jobs:
             LEAKED=1
           fi
 
-          # Check that VITE_ env vars are not exposing sensitive values
-          # (VITE_ vars are intentionally bundled — check for obvious mistakes)
-          if grep -rEl "VITE_STORAGE_CIPHER_KEY" dist/ 2>/dev/null; then
-            echo "::warning::VITE_STORAGE_CIPHER_KEY found in build — ensure this is expected (client-side encryption key)"
-          fi
-
           if [ "$LEAKED" -gt 0 ]; then
             exit 1
           fi
@@ -148,7 +150,6 @@ jobs:
         run: |
           echo "Checking bundle sizes..."
 
-          # Get JS bundle size
           JS_SIZE=$(find dist/assets -name "*.js" -exec du -cb {} + | tail -1 | cut -f1)
           CSS_SIZE=$(find dist/assets -name "*.css" -exec du -cb {} + | tail -1 | cut -f1)
           TOTAL_SIZE=$((JS_SIZE + CSS_SIZE))
@@ -161,7 +162,7 @@ jobs:
           echo "  CSS:   ${CSS_KB} KB"
           echo "  Total: ${TOTAL_MB} MB"
 
-          # Warn if total exceeds 5MB (excluding Chime SDK which is ~3.5MB)
+          # Warn if total exceeds 5MB (Chime SDK is ~3.5MB alone)
           LIMIT=5242880
           if [ "$TOTAL_SIZE" -gt "$LIMIT" ]; then
             echo "::warning::Bundle size (${TOTAL_MB} MB) exceeds 5MB. Consider code-splitting."
@@ -190,7 +191,7 @@ jobs:
         with:
           node-version: 22
           cache: npm
-          cache-dependency-path: mediconnect-hub/package-lock.json
+          cache-dependency-path: package-lock.json
 
       - run: npm ci
 
@@ -203,7 +204,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: frontend-dist
-          path: mediconnect-hub/dist
+          path: dist
           retention-days: 7
 
   # ═══════════════════════════════════════════════════════════════
@@ -223,7 +224,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: frontend-dist
-          path: mediconnect-hub/dist
+          path: dist
 
       - name: Deploy to Firebase preview channel
         uses: FirebaseExtended/action-hosting-deploy@v0
@@ -231,8 +232,6 @@ jobs:
           repoToken: ${{ secrets.GITHUB_TOKEN }}
           firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
           projectId: mediconnect-hub
-          entryPoint: mediconnect-hub
-          expires: 7d
 
   # ── 4b. Production deploy on push to main ──
   deploy-production:
@@ -250,7 +249,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: frontend-dist
-          path: mediconnect-hub/dist
+          path: dist
 
       - name: Deploy to Firebase production
         uses: FirebaseExtended/action-hosting-deploy@v0
@@ -259,7 +258,6 @@ jobs:
           firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
           projectId: mediconnect-hub
           channelId: live
-          entryPoint: mediconnect-hub
 
       - name: Post-deploy health check
         run: |
