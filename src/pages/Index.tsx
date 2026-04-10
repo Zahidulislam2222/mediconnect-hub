@@ -315,6 +315,53 @@ function ScrollWord({ word, range, progress }: { word: string; range: [number, n
   );
 }
 
+// ─── Step Card (extracted to avoid hooks-in-map) ───
+function StepCard({ item, idx, total }: { item: { num: string; title: string; description: string }; idx: number; total: number }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const isInView = useInView(ref, { once: true, margin: "-100px" });
+
+  return (
+    <motion.div
+      ref={ref}
+      initial={{ opacity: 0, y: 40 }}
+      animate={isInView ? { opacity: 1, y: 0 } : {}}
+      transition={{ duration: 0.6, delay: idx * 0.15, ease: [0.16, 1, 0.3, 1] }}
+      className="relative group"
+    >
+      {idx < total - 1 && (
+        <div className="hidden md:block absolute top-12 left-[60%] w-[80%] h-px border-t-2 border-dashed border-border" />
+      )}
+      <div className="relative bg-card rounded-xl p-8 border border-border shadow-soft hover:shadow-card transition-all duration-200 text-center">
+        <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-foreground text-background text-lg font-display font-bold mx-auto mb-5 group-hover:scale-110 group-hover:rotate-3 transition-transform duration-300">
+          {item.num}
+        </div>
+        <h3 className="font-display text-lg font-semibold text-foreground mb-3">{item.title}</h3>
+        <p className="text-muted-foreground text-sm leading-relaxed">{item.description}</p>
+      </div>
+    </motion.div>
+  );
+}
+
+// ─── Trust Card (extracted to avoid hooks-in-map) ───
+function TrustCard({ icon: Icon, label, sub, idx }: { icon: any; label: string; sub: string; idx: number }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const isInView = useInView(ref, { once: true, margin: "-50px" });
+
+  return (
+    <motion.div
+      ref={ref}
+      initial={{ opacity: 0, scale: 0.8, rotate: -5 }}
+      animate={isInView ? { opacity: 1, scale: 1, rotate: 0 } : {}}
+      transition={{ duration: 0.5, delay: idx * 0.1, ease: [0.16, 1, 0.3, 1] }}
+      className="bg-card border border-border rounded-xl p-6 text-center shadow-soft hover:shadow-card transition-all duration-200"
+    >
+      <Icon className="h-8 w-8 text-accent mx-auto mb-3" />
+      <p className="font-display font-semibold text-foreground text-sm">{label}</p>
+      <p className="text-xs text-muted-foreground mt-1">{sub}</p>
+    </motion.div>
+  );
+}
+
 // ═══════════════════════════════════════════════════════
 // MAIN PAGE
 // ═══════════════════════════════════════════════════════
@@ -489,33 +536,9 @@ export default function Index() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8">
-            {steps.map((item, idx) => {
-              const ref = useRef<HTMLDivElement>(null);
-              const isInView = useInView(ref, { once: true, margin: "-100px" });
-
-              return (
-                <motion.div
-                  ref={ref}
-                  key={idx}
-                  initial={{ opacity: 0, y: 40 }}
-                  animate={isInView ? { opacity: 1, y: 0 } : {}}
-                  transition={{ duration: 0.6, delay: idx * 0.15, ease: [0.16, 1, 0.3, 1] }}
-                  className="relative group"
-                >
-                  {/* Connecting line (desktop) */}
-                  {idx < steps.length - 1 && (
-                    <div className="hidden md:block absolute top-12 left-[60%] w-[80%] h-px border-t-2 border-dashed border-border" />
-                  )}
-                  <div className="relative bg-card rounded-xl p-8 border border-border shadow-soft hover:shadow-card transition-all duration-200 text-center">
-                    <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-foreground text-background text-lg font-display font-bold mx-auto mb-5 group-hover:scale-110 group-hover:rotate-3 transition-transform duration-300">
-                      {item.num}
-                    </div>
-                    <h3 className="font-display text-lg font-semibold text-foreground mb-3">{item.title}</h3>
-                    <p className="text-muted-foreground text-sm leading-relaxed">{item.description}</p>
-                  </div>
-                </motion.div>
-              );
-            })}
+            {steps.map((item, idx) => (
+              <StepCard key={idx} item={item} idx={idx} total={steps.length} />
+            ))}
           </div>
         </div>
       </section>
@@ -549,24 +572,9 @@ export default function Index() {
                 { icon: Globe, label: "GDPR", sub: "Data Sovereignty" },
                 { icon: Lock, label: "AES-256", sub: "Encryption" },
                 { icon: Activity, label: "FHIR R4", sub: "Interoperable" },
-              ].map((item, idx) => {
-                const ref = useRef<HTMLDivElement>(null);
-                const isInView = useInView(ref, { once: true, margin: "-50px" });
-                return (
-                  <motion.div
-                    ref={ref}
-                    key={idx}
-                    initial={{ opacity: 0, scale: 0.8, rotate: -5 }}
-                    animate={isInView ? { opacity: 1, scale: 1, rotate: 0 } : {}}
-                    transition={{ duration: 0.5, delay: idx * 0.1, ease: [0.16, 1, 0.3, 1] }}
-                    className="bg-card border border-border rounded-xl p-6 text-center shadow-soft hover:shadow-card transition-all duration-200"
-                  >
-                    <item.icon className="h-8 w-8 text-accent mx-auto mb-3" />
-                    <p className="font-display font-semibold text-foreground text-sm">{item.label}</p>
-                    <p className="text-xs text-muted-foreground mt-1">{item.sub}</p>
-                  </motion.div>
-                );
-              })}
+              ].map((item, idx) => (
+                <TrustCard key={idx} icon={item.icon} label={item.label} sub={item.sub} idx={idx} />
+              ))}
             </div>
           </div>
         </div>
