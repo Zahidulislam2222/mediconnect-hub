@@ -231,7 +231,7 @@ jobs:
         with:
           repoToken: ${{ secrets.GITHUB_TOKEN }}
           firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
-          projectId: mediconnect-hub
+          projectId: askme-82f72
 
   # ── 4b. Production deploy on push to main ──
   deploy-production:
@@ -241,7 +241,7 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: production
-      url: https://mediconnect-hub.web.app
+      url: https://askme-82f72.web.app
     steps:
       - uses: actions/checkout@v4
 
@@ -256,7 +256,7 @@ jobs:
         with:
           repoToken: ${{ secrets.GITHUB_TOKEN }}
           firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
-          projectId: mediconnect-hub
+          projectId: askme-82f72
           channelId: live
 
       - name: Post-deploy health check
@@ -264,7 +264,7 @@ jobs:
           echo "Waiting for deployment to propagate..."
           sleep 15
 
-          HTTP_STATUS=$(curl -o /dev/null -s -w "%{http_code}" https://mediconnect-hub.web.app)
+          HTTP_STATUS=$(curl -o /dev/null -s -w "%{http_code}" https://askme-82f72.web.app)
           echo "Health check: HTTP $HTTP_STATUS"
 
           if [ "$HTTP_STATUS" -ne 200 ]; then
@@ -288,8 +288,8 @@ jobs:
         uses: treosh/lighthouse-ci-action@v12
         with:
           urls: |
-            https://mediconnect-hub.web.app
-            https://mediconnect-hub.web.app/auth
+            https://askme-82f72.web.app
+            https://askme-82f72.web.app/auth
           uploadArtifacts: true
           temporaryPublicStorage: true
           runs: 3
