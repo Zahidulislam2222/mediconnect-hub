@@ -17,6 +17,7 @@ class MobileRuntime(private val context: Context) {
     val config = MobileConfiguration(read("mobile-config.json"), BuildConfig.RESIDENCY)
     val contract = MobileContract(read("mobile-contract.json"), read("session-policy.json"))
     val sessions = CognitoSession(context, config, contract)
+    val profiles = ProfileApi(NativeApi(config, sessions, NativeHttp.client(config)), contract)
     val appointments = AppointmentsApi(config, contract, sessions, NativeHttp.client(config))
     // This preference is a non-sensitive logout safety latch, never a credential or a profile cache.
     private val preferences = context.getSharedPreferences("session-safety", Context.MODE_PRIVATE)

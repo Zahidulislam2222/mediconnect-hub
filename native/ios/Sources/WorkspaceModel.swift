@@ -1,4 +1,5 @@
 import Amplify
+import Combine
 import Foundation
 import SwiftUI
 
@@ -10,12 +11,15 @@ final class WorkspaceModel: ObservableObject {
     @Published private(set) var busy = false
     @Published private(set) var message: String?
     @Published private(set) var challenge = false
+    @Published private(set) var challengeInput: ChallengeInput = .code
     @Published private(set) var visible = true
     let residency: String
     let content: MobileContent?
     let policies: MobilePolicies?
     let registration: AccountRegistration
     let recovery: PasswordRecovery
+    let profile: ProfileEnrollment
+    private var profileObservation: AnyCancellable?
     private let auth: CognitoSession?
     private let api: AppointmentsAPI?
     private var operation: Task<Void, Never>?
@@ -33,17 +37,28 @@ final class WorkspaceModel: ObservableObject {
         residency = Bundle.main.object(forInfoDictionaryKey: "MediConnectResidency") as? String ?? ""
         content = try? MobileContent(data: BundledAssets.data("mobile-content"))
         policies = try? MobilePolicies(legal: BundledAssets.data("legal"), consent: BundledAssets.data("consent"))
+        var profileService: ProfileAPI?
         do {
             let config = try MobileConfiguration(data: BundledAssets.data("mobile-config"), residency: residency)
             let contract = try MobileContract(data: BundledAssets.data("mobile-contract"), policy: BundledAssets.data("session-policy"))
-            auth = try CognitoSession(config: config, contract: contract)
+            let session = try CognitoSession(config: config, contract: contract)
+            auth = session
+            profileService = ProfileAPI(transport: NativeAPI(config: config), contract: contract, fetch: { try await session.fetch() })
             api = AppointmentsAPI(config: config, contract: contract)
         } catch { auth = nil; api = nil }
+        profile = ProfileEnrollment(service: profileService, policyVersion: policies?.policyVersion ?? "")
         recovery = PasswordRecovery(service: auth)
         registration = AccountRegistration(service: policies == nil ? nil : auth)
+        profileObservation = profile.$state.filter { $0.step == .ready }.sink { [weak self] value in
+            Task { @MainActor [weak self] in
+                guard let self, value.profile?.subject == identity?.subject, profile.state.step == .ready else { return }
+                refresh()
+            }
+        }
     }
 
     private func clear(visible: Bool = true) {
+        profile.close()
         generation += 1
         operation?.cancel()
         expiry?.cancel()
@@ -52,6 +67,7 @@ final class WorkspaceModel: ObservableObject {
         next = nil
         busy = false
         challenge = false
+        challengeInput = .code
         message = nil
         self.visible = visible
     }
@@ -91,9 +107,9 @@ final class WorkspaceModel: ObservableObject {
         }
     }
     func confirm(code: String) {
-        guard !busy, challenge, !code.isEmpty, let auth else { return }
+        guard !busy, challenge, let response = SignInChallenge.response(challengeInput, value: code), let auth else { return }
         run(message: "signInFailed") { [weak self] in
-            let result = try await auth.confirm(code: code)
+            let result = try await auth.confirm(code: response)
             try Task.checkCancellation()
             try await self?.complete(result)
         }
@@ -106,13 +122,10 @@ final class WorkspaceModel: ObservableObject {
             requiresExplicitSignIn = false
             try await accept(access)
         } else {
-            switch result.nextStep {
-            case .confirmSignInWithSMSMFACode, .confirmSignInWithTOTPCode, .confirmSignInWithOTP:
-                challenge = true
-            default:
-                challenge = false
-                message = "additionalStep"
-            }
+            let input = SignInChallenge.input(result.nextStep)
+            challenge = input != nil
+            challengeInput = input ?? .code
+            message = input == nil ? "additionalStep" : nil
         }
     }
     private func accept(_ access: SessionAccess) async throws {
@@ -126,14 +139,10 @@ final class WorkspaceModel: ObservableObject {
             self?.clear()
             self?.message = "sessionExpired"
         }
-        guard [.patient, .doctor].contains(access.identity.role), let api else { return }
-        let page = try await api.load(access: access, cursor: nil)
-        try Task.checkCancellation()
-        appointments = page.items
-        next = page.next
+        profile.open(access.identity)
     }
     func refresh(more: Bool = false) {
-        guard !busy, let identity, let auth, let api, !more || next != nil else { return }
+        guard !busy, profile.state.step == .ready, let identity, let auth, let api, !more || next != nil else { return }
         let cursor = more ? next : nil
         let previous = more ? appointments : []
         run(message: "unavailable") { [weak self] in

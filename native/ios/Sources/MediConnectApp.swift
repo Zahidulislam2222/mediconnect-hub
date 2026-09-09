@@ -16,12 +16,15 @@ struct MediConnectApp: App {
     }
     @ViewBuilder private func root(_ content: MobileContent) -> some View {
         #if DEBUG
-        if RegistrationUITestFixture.requested(), let policies = model.policies {
+        if ChallengeUITestFixture.requested() { ChallengeUITestFixture(content: content) }
+        else if ProfileUITestFixture.requested(), let policies = model.policies {
+            ProfileUITestFixture(content: content, policies: policies)
+        } else if RegistrationUITestFixture.requested(), let policies = model.policies {
             RegistrationUITestFixture(content: content, policies: policies)
         } else if RecoveryUITestFixture.requested() { RecoveryUITestFixture(content: content) }
-        else { WorkspaceView(model: model, content: content, recovery: model.recovery, registration: model.registration) }
+        else { WorkspaceView(model: model, content: content, recovery: model.recovery, registration: model.registration, profile: model.profile) }
         #else
-        WorkspaceView(model: model, content: content, recovery: model.recovery, registration: model.registration)
+        WorkspaceView(model: model, content: content, recovery: model.recovery, registration: model.registration, profile: model.profile)
         #endif
     }
 }
@@ -40,6 +43,7 @@ struct WorkspaceView: View {
     let content: MobileContent
     @ObservedObject var recovery: PasswordRecovery
     @ObservedObject var registration: AccountRegistration
+    @ObservedObject var profile: ProfileEnrollment
     @State private var email = ""
     @State private var password = ""
     @State private var code = ""
@@ -74,16 +78,15 @@ struct WorkspaceView: View {
             .background(content.color("background"))
             .foregroundStyle(content.color("foreground"))
             .tint(content.color("accent"))
+            .onChange(of: model.challengeInput) { _ in code = "" }
             .onChange(of: model.visible) { visible in if !visible { email = ""; password = ""; code = "" } }
         }
     }
     private var signInForm: some View {
         VStack(alignment: .leading, spacing: 16) {
             if model.challenge {
-                TextField(content.text("code"), text: $code).textContentType(.oneTimeCode).keyboardType(.numberPad)
-                Button(content.text("verify")) { let value = code; code = ""; model.confirm(code: value) }
-                    .disabled(code.isEmpty || model.busy)
-                Button(content.text("cancel"), action: model.signOut)
+                ChallengeResponseView(input: model.challengeInput, content: content, busy: model.busy,
+                                      confirm: { model.confirm(code: $0) }, cancel: model.signOut).id(model.challengeInput)
             } else {
                 TextField(content.text("email"), text: $email).textContentType(.username)
                     .keyboardType(.emailAddress).textInputAutocapitalization(.never).autocorrectionDisabled()
@@ -107,6 +110,9 @@ struct WorkspaceView: View {
             Button(content.text("signOut"), action: model.signOut)
         }
         if identity.role == .patient || identity.role == .doctor {
+            if profile.state.step != .ready, let policies = model.policies {
+                ProfileSetupView(model: profile, role: identity.role, content: content, policies: policies).id(profile.state.step)
+            } else {
             HStack {
                 Text(content.text("appointments")).font(.title2.bold())
                 Spacer()
@@ -124,6 +130,7 @@ struct WorkspaceView: View {
                 .background(content.color("surface"), in: RoundedRectangle(cornerRadius: 10))
             }
             if model.next != nil { Button(content.text("loadMore")) { model.refresh(more: true) }.disabled(model.busy) }
+            }
         } else { Text(content.text("roleUnavailable")) }
     }
 }

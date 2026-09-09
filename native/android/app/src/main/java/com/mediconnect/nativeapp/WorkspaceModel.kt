@@ -21,6 +21,7 @@ data class WorkspaceState(
     val busy: Boolean = false,
     val error: String? = null,
     val challenge: Boolean = false,
+    val challengeInput: ChallengeInput = ChallengeInput.CODE,
     val visible: Boolean = true,
 )
 
@@ -30,6 +31,7 @@ class WorkspaceModel(application: Application) : AndroidViewModel(application) {
     private val runtime = (application as MediConnectApplication).runtime.getOrNull()
     val configured = runtime != null
     val recovery = PasswordRecovery(runtime?.sessions, viewModelScope)
+    val profile = ProfileEnrollment(runtime?.profiles, policies.policyVersion, viewModelScope)
     val registration = AccountRegistration(runtime?.sessions, viewModelScope)
     private val mutable = MutableStateFlow(WorkspaceState())
     val state = mutable.asStateFlow()
@@ -37,7 +39,17 @@ class WorkspaceModel(application: Application) : AndroidViewModel(application) {
     private var expiry: Job? = null
     private var generation = 0L
 
+    init {
+        viewModelScope.launch {
+            profile.state.collect { value ->
+                val identity = mutable.value.identity
+                if (value.step == ProfileStep.READY && identity != null && value.profile?.subject == identity.subject) refresh()
+            }
+        }
+    }
+
     private fun reset(visible: Boolean = true) {
+        profile.close()
         generation++
         operation?.cancel()
         expiry?.cancel()
@@ -84,7 +96,8 @@ class WorkspaceModel(application: Application) : AndroidViewModel(application) {
     fun confirm(code: String) {
         val runtime = runtime ?: return
         if (!mutable.value.challenge || code.isBlank() || mutable.value.busy) return
-        runOperation("signInFailed") { completeSignIn(runtime.sessions.confirm(code.trim())) }
+        val response = SignInChallenge.response(mutable.value.challengeInput, code) ?: return
+        runOperation("signInFailed") { completeSignIn(runtime.sessions.confirm(response)) }
     }
 
     private suspend fun completeSignIn(result: AuthSignInResult) {
@@ -94,8 +107,8 @@ class WorkspaceModel(application: Application) : AndroidViewModel(application) {
             runtime.requiresExplicitSignIn = false
             accept(identity)
         } else {
-            val supported = SignInChallenge.needsCode(result.nextStep.signInStep)
-            mutable.value = mutable.value.copy(challenge = supported, error = if (supported) null else "additionalStep")
+            val input = SignInChallenge.input(result.nextStep.signInStep)
+            mutable.value = mutable.value.copy(challenge = input != null, challengeInput = input ?: ChallengeInput.CODE, error = if (input != null) null else "additionalStep")
         }
     }
 
@@ -108,17 +121,15 @@ class WorkspaceModel(application: Application) : AndroidViewModel(application) {
             reset()
             mutable.value = mutable.value.copy(error = "sessionExpired")
         }
-        if (identity.role in runtime.contract.appointmentQueries) {
-            val page = runtime.appointments.load(identity)
-            mutable.value = mutable.value.copy(appointments = page.items, next = page.next)
-        }
+        profile.open(identity)
+
     }
 
     fun refresh(more: Boolean = false) {
         val runtime = runtime ?: return
         val current = mutable.value
         val identity = current.identity ?: return
-        if (current.busy || (more && current.next == null)) return
+        if (current.busy || profile.state.value.step != ProfileStep.READY || (more && current.next == null)) return
         runOperation("unavailable") {
             val page = runtime.appointments.load(identity, if (more) current.next else null)
             mutable.value = mutable.value.copy(

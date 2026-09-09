@@ -49,13 +49,15 @@ class MainActivity : ComponentActivity() {
         setContent {
             val state by model.state.collectAsStateWithLifecycle()
             val recovery by model.recovery.state.collectAsStateWithLifecycle()
+            val profile by model.profile.state.collectAsStateWithLifecycle()
             val registration by model.registration.state.collectAsStateWithLifecycle()
             MobileTheme(model.content) {
                 WorkspaceScreen(state, model.content, model.configured, BuildConfig.RESIDENCY,
                     model::signIn, model::confirm, model::signOut, model::refresh,
                     recovery, model::openRecovery, model.recovery::request, model.recovery::confirm, model.recovery::close,
                     model.policies, registration, model::openRegistration, model.registration::accept, model.registration::register,
-                    model.registration::confirm, model.registration::resend, model.registration::close)
+                    model.registration::confirm, model.registration::resend, model.registration::close,
+                    profile, model.profile::accept, model.profile::submit, model.profile::check)
             }
         }
     }
@@ -81,7 +83,9 @@ fun WorkspaceScreen(state: WorkspaceState, content: MobileContent, configured: B
                     confirmReset: (String, String) -> Unit, closeRecovery: () -> Unit,
                     policies: MobilePolicies, registration: RegistrationState, openRegistration: () -> Unit,
                     acceptTerms: (Boolean) -> Unit, register: (String, String, String) -> Unit,
-                    confirmRegistration: (String) -> Unit, resendRegistration: () -> Unit, closeRegistration: () -> Unit) {
+                    confirmRegistration: (String) -> Unit, resendRegistration: () -> Unit, closeRegistration: () -> Unit,
+                    profile: ProfileState = ProfileState(), acceptProfile: (Boolean) -> Unit = {},
+                    saveProfile: (String, String, String) -> Unit = { _, _, _ -> }, checkProfile: () -> Unit = {}) {
     Scaffold { padding ->
         LazyColumn(Modifier.fillMaxSize().padding(padding), contentPadding = PaddingValues(24.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
             item {
@@ -116,6 +120,10 @@ fun WorkspaceScreen(state: WorkspaceState, content: MobileContent, configured: B
                     }
                 }
                 if (state.identity.role == Role.PATIENT || state.identity.role == Role.DOCTOR) {
+                    if (profile.step != ProfileStep.READY && profile.step != ProfileStep.CLOSED) {
+                        item { ProfileSetup(profile, state.identity.role, content, policies, acceptProfile, saveProfile, checkProfile) }
+                        return@LazyColumn
+                    }
                     item {
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                             Text(content.text("appointments"), style = MaterialTheme.typography.headlineSmall)
@@ -142,11 +150,14 @@ private fun SignInForm(state: WorkspaceState, content: MobileContent,
     // Deliberately remember, not rememberSaveable: credentials must never enter saved instance state.
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
-    var code by remember { mutableStateOf("") }
+    var code by remember(state.challenge, state.challengeInput) { mutableStateOf("") }
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
         if (state.challenge) {
             OutlinedTextField(code, { code = it }, Modifier.fillMaxWidth(), enabled = !state.busy,
-                label = { Text(content.text("code")) }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword))
+                label = { Text(content.text(when (state.challengeInput) {
+                    ChallengeInput.CODE -> "code"; ChallengeInput.PASSWORD -> "password"; ChallengeInput.NEW_PASSWORD -> "newPassword"
+                })) }, singleLine = true, visualTransformation = PasswordVisualTransformation(),
+                keyboardOptions = KeyboardOptions(keyboardType = if (state.challengeInput == ChallengeInput.CODE) KeyboardType.NumberPassword else KeyboardType.Password))
             Button(onClick = { val value = code; code = ""; confirm(value) }, enabled = !state.busy && code.isNotBlank()) { Text(content.text("verify")) }
             TextButton(onClick = cancel) { Text(content.text("cancel")) }
         } else {

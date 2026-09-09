@@ -14,7 +14,16 @@ class MobileContent(private val source: JSONObject) {
     fun label(group: String, key: String): String = source.getJSONObject(group).getString(key)
 }
 
+data class ProfileContract(val service: String, val readPath: String, val appendSubject: Boolean, val createPath: String, val subjectField: String)
+
 class MobileContract(source: JSONObject, policy: JSONObject) {
+    val profiles = source.getJSONObject("profiles").let { profiles ->
+        profiles.keys().asSequence().associate { key ->
+            val row = profiles.getJSONObject(key)
+            fun path(name: String) = row.getString(name).also { require(it.matches(Regex("/[A-Za-z0-9/_-]+")) && !it.contains("//")) }
+            Role.from(key) to ProfileContract(row.getString("service"), path("readPath"), row.getBoolean("appendSubject"), path("createPath"), row.getString("subjectField"))
+        }
+    }
     val groups: Map<String, Role> = policy.getJSONObject("groups").let { groups ->
         groups.keys().asSequence().associateWith { Role.from(groups.getString(it)) }
     }

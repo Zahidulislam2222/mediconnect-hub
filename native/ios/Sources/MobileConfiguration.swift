@@ -49,6 +49,14 @@ struct MobileConfiguration {
     }
 }
 
+struct ProfileContract: Decodable {
+    let service: String
+    let readPath: String
+    let appendSubject: Bool
+    let createPath: String
+    let subjectField: String
+}
+
 struct MobileContract {
     struct AppointmentContract: Decodable {
         let service: String
@@ -59,11 +67,14 @@ struct MobileContract {
     let groups: [String: Role]
     let defaultRole: Role
     let appointments: AppointmentContract
+    let profiles: [String: ProfileContract]
 
     init(data: Data, policy: Data) throws {
-        struct Document: Decodable { let appointments: AppointmentContract }
+        struct Document: Decodable { let appointments: AppointmentContract; let profiles: [String: ProfileContract] }
         struct Policy: Decodable { let groups: [String: Role]; let defaultRole: Role }
-        appointments = try JSONDecoder().decode(Document.self, from: data).appointments
+        let document = try JSONDecoder().decode(Document.self, from: data)
+        appointments = document.appointments
+        profiles = document.profiles
         let roles = try JSONDecoder().decode(Policy.self, from: policy)
         groups = roles.groups
         defaultRole = roles.defaultRole

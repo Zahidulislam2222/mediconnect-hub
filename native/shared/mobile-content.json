@@ -17,7 +17,7 @@
   "code": "Verification code",
   "verify": "Verify",
   "cancel": "Cancel",
-  "loading": "Please wait…",
+  "loading": "Please wait\u2026",
   "refresh": "Refresh",
   "appointments": "Appointments",
   "emptyAppointments": "No appointments to display.",
@@ -61,5 +61,11 @@
   "registrationComplete": "Account confirmation completed. Sign in to continue.",
   "resendCode": "Request another code",
   "registrationCodeRequested": "A new confirmation code was requested. Check your registered contact.",
-  "close": "Close"
+  "close": "Close",
+  "profileSetup": "Set up your profile",
+  "profileSetupInstructions": "Enter your details and review the current policies to create your profile. Clinical access may require separate verification.",
+  "specialization": "Specialization",
+  "saveProfile": "Save profile",
+  "profileCheckFailed": "Your profile could not be confirmed. Check its status before trying to create it again.",
+  "checkProfile": "Check profile status"
 }

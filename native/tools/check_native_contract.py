@@ -42,6 +42,13 @@ def main():
     assert set(web_policy["groups"].values()) == set(content["roles"])
     assert set(contract["appointments"]["query"]) == {"patient", "doctor"}
     assert re.fullmatch(r"/[A-Za-z0-9/_-]+", contract["appointments"]["path"])
+    assert set(contract["profiles"]) == {"patient", "doctor"}
+    for route in contract["profiles"].values():
+        assert route["service"] in config["regions"]["US"]["services"]
+        assert isinstance(route["appendSubject"], bool)
+        assert re.fullmatch(r"[A-Za-z]+", route["subjectField"])
+        for key in ("readPath", "createPath"):
+            assert re.fullmatch(r"/[A-Za-z0-9/_-]+", route[key]) and "//" not in route[key]
     count = 0
     roots = (NATIVE / "android/app/src/main/java", NATIVE / "ios/Sources")
     for root in roots:

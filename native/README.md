@@ -4,7 +4,7 @@ Android uses Kotlin and Jetpack Compose. iOS uses Swift and SwiftUI. The React w
 existing Capacitor project remain separate and are preserved during migration.
 
 This is an **incomplete native implementation**. The first slice covers sign-in, code confirmation,
-password recovery, session handling and read-only patient/doctor appointments. Staff/admin workspaces, registration,
+password recovery, registration, canonical policy viewers, own-profile setup, secure password/new-password challenges, session handling and read-only patient/doctor appointments. Staff/admin workspaces,
 appointment mutations, billing, messaging, consultations, records and other web
 features still need native implementation. A successful build does not establish feature parity,
 live-provider behavior, clinical readiness or physical-device behavior.
@@ -18,7 +18,7 @@ signing keys or API keys. Cognito must use a public app client; session tokens a
 
 The configuration owns request deadlines, response limits, regional Cognito pool/client/issuer
 and service base URLs. The existing `src/content/session-policy.json` owns role aliases and is
-packaged into both native apps; `shared/mobile-contract.json` owns appointment routing;
+packaged into both native apps alongside the canonical consent/legal JSON; `shared/mobile-contract.json` owns appointment and own-profile routing;
 `shared/mobile-content.json` owns copy and theme colors. JWT/HTTP field names are protocol syntax.
 US and EU initially have separate build variants. Regional switching inside one running app is
 not implemented. There is no cross-region failover.
@@ -64,3 +64,5 @@ independent review remain separate, incomplete gates.
 
 UI tests expect the safe default blank configuration; use synthetic accounts/data for any added
 connected tests. Do not put patient data or authentication material in fixtures, screenshots or logs.
+
+Registration, profile and password-challenge changes after that iOS run are not yet compiled on macOS. Current Android source passes104unit/HTTPS tests and28UI tests across the two regions, both debug/optimized unsigned release builds, lint and real blank-config launch checks. Provider registration/profile tests use synthetic boundaries only.

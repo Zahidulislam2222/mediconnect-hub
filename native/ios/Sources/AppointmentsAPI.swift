@@ -38,57 +38,17 @@ enum AppointmentDecoder {
     }
 }
 
-final class RejectRedirects: NSObject, URLSessionTaskDelegate {
-    func urlSession(_ session: URLSession, task: URLSessionTask, willPerformHTTPRedirection response: HTTPURLResponse,
-                    newRequest request: URLRequest, completionHandler: @escaping (URLRequest?) -> Void) { completionHandler(nil) }
-}
-
 final class AppointmentsAPI {
-    private let config: MobileConfiguration
+    private let transport: NativeAPI
     private let contract: MobileContract
-    private let session: URLSession
     init(config: MobileConfiguration, contract: MobileContract) {
-        self.config = config
-        self.contract = contract
-        let settings = URLSessionConfiguration.ephemeral
-        settings.urlCache = nil
-        settings.httpCookieStorage = nil
-        settings.httpShouldSetCookies = false
-        settings.requestCachePolicy = .reloadIgnoringLocalCacheData
-        settings.timeoutIntervalForRequest = config.requestTimeoutSeconds
-        settings.timeoutIntervalForResource = config.requestTimeoutSeconds
-        session = URLSession(configuration: settings, delegate: RejectRedirects(), delegateQueue: nil)
+        transport = NativeAPI(config: config); self.contract = contract
     }
-    deinit { session.invalidateAndCancel() }
-
     func load(access: SessionAccess, cursor: String?) async throws -> AppointmentPage {
-        guard access.identity.expiresAt > Date(), let subjectKey = contract.appointments.query[access.identity.role.rawValue],
-              let base = config.services[contract.appointments.service],
-              var url = URLComponents(url: base, resolvingAgainstBaseURL: false),
-              contract.appointments.path.range(of: "^/[A-Za-z0-9/_-]+$", options: .regularExpression) != nil,
-              !contract.appointments.path.contains("//") else { throw MobileFailure.forbidden }
-        url.path = url.path.trimmingCharacters(in: CharacterSet(charactersIn: "/")) + contract.appointments.path
-        if !url.path.hasPrefix("/") { url.path = "/" + url.path }
-        url.queryItems = [URLQueryItem(name: subjectKey, value: access.identity.subject)]
-        if let cursor { url.queryItems?.append(URLQueryItem(name: "startKey", value: cursor)) }
-        guard let endpoint = url.url else { throw MobileFailure.configuration }
-        var request = URLRequest(url: endpoint)
-        request.httpMethod = "GET"
-        request.setValue("Bearer " + access.token, forHTTPHeaderField: "Authorization")
-        request.setValue(config.residency, forHTTPHeaderField: "x-user-region")
-        request.setValue("application/json", forHTTPHeaderField: "Accept")
-        request.setValue("no-store", forHTTPHeaderField: "Cache-Control")
-        let (bytes, response) = try await session.bytes(for: request)
-        defer { bytes.task.cancel() }
-        guard let response = response as? HTTPURLResponse else { throw HTTPFailure(status: nil) }
-        guard (200..<300).contains(response.statusCode) else { throw HTTPFailure(status: response.statusCode) }
-        guard response.expectedContentLength <= config.maxResponseBytes else { throw MobileFailure.response }
-        var data = Data()
-        for try await byte in bytes {
-            try Task.checkCancellation()
-            guard data.count < config.maxResponseBytes else { throw MobileFailure.response }
-            data.append(byte)
-        }
+        guard let subjectKey = contract.appointments.query[access.identity.role.rawValue] else { throw MobileFailure.forbidden }
+        var query = [subjectKey: access.identity.subject]
+        if let cursor { query["startKey"] = cursor }
+        let data = try await transport.request(access: access, service: contract.appointments.service, path: contract.appointments.path, query: query)
         return try AppointmentDecoder.decode(data, identity: access.identity, contract: contract)
     }
 }

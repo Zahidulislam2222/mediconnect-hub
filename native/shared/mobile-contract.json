@@ -11,5 +11,21 @@
       "existingBookings",
       "data"
     ]
+  },
+  "profiles": {
+    "patient": {
+      "service": "patient",
+      "readPath": "/me",
+      "appendSubject": false,
+      "createPath": "/register-patient",
+      "subjectField": "patientId"
+    },
+    "doctor": {
+      "service": "doctor",
+      "readPath": "/doctors",
+      "appendSubject": true,
+      "createPath": "/register-doctor",
+      "subjectField": "doctorId"
+    }
   }
 }

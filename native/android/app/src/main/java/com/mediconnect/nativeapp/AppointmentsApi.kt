@@ -43,45 +43,13 @@ object AppointmentDecoder {
     }
 }
 
-class AppointmentsApi(private val config: MobileConfiguration, private val contract: MobileContract,
-                      private val sessions: SessionProvider, private val client: OkHttpClient) {
+class AppointmentsApi(config: MobileConfiguration, private val contract: MobileContract,
+                      sessions: SessionProvider, client: OkHttpClient) {
+    private val transport = NativeApi(config, sessions, client)
     suspend fun load(identity: Identity, cursor: String? = null): AppointmentPage {
-        val session = sessions.fetch()
-        require(session.identity.subject == identity.subject && session.identity.role == identity.role)
         val subjectKey = contract.appointmentQueries[identity.role] ?: throw ApiFailure(403)
-        val base = config.services[contract.appointmentService] ?: throw ApiFailure()
-        val builder = base.newBuilder().encodedPath(base.encodedPath.trimEnd('/') + contract.appointmentPath)
-            .addQueryParameter(subjectKey, identity.subject)
-        if (cursor != null) builder.addQueryParameter("startKey", cursor)
-        val request = Request.Builder().url(builder.build()).get()
-            .header("Authorization", "Bearer ${session.token}").header("x-user-region", config.residency)
-            .header("Accept", "application/json").header("Cache-Control", "no-store").build()
-        val body = execute(client.newCall(request))
-        return AppointmentDecoder.decode(body, identity, contract)
-    }
-
-    private suspend fun execute(call: Call): String = suspendCancellableCoroutine { continuation ->
-        continuation.invokeOnCancellation { call.cancel() }
-        call.enqueue(object : Callback {
-            override fun onFailure(call: Call, e: IOException) {
-                if (continuation.isActive) continuation.resumeWithException(ApiFailure())
-            }
-            override fun onResponse(call: Call, response: Response) {
-                response.use {
-                    try {
-                        if (!it.isSuccessful) throw ApiFailure(it.code)
-                        val body = it.body
-                        if (body.contentLength() > config.maxResponseBytes) throw ApiFailure()
-                        val source = body.source()
-                        source.request(config.maxResponseBytes + 1)
-                        if (source.buffer.size > config.maxResponseBytes) throw ApiFailure()
-                        val text = source.readUtf8()
-                        if (continuation.isActive) continuation.resume(text)
-                    } catch (_: Exception) {
-                        if (continuation.isActive) continuation.resumeWithException(ApiFailure(it.code))
-                    }
-                }
-            }
-        })
+        val query = mutableMapOf(subjectKey to identity.subject)
+        if (cursor != null) query["startKey"] = cursor
+        return AppointmentDecoder.decode(transport.request(identity, contract.appointmentService, contract.appointmentPath, query), identity, contract)
     }
 }
