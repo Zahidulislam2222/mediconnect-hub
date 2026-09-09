@@ -1,5 +1,6 @@
 import Amplify
 import AWSCognitoAuthPlugin
+import AWSPluginsCore
 import Foundation
 
 final class CognitoSession: PasswordRecoveryService {

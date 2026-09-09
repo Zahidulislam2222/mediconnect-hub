@@ -64,6 +64,8 @@ targets:
         product: Amplify
       - package: Amplify
         product: AWSCognitoAuthPlugin
+      - package: Amplify
+        product: AWSPluginsCore
   NativeBoundaryTests:
     type: bundle.unit-test
     platform: iOS
