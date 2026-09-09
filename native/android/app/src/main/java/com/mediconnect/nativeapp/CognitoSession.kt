@@ -4,6 +4,9 @@ import android.content.Context
 import com.amplifyframework.auth.cognito.AWSCognitoAuthPlugin
 import com.amplifyframework.auth.cognito.AWSCognitoAuthSession
 import com.amplifyframework.auth.result.AuthSignInResult
+import com.amplifyframework.auth.AuthUserAttribute
+import com.amplifyframework.auth.AuthUserAttributeKey
+import com.amplifyframework.auth.options.AuthSignUpOptions
 import com.amplifyframework.core.Amplify
 import com.amplifyframework.core.AmplifyConfiguration
 import kotlinx.coroutines.suspendCancellableCoroutine
@@ -14,7 +17,7 @@ import kotlin.coroutines.resumeWithException
 
 interface SessionProvider { suspend fun fetch(): SessionAccess }
 
-class CognitoSession(context: Context, private val config: MobileConfiguration, private val contract: MobileContract) : SessionProvider, PasswordRecoveryService {
+class CognitoSession(context: Context, private val config: MobileConfiguration, private val contract: MobileContract) : SessionProvider, PasswordRecoveryService, RegistrationService {
     init {
         val pool = JSONObject().put("PoolId", config.userPoolId).put("AppClientId", config.clientId).put("Region", config.awsRegion)
         val plugin = JSONObject()
@@ -64,5 +67,23 @@ class CognitoSession(context: Context, private val config: MobileConfiguration, 
         Amplify.Auth.confirmResetPassword(username, password, code,
             { if (continuation.isActive) continuation.resume(Unit) },
             { if (continuation.isActive) continuation.resumeWithException(IllegalStateException("RECOVERY_FAILED")) })
+    }
+
+    override suspend fun register(username: String, password: String, name: String): Boolean = suspendCancellableCoroutine { continuation ->
+        val options = AuthSignUpOptions.builder().userAttributes(listOf(
+            AuthUserAttribute(AuthUserAttributeKey.email(), username), AuthUserAttribute(AuthUserAttributeKey.name(), name))).build()
+        Amplify.Auth.signUp(username, password, options,
+            { if (continuation.isActive) continuation.resume(it.isSignUpComplete) },
+            { if (continuation.isActive) continuation.resumeWithException(IllegalStateException("REGISTRATION_FAILED")) })
+    }
+    override suspend fun confirmRegistration(username: String, code: String): Boolean = suspendCancellableCoroutine { continuation ->
+        Amplify.Auth.confirmSignUp(username, code,
+            { if (continuation.isActive) continuation.resume(it.isSignUpComplete) },
+            { if (continuation.isActive) continuation.resumeWithException(IllegalStateException("REGISTRATION_FAILED")) })
+    }
+    override suspend fun resendRegistration(username: String): Unit = suspendCancellableCoroutine { continuation ->
+        Amplify.Auth.resendSignUpCode(username,
+            { if (continuation.isActive) continuation.resume(Unit) },
+            { if (continuation.isActive) continuation.resumeWithException(IllegalStateException("REGISTRATION_FAILED")) })
     }
 }

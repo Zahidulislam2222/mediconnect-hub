@@ -4,6 +4,7 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.amplifyframework.auth.result.AuthSignInResult
+import com.amplifyframework.auth.result.step.AuthSignInStep
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -25,9 +26,11 @@ data class WorkspaceState(
 
 class WorkspaceModel(application: Application) : AndroidViewModel(application) {
     val content = (application as MediConnectApplication).content
+    val policies = (application as MediConnectApplication).policies
     private val runtime = (application as MediConnectApplication).runtime.getOrNull()
     val configured = runtime != null
     val recovery = PasswordRecovery(runtime?.sessions, viewModelScope)
+    val registration = AccountRegistration(runtime?.sessions, viewModelScope)
     private val mutable = MutableStateFlow(WorkspaceState())
     val state = mutable.asStateFlow()
     private var operation: Job? = null
@@ -41,17 +44,24 @@ class WorkspaceModel(application: Application) : AndroidViewModel(application) {
         mutable.value = WorkspaceState(visible = visible)
     }
 
-    fun hide() { recovery.close(); reset(visible = false) }
+    fun hide() { registration.close(); recovery.close(); reset(visible = false) }
+
+    fun openRegistration() {
+        val runtime = runtime ?: return
+        runtime.requiresExplicitSignIn = true
+        recovery.close(); reset(); registration.open()
+    }
 
     fun openRecovery() {
         val runtime = runtime ?: return
         runtime.requiresExplicitSignIn = true
+        registration.close()
         reset()
         recovery.open()
     }
 
     fun resume() {
-        if (recovery.state.value.step != RecoveryStep.CLOSED) return
+        if (recovery.state.value.step != RecoveryStep.CLOSED || registration.state.value.step != RegistrationStep.CLOSED) return
         if (mutable.value.visible && (mutable.value.identity != null || mutable.value.busy)) return
         mutable.value = mutable.value.copy(visible = true)
         val runtime = runtime ?: return
@@ -65,7 +75,9 @@ class WorkspaceModel(application: Application) : AndroidViewModel(application) {
         runtime.requiresExplicitSignIn = true
         runOperation("signInFailed") {
             runtime.sessions.signOut()
-            completeSignIn(runtime.sessions.signIn(email.trim(), password))
+            val result = runtime.sessions.signIn(email.trim(), password)
+            if (result.nextStep.signInStep == AuthSignInStep.CONFIRM_SIGN_UP) registration.resumeConfirmation(email)
+            else completeSignIn(result)
         }
     }
 
@@ -117,6 +129,7 @@ class WorkspaceModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun signOut() {
+        registration.close()
         recovery.close()
         val runtime = runtime ?: return
         runtime.requiresExplicitSignIn = true

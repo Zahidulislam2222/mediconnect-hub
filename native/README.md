@@ -4,8 +4,8 @@ Android uses Kotlin and Jetpack Compose. iOS uses Swift and SwiftUI. The React w
 existing Capacitor project remain separate and are preserved during migration.
 
 This is an **incomplete native implementation**. The first slice covers sign-in, code confirmation,
-session handling and read-only patient/doctor appointments. Staff/admin workspaces, registration,
-account recovery, appointment mutations, billing, messaging, consultations, records and other web
+password recovery, session handling and read-only patient/doctor appointments. Staff/admin workspaces, registration,
+appointment mutations, billing, messaging, consultations, records and other web
 features still need native implementation. A successful build does not establish feature parity,
 live-provider behavior, clinical readiness or physical-device behavior.
 
@@ -56,6 +56,11 @@ or manual dispatch once registered on the default branch. It builds the pinned X
 gates on a standard macOS runner only for public repositories. It does not upload artifacts, sign,
 publish or deploy. Check runner eligibility and billing before enabling/dispatching it. The local
 presence of this workflow is not evidence that it has run.
+
+Verification run [34399561053](https://github.com/Zahidulislam2222/mediconnect-hub/actions/runs/34399561053)
+passed for commit `a2538198dec2b3fcd0b6328fde4b60bd8ba05cc8`: both regional simulator schemes built
+and passed their unit and UI tests. Signed distribution builds, physical devices, live providers and
+independent review remain separate, incomplete gates.
 
 UI tests expect the safe default blank configuration; use synthetic accounts/data for any added
 connected tests. Do not put patient data or authentication material in fixtures, screenshots or logs.

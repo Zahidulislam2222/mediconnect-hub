@@ -14,6 +14,8 @@ def main():
         json.loads((SHARED / name).read_text(encoding="utf-8"))
         shutil.copyfile(SHARED / name, OUTPUT / name)
     shutil.copyfile(NATIVE.parent / "src/content/session-policy.json", OUTPUT / "session-policy.json")
+    for name in ("legal.json", "consent.json"):
+        shutil.copyfile(NATIVE.parent / "src/content" / name, OUTPUT / name)
     local = NATIVE / "local/mobile-config.json"
     source = local if local.exists() else SHARED / "mobile-config.example.json"
     json.loads(source.read_text(encoding="utf-8"))

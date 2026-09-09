@@ -13,6 +13,8 @@ final class WorkspaceModel: ObservableObject {
     @Published private(set) var visible = true
     let residency: String
     let content: MobileContent?
+    let policies: MobilePolicies?
+    let registration: AccountRegistration
     let recovery: PasswordRecovery
     private let auth: CognitoSession?
     private let api: AppointmentsAPI?
@@ -30,6 +32,7 @@ final class WorkspaceModel: ObservableObject {
     init() {
         residency = Bundle.main.object(forInfoDictionaryKey: "MediConnectResidency") as? String ?? ""
         content = try? MobileContent(data: BundledAssets.data("mobile-content"))
+        policies = try? MobilePolicies(legal: BundledAssets.data("legal"), consent: BundledAssets.data("consent"))
         do {
             let config = try MobileConfiguration(data: BundledAssets.data("mobile-config"), residency: residency)
             let contract = try MobileContract(data: BundledAssets.data("mobile-contract"), policy: BundledAssets.data("session-policy"))
@@ -37,6 +40,7 @@ final class WorkspaceModel: ObservableObject {
             api = AppointmentsAPI(config: config, contract: contract)
         } catch { auth = nil; api = nil }
         recovery = PasswordRecovery(service: auth)
+        registration = AccountRegistration(service: policies == nil ? nil : auth)
     }
 
     private func clear(visible: Bool = true) {
@@ -51,15 +55,21 @@ final class WorkspaceModel: ObservableObject {
         message = nil
         self.visible = visible
     }
-    func hide() { recovery.close(); clear(visible: false) }
+    func hide() { registration.close(); recovery.close(); clear(visible: false) }
+    func openRegistration() {
+        guard configured, policies != nil else { return }
+        requiresExplicitSignIn = true
+        recovery.close(); clear(); registration.open()
+    }
     func openRecovery() {
+        registration.close()
         guard configured else { return }
         requiresExplicitSignIn = true
         clear()
         recovery.open()
     }
     func resume() {
-        guard recovery.state.step == .closed else { return }
+        guard recovery.state.step == .closed, registration.state.step == .closed else { return }
         visible = true
         guard !busy, identity == nil, !requiresExplicitSignIn, let auth else { return }
         run(message: "sessionExpired") { [weak self] in
@@ -76,7 +86,8 @@ final class WorkspaceModel: ObservableObject {
             try Task.checkCancellation()
             let result = try await auth.signIn(email: email.trimmingCharacters(in: .whitespacesAndNewlines), password: password)
             try Task.checkCancellation()
-            try await self?.complete(result)
+            if case .confirmSignUp = result.nextStep { self?.registration.resumeConfirmation(email) }
+            else { try await self?.complete(result) }
         }
     }
     func confirm(code: String) {
@@ -137,6 +148,7 @@ final class WorkspaceModel: ObservableObject {
         }
     }
     func signOut() {
+        registration.close()
         recovery.close()
         requiresExplicitSignIn = true
         clear()

@@ -13,9 +13,13 @@ class WorkspaceScreenTest {
     @get:Rule val compose = createComposeRule()
     private val content = MobileContent(JSONObject(InstrumentationRegistry.getInstrumentation().targetContext.assets
         .open("mobile-content.json").bufferedReader().use { it.readText() }))
+    private val policies = InstrumentationRegistry.getInstrumentation().targetContext.assets.let { assets ->
+        MobilePolicies(JSONObject(assets.open("legal.json").bufferedReader().use { it.readText() }),
+            JSONObject(assets.open("consent.json").bufferedReader().use { it.readText() }))
+    }
     private fun show(state: WorkspaceState, configured: Boolean = true) {
         compose.setContent { MobileTheme(content) { WorkspaceScreen(state, content, configured, "US", { _, _ -> }, {}, {}, {},
-            RecoveryState(), {}, {}, { _, _ -> }, {}) } }
+            RecoveryState(), {}, {}, { _, _ -> }, {}, policies, RegistrationState(), {}, {}, { _, _, _ -> }, {}, {}, {}) } }
     }
     @Test fun unconfiguredAppDoesNotOfferSignIn() {
         show(WorkspaceState(), false)

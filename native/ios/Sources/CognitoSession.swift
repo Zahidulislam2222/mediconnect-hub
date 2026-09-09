@@ -3,7 +3,7 @@ import AWSCognitoAuthPlugin
 import AWSPluginsCore
 import Foundation
 
-final class CognitoSession: PasswordRecoveryService {
+final class CognitoSession: PasswordRecoveryService, RegistrationService {
     private let config: MobileConfiguration
     private let contract: MobileContract
     init(config: MobileConfiguration, contract: MobileContract) throws {
@@ -34,5 +34,15 @@ final class CognitoSession: PasswordRecoveryService {
     }
     func confirmReset(username: String, password: String, code: String) async throws {
         try await Amplify.Auth.confirmResetPassword(for: username, with: password, confirmationCode: code)
+    }
+    func register(username: String, password: String, name: String) async throws -> Bool {
+        let options = AuthSignUpRequest.Options(userAttributes: [AuthUserAttribute(.email, value: username), AuthUserAttribute(.name, value: name)])
+        return try await Amplify.Auth.signUp(username: username, password: password, options: options).isSignUpComplete
+    }
+    func confirmRegistration(username: String, code: String) async throws -> Bool {
+        try await Amplify.Auth.confirmSignUp(for: username, confirmationCode: code).isSignUpComplete
+    }
+    func resendRegistration(username: String) async throws {
+        _ = try await Amplify.Auth.resendSignUpCode(for: username)
     }
 }

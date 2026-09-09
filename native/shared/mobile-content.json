@@ -52,5 +52,14 @@
     "muted": "#64748B",
     "error": "#B91C1C"
   },
-  "loadMore": "Load more"
+  "loadMore": "Load more",
+  "createAccount": "Create account",
+  "register": "Register",
+  "fullName": "Full name",
+  "registrationInstructions": "Enter the confirmation code for your account. You can request a new code if needed.",
+  "registrationFailed": "Account setup could not be completed. Check your details and try again.",
+  "registrationComplete": "Account confirmation completed. Sign in to continue.",
+  "resendCode": "Request another code",
+  "registrationCodeRequested": "A new confirmation code was requested. Check your registered contact.",
+  "close": "Close"
 }

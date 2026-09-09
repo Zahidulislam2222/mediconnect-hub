@@ -8,6 +8,8 @@ val generatedAssets = layout.buildDirectory.dir("generated/mobileAssets")
 val prepareMobileAssets by tasks.registering(Sync::class) {
     from("../../shared") { include("*.json") }
     from("../../../src/content/session-policy.json")
+    from("../../../src/content/legal.json")
+    from("../../../src/content/consent.json")
     val localConfig = file("../../local/mobile-config.json")
     if (localConfig.exists()) {
         from(localConfig) { rename { "mobile-config.json" } }

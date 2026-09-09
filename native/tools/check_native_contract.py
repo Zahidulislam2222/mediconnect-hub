@@ -28,6 +28,16 @@ def main():
     assert all(re.fullmatch(r"#[0-9A-Fa-f]{6}", value) for value in content["theme"].values())
     contract = read("mobile-contract.json")
     web_policy = json.loads((HUB / "src/content/session-policy.json").read_text())
+    consent = json.loads((HUB / "src/content/consent.json").read_text())
+    legal = json.loads((HUB / "src/content/legal.json").read_text())
+    assert all(isinstance(consent.get(key), str) and consent[key] for key in ("policyVersion", "signupDescription"))
+    assert isinstance(legal.get("notice"), str) and legal["notice"]
+    for key in ("terms", "privacy", "security"):
+        page = legal["pages"][key]
+        assert isinstance(page["title"], str) and page["title"]
+        assert page["sections"]
+        for section in page["sections"]:
+            assert all(isinstance(section.get(field), str) and section[field] for field in ("title", "body"))
     assert "groups" not in contract and "defaultRole" not in contract
     assert set(web_policy["groups"].values()) == set(content["roles"])
     assert set(contract["appointments"]["query"]) == {"patient", "doctor"}

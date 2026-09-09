@@ -16,10 +16,12 @@ struct MediConnectApp: App {
     }
     @ViewBuilder private func root(_ content: MobileContent) -> some View {
         #if DEBUG
-        if RecoveryUITestFixture.requested() { RecoveryUITestFixture(content: content) }
-        else { WorkspaceView(model: model, content: content, recovery: model.recovery) }
+        if RegistrationUITestFixture.requested(), let policies = model.policies {
+            RegistrationUITestFixture(content: content, policies: policies)
+        } else if RecoveryUITestFixture.requested() { RecoveryUITestFixture(content: content) }
+        else { WorkspaceView(model: model, content: content, recovery: model.recovery, registration: model.registration) }
         #else
-        WorkspaceView(model: model, content: content, recovery: model.recovery)
+        WorkspaceView(model: model, content: content, recovery: model.recovery, registration: model.registration)
         #endif
     }
 }
@@ -37,6 +39,7 @@ struct WorkspaceView: View {
     @ObservedObject var model: WorkspaceModel
     let content: MobileContent
     @ObservedObject var recovery: PasswordRecovery
+    @ObservedObject var registration: AccountRegistration
     @State private var email = ""
     @State private var password = ""
     @State private var code = ""
@@ -50,9 +53,12 @@ struct WorkspaceView: View {
                         Text(content.label("residency", model.residency)).font(.subheadline)
                     }
                     if model.visible {
+                        if let policies = model.policies { PolicyLinks(policies: policies, content: content) }
                         if !model.configured { Text(content.text("configurationUnavailable")) }
                         else {
-                            if recovery.state.step != .closed {
+                            if registration.state.step != .closed, let policies = model.policies {
+                                RegistrationView(model: registration, content: content, policies: policies).id(registration.state.step)
+                            } else if recovery.state.step != .closed {
                                 RecoveryView(model: recovery, content: content).id(recovery.state.step)
                             } else {
                                 if let message = model.message { Text(content.text(message)).foregroundStyle(content.color("error")) }
@@ -84,6 +90,9 @@ struct WorkspaceView: View {
                 SecureField(content.text("password"), text: $password).textContentType(.password)
                 Button(content.text("signIn")) { let value = password; password = ""; model.signIn(email: email, password: value) }
                     .disabled(email.isEmpty || password.isEmpty || model.busy)
+                Button(content.text("createAccount")) {
+                    email = ""; password = ""; code = ""; model.openRegistration()
+                }.disabled(model.policies == nil)
                 Button(content.text("forgotPassword")) {
                     email = ""; password = ""; code = ""; model.openRecovery()
                 }

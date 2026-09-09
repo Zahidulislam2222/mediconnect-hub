@@ -7,6 +7,8 @@ on:
     paths:
       - "native/**"
       - "src/content/session-policy.json"
+      - "src/content/consent.json"
+      - "src/content/legal.json"
       - ".github/workflows/native-ios.yml"
 
 permissions:

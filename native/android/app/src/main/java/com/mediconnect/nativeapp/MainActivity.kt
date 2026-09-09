@@ -49,10 +49,13 @@ class MainActivity : ComponentActivity() {
         setContent {
             val state by model.state.collectAsStateWithLifecycle()
             val recovery by model.recovery.state.collectAsStateWithLifecycle()
+            val registration by model.registration.state.collectAsStateWithLifecycle()
             MobileTheme(model.content) {
                 WorkspaceScreen(state, model.content, model.configured, BuildConfig.RESIDENCY,
                     model::signIn, model::confirm, model::signOut, model::refresh,
-                    recovery, model::openRecovery, model.recovery::request, model.recovery::confirm, model.recovery::close)
+                    recovery, model::openRecovery, model.recovery::request, model.recovery::confirm, model.recovery::close,
+                    model.policies, registration, model::openRegistration, model.registration::accept, model.registration::register,
+                    model.registration::confirm, model.registration::resend, model.registration::close)
             }
         }
     }
@@ -75,7 +78,10 @@ fun WorkspaceScreen(state: WorkspaceState, content: MobileContent, configured: B
                     signIn: (String, String) -> Unit, confirm: (String) -> Unit,
                     signOut: () -> Unit, refresh: (Boolean) -> Unit,
                     recovery: RecoveryState, openRecovery: () -> Unit, requestReset: (String) -> Unit,
-                    confirmReset: (String, String) -> Unit, closeRecovery: () -> Unit) {
+                    confirmReset: (String, String) -> Unit, closeRecovery: () -> Unit,
+                    policies: MobilePolicies, registration: RegistrationState, openRegistration: () -> Unit,
+                    acceptTerms: (Boolean) -> Unit, register: (String, String, String) -> Unit,
+                    confirmRegistration: (String) -> Unit, resendRegistration: () -> Unit, closeRegistration: () -> Unit) {
     Scaffold { padding ->
         LazyColumn(Modifier.fillMaxSize().padding(padding), contentPadding = PaddingValues(24.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
             item {
@@ -86,8 +92,13 @@ fun WorkspaceScreen(state: WorkspaceState, content: MobileContent, configured: B
                 }
             }
             if (!state.visible) return@LazyColumn
+            item { PolicyLinks(policies, content) }
             if (!configured) {
                 item { Text(content.text("configurationUnavailable")) }
+                return@LazyColumn
+            }
+            if (registration.step != RegistrationStep.CLOSED) {
+                item { RegistrationForm(registration, content, policies, acceptTerms, register, confirmRegistration, resendRegistration, closeRegistration) }
                 return@LazyColumn
             }
             if (recovery.step != RecoveryStep.CLOSED) {
@@ -96,7 +107,7 @@ fun WorkspaceScreen(state: WorkspaceState, content: MobileContent, configured: B
             }
             state.error?.let { key -> item { Text(content.text(key), color = MaterialTheme.colorScheme.error) } }
             if (state.identity == null) {
-                item { SignInForm(state, content, signIn, confirm, signOut, openRecovery) }
+                item { SignInForm(state, content, signIn, confirm, signOut, openRecovery, openRegistration) }
             } else {
                 item {
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -127,7 +138,7 @@ fun WorkspaceScreen(state: WorkspaceState, content: MobileContent, configured: B
 
 @Composable
 private fun SignInForm(state: WorkspaceState, content: MobileContent,
-                       signIn: (String, String) -> Unit, confirm: (String) -> Unit, cancel: () -> Unit, openRecovery: () -> Unit) {
+                       signIn: (String, String) -> Unit, confirm: (String) -> Unit, cancel: () -> Unit, openRecovery: () -> Unit, openRegistration: () -> Unit) {
     // Deliberately remember, not rememberSaveable: credentials must never enter saved instance state.
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
@@ -146,6 +157,9 @@ private fun SignInForm(state: WorkspaceState, content: MobileContent,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password))
             Button(onClick = { val value = password; password = ""; signIn(email, value) },
                 enabled = !state.busy && email.isNotBlank() && password.isNotEmpty()) { Text(content.text("signIn")) }
+            TextButton(onClick = { email = ""; password = ""; code = ""; openRegistration() }, enabled = !state.busy) {
+                Text(content.text("createAccount"))
+            }
             TextButton(onClick = { email = ""; password = ""; code = ""; openRecovery() }, enabled = !state.busy) {
                 Text(content.text("forgotPassword"))
             }
