@@ -1,0 +1,15 @@
+{
+  "appointments": {
+    "service": "booking",
+    "path": "/appointments",
+    "query": {
+      "patient": "patientId",
+      "doctor": "doctorId"
+    },
+    "listKeys": [
+      "appointments",
+      "existingBookings",
+      "data"
+    ]
+  }
+}

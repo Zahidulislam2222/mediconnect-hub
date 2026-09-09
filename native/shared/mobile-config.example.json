@@ -1,0 +1,34 @@
+{
+  "requestTimeoutSeconds": 30,
+  "maxResponseBytes": 1048576,
+  "regions": {
+    "US": {
+      "awsRegion": "",
+      "userPoolId": "",
+      "clientId": "",
+      "services": {
+        "patient": "",
+        "doctor": "",
+        "booking": "",
+        "communication": "",
+        "staff": "",
+        "admin": ""
+      },
+      "issuer": ""
+    },
+    "EU": {
+      "awsRegion": "",
+      "userPoolId": "",
+      "clientId": "",
+      "services": {
+        "patient": "",
+        "doctor": "",
+        "booking": "",
+        "communication": "",
+        "staff": "",
+        "admin": ""
+      },
+      "issuer": ""
+    }
+  }
+}

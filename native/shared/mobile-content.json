@@ -1,0 +1,47 @@
+{
+  "brand": "MediConnect",
+  "tagline": "Your care, connected.",
+  "signIn": "Sign in",
+  "signOut": "Sign out",
+  "email": "Email",
+  "password": "Password",
+  "code": "Verification code",
+  "verify": "Verify",
+  "cancel": "Cancel",
+  "loading": "Please wait…",
+  "refresh": "Refresh",
+  "appointments": "Appointments",
+  "emptyAppointments": "No appointments to display.",
+  "unavailable": "We couldn't load your appointments. Please try again.",
+  "configurationUnavailable": "This app's connection is not available yet.",
+  "signInFailed": "Sign-in could not be completed. Check your details and try again.",
+  "additionalStep": "Your account requires another sign-in step. Complete account setup with your care provider.",
+  "sessionExpired": "Please sign in again to continue.",
+  "accessDenied": "Your account cannot access this area.",
+  "unknown": "Not provided",
+  "date": "Date",
+  "time": "Time",
+  "status": "Status",
+  "with": "With",
+  "residency": {
+    "US": "United States",
+    "EU": "European Union"
+  },
+  "roles": {
+    "patient": "Patient",
+    "doctor": "Doctor",
+    "staff": "Staff",
+    "admin": "Administrator"
+  },
+  "roleUnavailable": "This workspace is not available in the native app yet.",
+  "theme": {
+    "background": "#F9FAFB",
+    "foreground": "#0F172A",
+    "surface": "#FFFFFF",
+    "accent": "#2563EB",
+    "onAccent": "#FFFFFF",
+    "muted": "#64748B",
+    "error": "#B91C1C"
+  },
+  "loadMore": "Load more"
+}

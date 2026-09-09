@@ -1,0 +1,48 @@
+name: Native iOS verification
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["verify/native-ios/**"]
+    paths:
+      - "native/**"
+      - "src/content/session-policy.json"
+      - ".github/workflows/native-ios.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: native-ios-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  simulator:
+    # Standard public-repository compute only. Never change visibility to bypass this gate.
+    if: github.event.repository.private == false
+    runs-on: macos-26
+    timeout-minutes: 45
+    env:
+      XCODEGEN_REPOSITORY: https://github.com/yonaskolb/XcodeGen.git
+      XCODEGEN_COMMIT: 8445e778451c7e44237b90281bde622d764b0084
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Validate shared configuration and prepare bundle resources
+        run: |
+          python3 native/tools/check_native_contract.py
+          python3 native/tools/prepare_ios_resources.py
+      - name: Build pinned XcodeGen from its official source
+        run: |
+          git init "$RUNNER_TEMP/XcodeGen"
+          git -C "$RUNNER_TEMP/XcodeGen" remote add origin "$XCODEGEN_REPOSITORY"
+          git -C "$RUNNER_TEMP/XcodeGen" fetch --depth=1 origin "$XCODEGEN_COMMIT"
+          git -C "$RUNNER_TEMP/XcodeGen" checkout --detach FETCH_HEAD
+          test "$(git -C "$RUNNER_TEMP/XcodeGen" rev-parse HEAD)" = "$XCODEGEN_COMMIT"
+          swift build --package-path "$RUNNER_TEMP/XcodeGen" -c release --product xcodegen
+          "$RUNNER_TEMP/XcodeGen/.build/release/xcodegen" generate --spec native/ios/project.yml
+      - name: Build and exercise both regional simulator schemes
+        run: python3 native/tools/run_ios_gates.py
+      # No artifact uploads or remote caches: neither is needed to establish a build/test result.
+      # Signing, TestFlight and App Store publishing are separate release actions.

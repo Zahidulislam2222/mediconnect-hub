@@ -1,0 +1,4 @@
+{
+  "gateTimeoutSeconds": 2400,
+  "iosSchemes": ["MediConnect-US", "MediConnect-EU"]
+}

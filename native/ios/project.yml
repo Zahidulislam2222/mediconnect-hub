@@ -1,0 +1,105 @@
+name: MediConnect
+options:
+  minimumXcodeGenVersion: 2.46.0
+  deploymentTarget:
+    iOS: "16.0"
+configs:
+  USDebug: debug
+  EUDebug: debug
+  USRelease: release
+  EURelease: release
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    IPHONEOS_DEPLOYMENT_TARGET: "16.0"
+    TARGETED_DEVICE_FAMILY: "1,2"
+    CODE_SIGN_STYLE: Automatic
+    ENABLE_USER_SCRIPT_SANDBOXING: YES
+    SWIFT_TREAT_WARNINGS_AS_ERRORS: YES
+  configs:
+    USDebug:
+      MEDICONNECT_RESIDENCY: US
+    USRelease:
+      MEDICONNECT_RESIDENCY: US
+    EUDebug:
+      MEDICONNECT_RESIDENCY: EU
+    EURelease:
+      MEDICONNECT_RESIDENCY: EU
+packages:
+  Amplify:
+    url: https://github.com/aws-amplify/amplify-swift
+    exactVersion: 2.60.2
+targets:
+  MediConnectApp:
+    type: application
+    platform: iOS
+    sources:
+      - Sources
+      - path: Resources
+        buildPhase: resources
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.mediconnect.nativeapp
+        PRODUCT_MODULE_NAME: MediConnectApp
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_CFBundleDisplayName: MediConnect
+        INFOPLIST_KEY_MediConnectResidency: $(MEDICONNECT_RESIDENCY)
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        INFOPLIST_KEY_UIApplicationSceneManifest_Generation: YES
+        INFOPLIST_KEY_UISupportedInterfaceOrientations: UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight
+      configs:
+        EUDebug:
+          PRODUCT_BUNDLE_IDENTIFIER: com.mediconnect.nativeapp.eu
+        EURelease:
+          PRODUCT_BUNDLE_IDENTIFIER: com.mediconnect.nativeapp.eu
+    dependencies:
+      - package: Amplify
+        product: Amplify
+      - package: Amplify
+        product: AWSCognitoAuthPlugin
+  NativeBoundaryTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - Tests
+      - path: Resources
+        buildPhase: resources
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.mediconnect.nativeapp.tests
+        GENERATE_INFOPLIST_FILE: YES
+    dependencies:
+      - target: MediConnectApp
+  NativeUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources: [UITests]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.mediconnect.nativeapp.uitests
+        GENERATE_INFOPLIST_FILE: YES
+    dependencies:
+      - target: MediConnectApp
+schemes:
+  MediConnect-US:
+    build:
+      targets:
+        MediConnectApp: all
+    run:
+      config: USDebug
+    test:
+      config: USDebug
+      targets: [NativeBoundaryTests, NativeUITests]
+    archive:
+      config: USRelease
+  MediConnect-EU:
+    build:
+      targets:
+        MediConnectApp: all
+    run:
+      config: EUDebug
+    test:
+      config: EUDebug
+      targets: [NativeBoundaryTests, NativeUITests]
+    archive:
+      config: EURelease
