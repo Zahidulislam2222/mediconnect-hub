@@ -14,7 +14,7 @@ import kotlin.coroutines.resumeWithException
 
 interface SessionProvider { suspend fun fetch(): SessionAccess }
 
-class CognitoSession(context: Context, private val config: MobileConfiguration, private val contract: MobileContract) : SessionProvider {
+class CognitoSession(context: Context, private val config: MobileConfiguration, private val contract: MobileContract) : SessionProvider, PasswordRecoveryService {
     init {
         val pool = JSONObject().put("PoolId", config.userPoolId).put("AppClientId", config.clientId).put("Region", config.awsRegion)
         val plugin = JSONObject()
@@ -52,5 +52,17 @@ class CognitoSession(context: Context, private val config: MobileConfiguration, 
 
     suspend fun signOut() = suspendCancellableCoroutine { continuation ->
         Amplify.Auth.signOut { if (continuation.isActive) continuation.resume(Unit) }
+    }
+
+    override suspend fun requestReset(username: String): Boolean = suspendCancellableCoroutine { continuation ->
+        Amplify.Auth.resetPassword(username,
+            { if (continuation.isActive) continuation.resume(it.isPasswordReset) },
+            { if (continuation.isActive) continuation.resumeWithException(IllegalStateException("RECOVERY_FAILED")) })
+    }
+
+    override suspend fun confirmReset(username: String, password: String, code: String): Unit = suspendCancellableCoroutine { continuation ->
+        Amplify.Auth.confirmResetPassword(username, password, code,
+            { if (continuation.isActive) continuation.resume(Unit) },
+            { if (continuation.isActive) continuation.resumeWithException(IllegalStateException("RECOVERY_FAILED")) })
     }
 }

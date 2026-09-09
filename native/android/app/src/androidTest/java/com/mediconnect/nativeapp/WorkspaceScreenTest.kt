@@ -14,7 +14,8 @@ class WorkspaceScreenTest {
     private val content = MobileContent(JSONObject(InstrumentationRegistry.getInstrumentation().targetContext.assets
         .open("mobile-content.json").bufferedReader().use { it.readText() }))
     private fun show(state: WorkspaceState, configured: Boolean = true) {
-        compose.setContent { MobileTheme(content) { WorkspaceScreen(state, content, configured, "US", { _, _ -> }, {}, {}, {}) } }
+        compose.setContent { MobileTheme(content) { WorkspaceScreen(state, content, configured, "US", { _, _ -> }, {}, {}, {},
+            RecoveryState(), {}, {}, { _, _ -> }, {}) } }
     }
     @Test fun unconfiguredAppDoesNotOfferSignIn() {
         show(WorkspaceState(), false)

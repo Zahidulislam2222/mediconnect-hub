@@ -26,6 +26,12 @@ settings:
     EURelease:
       MEDICONNECT_RESIDENCY: EU
 packages:
+  Smithy:
+    url: https://github.com/smithy-lang/smithy-swift
+    exactVersion: 0.238.0
+  AWSSDK:
+    url: https://github.com/awslabs/aws-sdk-swift
+    exactVersion: 1.7.53
   Amplify:
     url: https://github.com/aws-amplify/amplify-swift
     exactVersion: 2.60.2
@@ -35,6 +41,7 @@ targets:
     platform: iOS
     sources:
       - Sources
+      - TestSupport/NativeUITestProtocol.swift
       - path: Resources
         buildPhase: resources
     settings:
@@ -73,7 +80,7 @@ targets:
   NativeUITests:
     type: bundle.ui-testing
     platform: iOS
-    sources: [UITests]
+    sources: [UITests, TestSupport/NativeUITestProtocol.swift]
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.mediconnect.nativeapp.uitests

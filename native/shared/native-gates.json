@@ -1,4 +1,13 @@
 {
   "gateTimeoutSeconds": 2400,
-  "iosSchemes": ["MediConnect-US", "MediConnect-EU"]
+  "iosSchemes": ["MediConnect-US", "MediConnect-EU"],
+  "iosPluginTrustStore": "Library/org.swift.swiftpm/security/plugins.json",
+  "iosApprovedPlugins": [
+    {
+      "packageIdentity": "smithy-swift",
+      "targetName": "SmithyCodeGeneratorPlugin",
+      "fingerprint": "c3ec406867e570473e097344e64c3cfbcc5d36b9",
+      "location": "https://github.com/smithy-lang/smithy-swift"
+    }
+  ]
 }

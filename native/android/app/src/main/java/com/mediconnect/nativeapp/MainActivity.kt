@@ -48,9 +48,11 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             val state by model.state.collectAsStateWithLifecycle()
+            val recovery by model.recovery.state.collectAsStateWithLifecycle()
             MobileTheme(model.content) {
                 WorkspaceScreen(state, model.content, model.configured, BuildConfig.RESIDENCY,
-                    model::signIn, model::confirm, model::signOut, model::refresh)
+                    model::signIn, model::confirm, model::signOut, model::refresh,
+                    recovery, model::openRecovery, model.recovery::request, model.recovery::confirm, model.recovery::close)
             }
         }
     }
@@ -71,7 +73,9 @@ fun MobileTheme(content: MobileContent, children: @Composable () -> Unit) {
 @Composable
 fun WorkspaceScreen(state: WorkspaceState, content: MobileContent, configured: Boolean, residency: String,
                     signIn: (String, String) -> Unit, confirm: (String) -> Unit,
-                    signOut: () -> Unit, refresh: (Boolean) -> Unit) {
+                    signOut: () -> Unit, refresh: (Boolean) -> Unit,
+                    recovery: RecoveryState, openRecovery: () -> Unit, requestReset: (String) -> Unit,
+                    confirmReset: (String, String) -> Unit, closeRecovery: () -> Unit) {
     Scaffold { padding ->
         LazyColumn(Modifier.fillMaxSize().padding(padding), contentPadding = PaddingValues(24.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
             item {
@@ -86,9 +90,13 @@ fun WorkspaceScreen(state: WorkspaceState, content: MobileContent, configured: B
                 item { Text(content.text("configurationUnavailable")) }
                 return@LazyColumn
             }
+            if (recovery.step != RecoveryStep.CLOSED) {
+                item { RecoveryForm(recovery, content, requestReset, confirmReset, closeRecovery) }
+                return@LazyColumn
+            }
             state.error?.let { key -> item { Text(content.text(key), color = MaterialTheme.colorScheme.error) } }
             if (state.identity == null) {
-                item { SignInForm(state, content, signIn, confirm, signOut) }
+                item { SignInForm(state, content, signIn, confirm, signOut, openRecovery) }
             } else {
                 item {
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -119,7 +127,7 @@ fun WorkspaceScreen(state: WorkspaceState, content: MobileContent, configured: B
 
 @Composable
 private fun SignInForm(state: WorkspaceState, content: MobileContent,
-                       signIn: (String, String) -> Unit, confirm: (String) -> Unit, cancel: () -> Unit) {
+                       signIn: (String, String) -> Unit, confirm: (String) -> Unit, cancel: () -> Unit, openRecovery: () -> Unit) {
     // Deliberately remember, not rememberSaveable: credentials must never enter saved instance state.
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
@@ -138,7 +146,47 @@ private fun SignInForm(state: WorkspaceState, content: MobileContent,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password))
             Button(onClick = { val value = password; password = ""; signIn(email, value) },
                 enabled = !state.busy && email.isNotBlank() && password.isNotEmpty()) { Text(content.text("signIn")) }
+            TextButton(onClick = { email = ""; password = ""; code = ""; openRecovery() }, enabled = !state.busy) {
+                Text(content.text("forgotPassword"))
+            }
         }
+    }
+}
+
+@Composable
+fun RecoveryForm(state: RecoveryState, content: MobileContent, request: (String) -> Unit,
+                 confirm: (String, String) -> Unit, close: () -> Unit) {
+    var email by remember(state.step) { mutableStateOf("") }
+    var password by remember(state.step) { mutableStateOf("") }
+    var code by remember(state.step) { mutableStateOf("") }
+    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        Text(content.text("recoveryTitle"), style = MaterialTheme.typography.headlineSmall)
+        if (state.failed) Text(content.text("recoveryFailed"), color = MaterialTheme.colorScheme.error)
+        when (state.step) {
+            RecoveryStep.REQUEST -> {
+                OutlinedTextField(email, { email = it }, Modifier.fillMaxWidth(), enabled = !state.busy,
+                    label = { Text(content.text("email")) }, singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email))
+                Button(onClick = { val value = email; email = ""; request(value) }, enabled = !state.busy && email.isNotBlank()) {
+                    Text(content.text("sendResetCode"))
+                }
+            }
+            RecoveryStep.CONFIRM -> {
+                Text(content.text("recoveryInstructions"))
+                OutlinedTextField(code, { code = it }, Modifier.fillMaxWidth(), enabled = !state.busy,
+                    label = { Text(content.text("code")) }, singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword))
+                OutlinedTextField(password, { password = it }, Modifier.fillMaxWidth(), enabled = !state.busy,
+                    label = { Text(content.text("newPassword")) }, singleLine = true, visualTransformation = PasswordVisualTransformation(),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password))
+                Button(onClick = { val secret = password; val value = code; password = ""; code = ""; confirm(secret, value) },
+                    enabled = !state.busy && code.isNotBlank() && password.isNotEmpty()) { Text(content.text("resetPassword")) }
+            }
+            RecoveryStep.COMPLETE -> Text(content.text("recoveryComplete"))
+            RecoveryStep.CLOSED -> Unit
+        }
+        if (state.busy) CircularProgressIndicator()
+        TextButton(onClick = { email = ""; password = ""; code = ""; close() }) { Text(content.text("backToSignIn")) }
     }
 }
 

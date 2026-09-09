@@ -27,6 +27,7 @@ class WorkspaceModel(application: Application) : AndroidViewModel(application) {
     val content = (application as MediConnectApplication).content
     private val runtime = (application as MediConnectApplication).runtime.getOrNull()
     val configured = runtime != null
+    val recovery = PasswordRecovery(runtime?.sessions, viewModelScope)
     private val mutable = MutableStateFlow(WorkspaceState())
     val state = mutable.asStateFlow()
     private var operation: Job? = null
@@ -40,9 +41,17 @@ class WorkspaceModel(application: Application) : AndroidViewModel(application) {
         mutable.value = WorkspaceState(visible = visible)
     }
 
-    fun hide() { reset(visible = false) }
+    fun hide() { recovery.close(); reset(visible = false) }
+
+    fun openRecovery() {
+        val runtime = runtime ?: return
+        runtime.requiresExplicitSignIn = true
+        reset()
+        recovery.open()
+    }
 
     fun resume() {
+        if (recovery.state.value.step != RecoveryStep.CLOSED) return
         if (mutable.value.visible && (mutable.value.identity != null || mutable.value.busy)) return
         mutable.value = mutable.value.copy(visible = true)
         val runtime = runtime ?: return
@@ -108,6 +117,7 @@ class WorkspaceModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun signOut() {
+        recovery.close()
         val runtime = runtime ?: return
         runtime.requiresExplicitSignIn = true
         reset()

@@ -1,17 +1,26 @@
 import SwiftUI
 
 @main
+@MainActor
 struct MediConnectApp: App {
     @StateObject private var model = WorkspaceModel()
     @Environment(\.scenePhase) private var phase
     var body: some Scene {
         WindowGroup {
             if let content = model.content {
-                WorkspaceView(model: model, content: content)
+                root(content)
                     .onChange(of: phase) { value in if value == .active { model.resume() } else { model.hide() } }
                     .task { if phase == .active { model.resume() } }
             }
         }
+    }
+    @ViewBuilder private func root(_ content: MobileContent) -> some View {
+        #if DEBUG
+        if RecoveryUITestFixture.requested() { RecoveryUITestFixture(content: content) }
+        else { WorkspaceView(model: model, content: content, recovery: model.recovery) }
+        #else
+        WorkspaceView(model: model, content: content, recovery: model.recovery)
+        #endif
     }
 }
 
@@ -27,6 +36,7 @@ private extension MobileContent {
 struct WorkspaceView: View {
     @ObservedObject var model: WorkspaceModel
     let content: MobileContent
+    @ObservedObject var recovery: PasswordRecovery
     @State private var email = ""
     @State private var password = ""
     @State private var code = ""
@@ -42,10 +52,14 @@ struct WorkspaceView: View {
                     if model.visible {
                         if !model.configured { Text(content.text("configurationUnavailable")) }
                         else {
-                            if let message = model.message { Text(content.text(message)).foregroundStyle(content.color("error")) }
-                            if let identity = model.identity { workspace(identity) }
-                            else { signInForm }
-                            if model.busy { ProgressView(content.text("loading")) }
+                            if recovery.state.step != .closed {
+                                RecoveryView(model: recovery, content: content).id(recovery.state.step)
+                            } else {
+                                if let message = model.message { Text(content.text(message)).foregroundStyle(content.color("error")) }
+                                if let identity = model.identity { workspace(identity) }
+                                else { signInForm }
+                                if model.busy { ProgressView(content.text("loading")) }
+                            }
                         }
                     }
                 }
@@ -70,6 +84,9 @@ struct WorkspaceView: View {
                 SecureField(content.text("password"), text: $password).textContentType(.password)
                 Button(content.text("signIn")) { let value = password; password = ""; model.signIn(email: email, password: value) }
                     .disabled(email.isEmpty || password.isEmpty || model.busy)
+                Button(content.text("forgotPassword")) {
+                    email = ""; password = ""; code = ""; model.openRecovery()
+                }
             }
         }
         .textFieldStyle(.roundedBorder).buttonStyle(.borderedProminent).disabled(model.busy)
@@ -99,5 +116,39 @@ struct WorkspaceView: View {
             }
             if model.next != nil { Button(content.text("loadMore")) { model.refresh(more: true) }.disabled(model.busy) }
         } else { Text(content.text("roleUnavailable")) }
+    }
+}
+
+struct RecoveryView: View {
+    @ObservedObject var model: PasswordRecovery
+    let content: MobileContent
+    @State private var email = ""
+    @State private var password = ""
+    @State private var code = ""
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text(content.text("recoveryTitle")).font(.title2.bold())
+            if model.state.failed { Text(content.text("recoveryFailed")) }
+            switch model.state.step {
+            case .request:
+                TextField(content.text("email"), text: $email).keyboardType(.emailAddress)
+                    .textInputAutocapitalization(.never).autocorrectionDisabled().disabled(model.state.busy)
+                Button(content.text("sendResetCode")) { let value = email; email = ""; model.request(value) }
+                    .disabled(email.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || model.state.busy)
+            case .confirm:
+                Text(content.text("recoveryInstructions"))
+                TextField(content.text("code"), text: $code).textContentType(.oneTimeCode)
+                    .keyboardType(.numberPad).disabled(model.state.busy)
+                SecureField(content.text("newPassword"), text: $password).textContentType(.newPassword).disabled(model.state.busy)
+                Button(content.text("resetPassword")) {
+                    let secret = password; let value = code; password = ""; code = ""
+                    model.confirm(password: secret, code: value)
+                }.disabled(password.isEmpty || code.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || model.state.busy)
+            case .complete: Text(content.text("recoveryComplete"))
+            case .closed: EmptyView()
+            }
+            if model.state.busy { ProgressView(content.text("loading")) }
+            Button(content.text("backToSignIn")) { email = ""; password = ""; code = ""; model.close() }
+        }.textFieldStyle(.roundedBorder).buttonStyle(.borderedProminent)
     }
 }

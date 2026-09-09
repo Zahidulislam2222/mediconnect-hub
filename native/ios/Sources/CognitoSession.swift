@@ -2,7 +2,7 @@ import Amplify
 import AWSCognitoAuthPlugin
 import Foundation
 
-final class CognitoSession {
+final class CognitoSession: PasswordRecoveryService {
     private let config: MobileConfiguration
     private let contract: MobileContract
     init(config: MobileConfiguration, contract: MobileContract) throws {
@@ -24,4 +24,14 @@ final class CognitoSession {
     }
     func confirm(code: String) async throws -> AuthSignInResult { try await Amplify.Auth.confirmSignIn(challengeResponse: code) }
     func signOut() async { _ = await Amplify.Auth.signOut() }
+    func requestReset(username: String) async throws -> Bool {
+        let result = try await Amplify.Auth.resetPassword(for: username)
+        switch result.nextStep {
+        case .done: return true
+        case .confirmResetPasswordWithCode: return false
+        }
+    }
+    func confirmReset(username: String, password: String, code: String) async throws {
+        try await Amplify.Auth.confirmResetPassword(for: username, with: password, confirmationCode: code)
+    }
 }

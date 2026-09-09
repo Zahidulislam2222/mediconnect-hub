@@ -13,6 +13,7 @@ final class WorkspaceModel: ObservableObject {
     @Published private(set) var visible = true
     let residency: String
     let content: MobileContent?
+    let recovery: PasswordRecovery
     private let auth: CognitoSession?
     private let api: AppointmentsAPI?
     private var operation: Task<Void, Never>?
@@ -35,6 +36,7 @@ final class WorkspaceModel: ObservableObject {
             auth = try CognitoSession(config: config, contract: contract)
             api = AppointmentsAPI(config: config, contract: contract)
         } catch { auth = nil; api = nil }
+        recovery = PasswordRecovery(service: auth)
     }
 
     private func clear(visible: Bool = true) {
@@ -49,8 +51,15 @@ final class WorkspaceModel: ObservableObject {
         message = nil
         self.visible = visible
     }
-    func hide() { clear(visible: false) }
+    func hide() { recovery.close(); clear(visible: false) }
+    func openRecovery() {
+        guard configured else { return }
+        requiresExplicitSignIn = true
+        clear()
+        recovery.open()
+    }
     func resume() {
+        guard recovery.state.step == .closed else { return }
         visible = true
         guard !busy, identity == nil, !requiresExplicitSignIn, let auth else { return }
         run(message: "sessionExpired") { [weak self] in
@@ -128,6 +137,7 @@ final class WorkspaceModel: ObservableObject {
         }
     }
     func signOut() {
+        recovery.close()
         requiresExplicitSignIn = true
         clear()
         guard let auth else { return }
