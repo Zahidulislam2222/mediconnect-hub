@@ -88,7 +88,7 @@ export function DoctorEarnings() {
                 <CardHeader className="pb-2">
                     <CardTitle className="font-display text-lg flex items-center gap-2">
                         <Star className="h-5 w-5 text-primary" />
-                        Your Tier & Rate
+                        Your Tier &amp; Rate
                     </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">

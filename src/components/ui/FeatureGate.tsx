@@ -30,7 +30,7 @@ export function FeatureGate({ isOpen, onClose, serviceName }: FeatureGateProps) 
                     <div className="flex gap-3">
                         <ShieldCheck className="h-5 w-5 text-primary flex-shrink-0" />
                         <p className="text-xs text-slate-600 leading-relaxed">
-                            This feature requires active <span className="font-bold">AWS EKS & Neptune clusters</span>. In a production environment, this activates automatically based on demand.
+                            This feature requires active <span className="font-bold">AWS EKS &amp; Neptune clusters</span>. In a production environment, this activates automatically based on demand.
                         </p>
                     </div>
                 </div>

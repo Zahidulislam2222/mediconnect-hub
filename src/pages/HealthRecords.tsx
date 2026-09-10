@@ -499,7 +499,7 @@ export default function HealthRecords() {
                   <div>
                     <h3 className="text-lg font-semibold">Upload X-Ray or MRI</h3>
                     <p className="text-sm text-muted-foreground max-w-xs mx-auto mt-1">
-                      Powered by Google Vision & AWS Bedrock.
+                      Powered by Google Vision &amp; AWS Bedrock.
                     </p>
                   </div>
 
