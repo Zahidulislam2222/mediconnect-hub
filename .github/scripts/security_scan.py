@@ -69,6 +69,9 @@ def summarize(mode, report, exit_code, targets):
         scanned = len(paths)
         if not scanned:
             errors += 1
+        # A clean findings list is insufficient if targeting omitted source.
+        skipped = report["paths"].get("skipped", [])
+        errors += len(object_list(skipped))
     else:
         findings = len(object_list(report["results"]))
         errors = len(object_list(report["errors"]))
@@ -116,14 +119,16 @@ def scan(repo, mode, config):
                 cwd = repo
             command.append(".")
         elif mode == "semgrep":
-            # An empty file disables Semgrep's built-in test/vendor exclusions.
-            # Never overwrite an existing policy that could hide source.
+            # Reject repository exclusions, then explicitly disable Semgrep's
+            # default test/vendor exclusions. A real pinned-tool regression
+            # guards this internal targeting option against version changes.
             if any(source.rglob(".semgrepignore")):
                 raise RuntimeError("Review Semgrep ignore policy before scanning")
             (source / ".semgrepignore").write_text("", encoding="utf-8")
             command = ["semgrep", "scan", "--config=" + config["semgrep_rules"],
                        "--metrics=off", "--disable-version-check", "--disable-nosem",
-                       "--no-git-ignore", "--strict", "--error", "--json", "--verbose",
+                       "--no-git-ignore", "--x-ignore-semgrepignore-files",
+                       "--strict", "--error", "--json", "--verbose",
                        "--max-target-bytes=0",
                        "--output=" + str(report_path), "."]
         else:

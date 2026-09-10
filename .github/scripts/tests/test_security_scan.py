@@ -18,6 +18,31 @@ SPEC.loader.exec_module(SCAN)
 
 
 class SecurityScanTests(unittest.TestCase):
+    def test_real_semgrep_scans_tracked_test_paths(self):
+        config_path = Path(__file__).resolve().parents[2] / "security-tools.json"
+        config = json.loads(config_path.read_text())
+        with tempfile.TemporaryDirectory() as directory:
+            repo = Path(directory)
+            test_path = ".github/scripts/tests/example.py"
+            (repo / test_path).parent.mkdir(parents=True)
+            (repo / test_path).write_text("print('example')\n")
+            rules = repo / "rules.yaml"
+            rules.write_text("rules:\n- id: regression\n  languages: [python]\n"
+                             "  message: test rule\n  severity: ERROR\n"
+                             "  pattern: eval(...)\n")
+            config["semgrep_rules"] = str(rules)
+            with patch.object(SCAN, "git_output", return_value=(test_path + "\0").encode()):
+                result = SCAN.scan(repo, "semgrep", config)
+            self.assertEqual(result["status"], "PASS")
+            self.assertEqual(result["scanner_reported_files"], 1)
+            self.assertEqual(result["scanner_reported_skips"], 0)
+
+    def test_semgrep_ignored_source_fails(self):
+        report = {"results": [], "errors": [], "paths": {
+            "scanned": ["app.py"], "skipped": [
+                {"path": "tests/example.py", "reason": "semgrepignore_patterns_match"}]}}
+        self.assertEqual(SCAN.summarize("semgrep", report, 0, 2)["status"], "FAIL")
+
     def test_real_bandit_scans_github_paths_in_snapshot(self):
         config_path = Path(__file__).resolve().parents[2] / "security-tools.json"
         config = json.loads(config_path.read_text())
