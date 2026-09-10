@@ -46,7 +46,7 @@ const SERVICE_URLS = {
   VITE_STAFF_SERVICE_URL_EU: 'https://staff.eu.example.com',
   VITE_STAFF_SERVICE_URL_US_BACKUP: 'https://staff.us.backup.example.com',
   VITE_STAFF_SERVICE_URL_EU_BACKUP: 'https://staff.eu.backup.example.com',
-  VITE_STORAGE_CIPHER_KEY: 'test-cipher-key-for-api-tests-32char',
+  VITE_STORAGE_CIPHER_KEY: 'test-key',
 };
 
 for (const [key, value] of Object.entries(SERVICE_URLS)) {

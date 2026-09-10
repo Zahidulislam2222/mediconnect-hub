@@ -121,7 +121,7 @@ export const SignupCard: React.FC<SignupCardProps> = ({
               />
               <div className="space-y-1 leading-none">
                 <Label htmlFor="terms" className="text-sm font-medium leading-none cursor-pointer">
-                  Accept Terms & Privacy Policy
+                  Accept Terms &amp; Privacy Policy
                 </Label>
                 <p className="text-xs text-muted-foreground">
                   I agree to the processing of my medical data in accordance with HIPAA/GDPR policies.

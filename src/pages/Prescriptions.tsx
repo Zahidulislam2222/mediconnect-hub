@@ -500,7 +500,7 @@ export default function Prescriptions() {
                                     </>
                                 ) : (
                                     <>
-                                        <FileSignature className="mr-2 h-4 w-4" /> Sign & Issue
+                                        <FileSignature className="mr-2 h-4 w-4" /> Sign &amp; Issue
                                     </>
                                 )}
                             </Button>

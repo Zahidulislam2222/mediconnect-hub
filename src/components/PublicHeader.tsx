@@ -143,7 +143,7 @@ export function PublicHeader() {
                 onClick={() => { navigate("/admin-auth"); setMobileOpen(false); }}
                 className="block w-full text-left text-sm text-muted-foreground py-2"
               >
-                Staff & Admin Portal
+                Staff &amp; Admin Portal
               </button>
             </div>
           </div>
