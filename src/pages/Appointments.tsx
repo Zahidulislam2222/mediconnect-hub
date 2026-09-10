@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { fetchUserAttributes } from 'aws-amplify/auth';
 import { Plus } from "lucide-react";
@@ -7,6 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { api } from "@/lib/api";
+import { appointmentRouting } from "@/config/env";
+import { appointmentActionContent as actionContent } from "@/lib/appointment-content";
 import { getUser, clearAllSensitive } from "@/lib/secure-storage";
 
 // Extracted Components
@@ -17,6 +19,20 @@ import { PastAppointments } from "@/components/appointments/PastAppointments";
 export default function Appointments() {
     const navigate = useNavigate();
     const { toast } = useToast();
+    const lifecycle = useRef({ active: true, generation: 0 });
+    const pendingActions = useRef(new Map<string, AbortController>());
+    const submittedCancellations = useRef(new Set<string>());
+    useEffect(() => {
+        const current = lifecycle.current;
+        const pending = pendingActions.current;
+        current.active = true;
+        return () => {
+            current.active = false;
+            current.generation++;
+            pending.forEach(controller => controller.abort());
+            pending.clear();
+        };
+    }, []);
 
     const [user, setUser] = useState<any>(() => {
         // ─── SECURE STORAGE FIX ───
@@ -33,20 +49,23 @@ export default function Appointments() {
     const [lastEvaluatedKey, setLastEvaluatedKey] = useState<any>(null);
     const [isLoadingMore, setIsLoadingMore] = useState(false);
 
-    const fetchAppointments = async (patientId: string, isLoadMore = false) => {
+    const fetchAppointments = async (patientId: string, isLoadMore = false, signal?: AbortSignal) => {
         try {
+            signal?.throwIfAborted();
             if (isLoadMore) setIsLoadingMore(true);
             else setLoadingAppointments(true);
 
             let url = `/appointments?patientId=${patientId}`;
             if (isLoadMore && lastEvaluatedKey) url += `&startKey=${encodeURIComponent(JSON.stringify(lastEvaluatedKey))}`;
 
-            const data: any = await api.get(url);
+            const data: any = await api.get(url, { signal });
+            signal?.throwIfAborted();
             const newList = Array.isArray(data) ? data : (data.existingBookings ||[]);
 
             setAppointments(prev => isLoadMore ? [...prev, ...newList] : newList);
             setLastEvaluatedKey(data.lastEvaluatedKey || null);
         } catch (error: any) {
+            if (signal?.aborted) return;
             // 🟢 FIX: ONLY kick the user out if it is specifically a 401 Unauthorized (Expired Token)
             if (error?.message?.includes('401')) {
                 // ─── SECURE STORAGE FIX ───
@@ -57,8 +76,10 @@ export default function Appointments() {
                 toast({ variant: "destructive", title: "Appointments Error", description: error?.message || "Failed to load appointments" });
             }
         } finally {
-            setLoadingAppointments(false);
-            setIsLoadingMore(false);
+            if (!signal?.aborted) {
+                setLoadingAppointments(false);
+                setIsLoadingMore(false);
+            }
         }
     };
 
@@ -103,21 +124,52 @@ export default function Appointments() {
     }, [navigate]);
 
     const handleCancel = async (appointmentId: string) => {
-        if (!confirm("Are you sure? This will refund your payment.")) return;
+        const key = appointmentId;
+        if (!lifecycle.current.active || pendingActions.current.has(key)) return;
+        if (submittedCancellations.current.has(appointmentId)) {
+            toast({ variant: "destructive", title: actionContent.errorTitle, description: actionContent.cancelFailed });
+            return;
+        }
+        if (!confirm(actionContent.cancelConfirmation)) return;
+        const generation = lifecycle.current.generation;
+        const controller = new AbortController();
+        pendingActions.current.set(key, controller);
+        // A lost acknowledgement can conceal a completed refund request. Never replay it here.
+        submittedCancellations.current.add(appointmentId);
         try {
-            await api.post('/appointments/cancel', { appointmentId });
-            toast({ title: "Cancelled", description: "Appointment cancelled and refunded." });
-            fetchAppointments(user.id);
-        } catch (e) {
-            toast({ variant: "destructive", title: "Error", description: "Could not cancel." });
+            await api.post(appointmentRouting.cancel, { appointmentId }, { signal: controller.signal });
+            if (!lifecycle.current.active || generation !== lifecycle.current.generation) return;
+            toast({ title: actionContent.cancelledTitle, description: actionContent.cancelledDescription });
+            await fetchAppointments(user.id, false, controller.signal);
+        } catch {
+            if (lifecycle.current.active && generation === lifecycle.current.generation)
+                toast({ variant: "destructive", title: actionContent.errorTitle, description: actionContent.cancelFailed });
+        } finally {
+            if (generation === lifecycle.current.generation) pendingActions.current.delete(key);
         }
     };
 
-    const handleJoin = async (apt: any) => {
+    const handleJoin = async (apt: { appointmentId: string }) => {
+        const key = apt.appointmentId;
+        if (!lifecycle.current.active || pendingActions.current.has(key)) return;
+        if (submittedCancellations.current.has(apt.appointmentId)) {
+            toast({ variant: "destructive", title: actionContent.errorTitle, description: actionContent.cancelFailed });
+            return;
+        }
+        const generation = lifecycle.current.generation;
+        const controller = new AbortController();
+        pendingActions.current.set(key, controller);
         try {
-            await api.put('/appointments', { appointmentId: apt.appointmentId, status: apt.status, patientArrived: true });
-        } catch (e) { console.error("Check-in failed, proceeding anyway", e); }
-        navigate(`/consultation?appointmentId=${apt.appointmentId}&patientName=${user?.name}`);
+            await api.put(appointmentRouting.checkIn, { appointmentId: apt.appointmentId, patientArrived: true }, { signal: controller.signal });
+            if (!lifecycle.current.active || generation !== lifecycle.current.generation) return;
+            const query = new URLSearchParams({ appointmentId: apt.appointmentId });
+            navigate(`${appointmentRouting.consultation}?${query}`);
+        } catch {
+            if (lifecycle.current.active && generation === lifecycle.current.generation)
+                toast({ variant: "destructive", title: actionContent.errorTitle, description: actionContent.checkInFailed });
+        } finally {
+            if (generation === lifecycle.current.generation) pendingActions.current.delete(key);
+        }
     };
 
     const handleReceipt = async (appointmentId: string) => {
