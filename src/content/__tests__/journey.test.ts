@@ -2,6 +2,39 @@ import { describe, it, expect } from "vitest";
 import { journeySchema, journey } from "../journey";
 
 describe("connected-care content boundary", () => {
+  it.each(["coordinationArticleSlug", "preparationArticleSlug"] as const)(
+    "accepts content-only article renaming for %s",
+    (field) => {
+      const oldSlug = journey.workspace[field];
+      const result = journeySchema.safeParse({
+        ...journey,
+        workspace: { ...journey.workspace, [field]: "renamed-article" },
+        articles: journey.articles.map(article => article.slug === oldSlug
+          ? { ...article, slug: "renamed-article" } : article),
+      });
+      expect(result.success).toBe(true);
+      if (result.success) expect(result.data.workspace[field]).toBe("renamed-article");
+    },
+  );
+  it.each(["coordinationArticleSlug", "preparationArticleSlug"])(
+    "rejects absent or wrong-kind workspace reference %s",
+    (field) => {
+      for (const target of ["missing-article", journey.articles.find(article => article.kind === "blog")!.slug]) {
+        expect(journeySchema.safeParse({
+          ...journey,
+          workspace: { ...journey.workspace, [field]: target },
+        }).success).toBe(false);
+      }
+    },
+  );
+  it.each(["care-team-coordination", "prepare-for-your-visit"])(
+    "rejects deleting referenced article %s",
+    (slug) => {
+      expect(journeySchema.safeParse({
+        ...journey, articles: journey.articles.filter(article => article.slug !== slug),
+      }).success).toBe(false);
+    },
+  );
   it("contains all public and role destinations", () => {
     expect(journey.explore.roles.map((role) => role.id)).toEqual([
       "patient",

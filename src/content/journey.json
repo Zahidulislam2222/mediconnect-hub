@@ -390,6 +390,8 @@
     "note": "I would like to understand the next step and have time to ask questions."
   },
   "workspace": {
+    "coordinationArticleSlug": "care-team-coordination",
+    "preparationArticleSlug": "prepare-for-your-visit",
     "eyebrow": "A connected-care demonstration",
     "greeting": "Welcome to your space.",
     "notice": "Local demo only. Changes reset on reload. No booking, message, or consultation is sent.",

@@ -201,20 +201,20 @@ export default function Workspace({
                 <h2>
                   {
                     c.articles.find(
-                      (item) => item.slug === "care-team-coordination",
+                      (item) => item.slug === c.workspace.coordinationArticleSlug,
                     )!.title
                   }
                 </h2>
                 <p>
                   {
                     c.articles.find(
-                      (item) => item.slug === "care-team-coordination",
+                      (item) => item.slug === c.workspace.coordinationArticleSlug,
                     )!.summary
                   }
                 </p>
                 <Link
                   className="jy-text-link"
-                  to={`${routes.knowledge}/care-team-coordination`}
+                  to={`${routes.knowledge}/${c.workspace.coordinationArticleSlug}`}
                 >
                   {c.library.read}
                   <ArrowUpRight />
@@ -260,7 +260,7 @@ export default function Workspace({
                 <p>{c.workspace.followupBody}</p>
                 <Link
                   className="jy-text-link"
-                  to={`${routes.knowledge}/prepare-for-your-visit`}
+                  to={`${routes.knowledge}/${c.workspace.preparationArticleSlug}`}
                 >
                   {c.library.read}
                   <ArrowUpRight />

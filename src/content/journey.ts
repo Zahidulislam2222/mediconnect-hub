@@ -179,6 +179,8 @@ export const journeySchema = z
       })
       .refine((value) => value.slots.includes(value.defaultSlot)),
     workspace: copy([
+      "coordinationArticleSlug",
+      "preparationArticleSlug",
       "eyebrow",
       "greeting",
       "notice",
@@ -230,6 +232,15 @@ export const journeySchema = z
     ]).extend({ minimumPasswordLength: z.number().int().min(8).max(64) }),
   })
   .superRefine((data, ctx) => {
+    for (const field of ["coordinationArticleSlug", "preparationArticleSlug"] as const) {
+      if (!data.articles.some(article => article.slug === data.workspace[field] && article.kind === "knowledge")) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["workspace", field],
+          message: "Workspace reference must identify an existing knowledge article",
+        });
+      }
+    }
     if (data.media.finished && !data.media.film)
       ctx.addIssue({
         code: "custom",

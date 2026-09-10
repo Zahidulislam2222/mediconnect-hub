@@ -1,4 +1,18 @@
 import { expect, test } from '@playwright/test';
+import content from '../src/content/journey.json' with { type: 'json' };
+import routing from '../src/config/journey-routing.json' with { type: 'json' };
+
+for (const role of ['staff', 'patient', 'doctor']) {
+  test(`${role} demo opens its configured knowledge article`, async ({ page }) => {
+    const slug = role === 'staff' ? content.workspace.coordinationArticleSlug
+      : content.workspace.preparationArticleSlug;
+    const article = content.articles.find(item => item.slug === slug)!;
+    await page.goto(`${routing.application.workspace}/${role}`);
+    await page.getByRole('link', { name: content.library.read, exact: true }).click();
+    await expect(page).toHaveURL(`${routing.application.knowledge}/${slug}`);
+    await expect(page.getByRole('heading', { level: 1 })).toHaveText(article.title);
+  });
+}
 
 test.beforeEach(async ({ page }) => {
   await page.route('**/*', route => new URL(route.request().url()).hostname === '127.0.0.1'
