@@ -10,6 +10,7 @@ struct JourneyChapter: Decodable, Identifiable {
 
 struct NativeJourney {
     let editorial: NativeEditorial
+    let demo: NativeDemo
     let brand: String
     let notice: String
     let hero: JourneyChapter
@@ -22,7 +23,9 @@ struct NativeJourney {
     let chapters: [JourneyChapter]
 
     init(data: Data) throws {
-        editorial = try NativeEditorial(data: data)
+        let parsedEditorial = try NativeEditorial(data: data)
+        editorial = parsedEditorial
+        demo = try NativeDemo(data: data, editorial: parsedEditorial)
         struct Hero: Decodable { let eyebrow: String; let title: String; let emphasis: String; let body: String; let illustration: String }
         struct Navigation: Decodable { let login: String; let home: String }
         struct Media: Decodable { let poster: String; let homePoster: String; let alt: String }

@@ -6,6 +6,7 @@ data class JourneyChapter(val id: String, val label: String, val title: String, 
 
 class NativeJourney(document: JSONObject) {
     val editorial = NativeEditorial(document)
+    val demo = NativeDemo(document, editorial)
     private fun text(objectValue: JSONObject, key: String): String = (objectValue.get(key) as? String)
         ?.also { require(it.isNotBlank()) } ?: throw IllegalArgumentException("Invalid journey content")
     val brand = text(document, "brand")

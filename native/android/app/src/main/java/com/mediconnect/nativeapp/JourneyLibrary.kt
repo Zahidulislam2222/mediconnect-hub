@@ -18,21 +18,22 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 
 @Composable
-fun JourneyLibrary(journey: NativeJourney, kind: EditorialKind, onHome: () -> Unit) {
+fun JourneyLibrary(journey: NativeJourney, kind: EditorialKind, initialSlug: String? = null, onHome: () -> Unit) {
     val editorial = journey.editorial
     val copy = editorial.copy(kind)
     var query by rememberSaveable(kind) { mutableStateOf("") }
     var category by rememberSaveable(kind) { mutableStateOf<String?>(null) }
-    var slug by rememberSaveable(kind) { mutableStateOf<String?>(null) }
+    var slug by rememberSaveable(kind, initialSlug) { mutableStateOf(initialSlug) }
     val listState = rememberLazyListState()
     val focus = LocalFocusManager.current
-    BackHandler { if (slug != null) slug = null else onHome() }
+    val back: () -> Unit = { if (initialSlug != null || slug == null) onHome() else slug = null }
+    BackHandler(onBack = back)
     Scaffold { inset ->
         if (slug != null) {
             val article = editorial.article(kind, slug!!)
             LazyColumn(Modifier.fillMaxSize().padding(inset), contentPadding = PaddingValues(24.dp),
                 verticalArrangement = Arrangement.spacedBy(20.dp)) {
-                item { TextButton(onClick = { slug = null }) { Text(copy.back) } }
+                item { TextButton(onClick = back) { Text(copy.back) } }
                 if (article == null) item { Text(editorial.notFound) }
                 else {
                     item { Text("${article.category} · ${article.minutes} ${editorial.minutesRead}") }
@@ -46,7 +47,7 @@ fun JourneyLibrary(journey: NativeJourney, kind: EditorialKind, onHome: () -> Un
                         }
                     }
                     item { Text(journey.brand) }
-                    item { TextButton(onClick = { slug = null }) { Text(copy.back) } }
+                    item { TextButton(onClick = back) { Text(copy.back) } }
                 }
             }
         } else {

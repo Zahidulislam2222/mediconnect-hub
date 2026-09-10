@@ -38,6 +38,17 @@ handler shows an error while keeping the page readable. Opening or closing a pol
 accept registration consent. Native policy changes require their own regional build and UI gates;
 the historical verification results here do not establish that new code's iOS behavior.
 
+The public welcome also offers the canonical patient, clinician and clinic-team demo perspectives.
+They share fictional sample scheduling, readiness and a locally saved note. Only the patient
+perspective edits that note; the clinician reads it, and the clinic-team screen omits it. Guide
+links open the existing native article reader. Reset restores the sample defaults while keeping
+the selected perspective. In-memory demo state survives role, guide and home navigation but
+clears when the app is recreated or relaunched; it is not saved to device storage or sent anywhere.
+The consultation preview uses a packaged poster and illustrative controls, with no microphone,
+camera or calling API. This public demo grants no authenticated role or clinical capability.
+Its new native code requires separate regional build, behavioral and review evidence; earlier
+entry/editorial/policy results do not establish the demo candidate's iOS behavior.
+
 ## Configuration
 
 `shared/mobile-config.example.json` describes public settings. Copy it to the ignored

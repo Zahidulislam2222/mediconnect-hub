@@ -15,9 +15,18 @@ struct JourneyWelcome: View {
     let journey: NativeJourney
     let content: MobileContent
     let signIn: () -> Void
+    @State private var demo: DemoState
+    @State private var demoPresented = false
+    init(journey: NativeJourney, content: MobileContent, signIn: @escaping () -> Void) {
+        self.journey = journey; self.content = content; self.signIn = signIn
+        _demo = State(initialValue: journey.demo.initialState())
+    }
     var body: some View {
         NavigationStack {
             home.navigationTitle(journey.home).navigationBarTitleDisplayMode(.inline)
+                .navigationDestination(isPresented: $demoPresented) {
+                    JourneyDemoWorkspace(journey: journey, content: content, state: $demo)
+                }
         }.tint(content.color("accent"))
     }
     private var home: some View {
@@ -40,6 +49,18 @@ struct JourneyWelcome: View {
                 }
                 poster(journey.homePoster)
                 Text(journey.notice).font(.footnote).fixedSize(horizontal: false, vertical: true)
+                Text(journey.demo.eyebrow).font(.subheadline)
+                Text(journey.demo.title).font(.title2).accessibilityAddTraits(.isHeader)
+                Text(journey.demo.body)
+                ForEach(journey.demo.roles) { role in
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text(role.number + " · " + role.label)
+                        Text(role.title).font(.title2)
+                        Text(role.body)
+                        Button(role.action) { demo.role = role.id; demoPresented = true }.buttonStyle(.borderedProminent)
+                    }.padding(24).frame(maxWidth: .infinity, alignment: .leading)
+                        .background(content.color("surface"), in: RoundedRectangle(cornerRadius: 24))
+                }
                 Button(journey.login, action: signIn).buttonStyle(.borderedProminent)
             }
             .padding(24).frame(maxWidth: .infinity, alignment: .leading)

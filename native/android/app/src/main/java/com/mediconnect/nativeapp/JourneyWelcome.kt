@@ -36,13 +36,18 @@ import androidx.compose.ui.unit.dp
 @Composable
 fun JourneyWelcome(journey: NativeJourney, onSignIn: () -> Unit) {
     var library by rememberSaveable { mutableStateOf<EditorialKind?>(null) }
+    var demoVisible by remember { mutableStateOf(false) }
+    var demoState by remember(journey) { mutableStateOf(journey.demo.initialState()) }
     val kind = library
-    if (kind != null) JourneyLibrary(journey, kind) { library = null }
-    else JourneyHome(journey, onSignIn) { library = it }
+    if (demoVisible) JourneyDemoWorkspace(journey, demoState, { demoState = it }) { demoVisible = false }
+    else if (kind != null) JourneyLibrary(journey, kind) { library = null }
+    else JourneyHome(journey, onSignIn, { library = it }) { role ->
+        demoState = demoState.copy(role = role); demoVisible = true
+    }
 }
 
 @Composable
-private fun JourneyHome(journey: NativeJourney, onSignIn: () -> Unit, onLibrary: (EditorialKind) -> Unit) {
+private fun JourneyHome(journey: NativeJourney, onSignIn: () -> Unit, onLibrary: (EditorialKind) -> Unit, onDemo: (DemoRole) -> Unit) {
     Scaffold { inset ->
         LazyColumn(Modifier.fillMaxSize().padding(inset), contentPadding = PaddingValues(24.dp),
             verticalArrangement = Arrangement.spacedBy(24.dp)) {
@@ -64,6 +69,23 @@ private fun JourneyHome(journey: NativeJourney, onSignIn: () -> Unit, onLibrary:
             }
             item { JourneyPoster(journey.homePoster, journey.imageDescription) }
             item { Text(journey.notice, style = MaterialTheme.typography.bodyMedium) }
+            item {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(journey.demo.eyebrow)
+                    Text(journey.demo.title, style = MaterialTheme.typography.headlineSmall)
+                    Text(journey.demo.body)
+                }
+            }
+            items(journey.demo.roles, key = { it.id.wire }) { role ->
+                Card(Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Text(role.number + " · " + role.label)
+                        Text(role.title, style = MaterialTheme.typography.titleLarge)
+                        Text(role.body)
+                        Button(onClick = { onDemo(role.id) }) { Text(role.action) }
+                    }
+                }
+            }
             item { Button(onClick = onSignIn) { Text(journey.login) } }
         }
     }
@@ -80,7 +102,7 @@ private fun JourneyCopy(chapter: JourneyChapter) {
 }
 
 @Composable
-private fun JourneyPoster(name: String, description: String) {
+fun JourneyPoster(name: String, description: String) {
     val context = LocalContext.current
     val bitmap = remember(name) { runCatching {
         context.assets.open(name).use { BitmapFactory.decodeStream(it)?.asImageBitmap() }
