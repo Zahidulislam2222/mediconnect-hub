@@ -22,6 +22,7 @@ import { Button } from "@/components/ui/button";
 import { PublicHeader } from "@/components/PublicHeader";
 import {
   motion,
+  type Variants,
   useScroll,
   useTransform,
   useInView,
@@ -107,7 +108,7 @@ function PlatformMockup() {
   const ref = useRef<HTMLDivElement>(null);
   const isInView = useInView(ref, { once: true, margin: "-50px" });
 
-  const cardVariants = {
+  const cardVariants: Variants = {
     hidden: { opacity: 0, y: 40, scale: 0.95 },
     visible: (i: number) => ({
       opacity: 1,

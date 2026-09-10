@@ -1,0 +1,4 @@
+{
+  "outcomeUnknown": "The server may have completed this request, but its outcome could not be confirmed. Check the current record before trying again.",
+  "requestTimeout": "The request timed out before its full response was received."
+}

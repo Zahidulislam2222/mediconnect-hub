@@ -1,0 +1,8 @@
+{
+  "loading": "Checking your session…",
+  "unknownName": "User",
+  "loginPath": "/auth",
+  "defaultRole": "patient",
+  "groups": { "patient": "patient", "patients": "patient", "doctor": "doctor", "doctors": "doctor", "practitioner": "doctor", "admin": "admin", "staff": "staff" },
+  "home": { "patient": "/patient-dashboard", "doctor": "/doctor-dashboard", "admin": "/admin/dashboard", "staff": "/staff/dashboard" }
+}

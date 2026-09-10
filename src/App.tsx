@@ -8,7 +8,7 @@ import { useEffect, useState } from "react";
 import { PushNotifications } from '@capacitor/push-notifications';
 import { api } from "./lib/api";
 import { signOut } from 'aws-amplify/auth';
-import { isAuthenticated, clearAllSensitive, getUser } from "./lib/secure-storage";
+import { clearAllSensitive, getUser } from "./lib/secure-storage";
 
 // Page Imports
 import Index from "./pages/Index";
@@ -55,6 +55,7 @@ import StaffDirectory from "./pages/staff/StaffDirectory";
 
 // Context Provider
 import { CheckoutProvider } from "./context/CheckoutContext";
+import { VerifiedSession, VerifiedRole as RoleGuard } from "./context/VerifiedSession";
 import { SubscriptionProvider } from "./context/SubscriptionContext";
 import { ChatWidget } from "./components/chat/ChatWidget";
 
@@ -248,37 +249,18 @@ const HipaaGuard = ({ children }: { children: React.ReactNode }) => {
 // =========================================================================
 // 🔒 ROLE GUARD: Prevents cross-role access (e.g., patient accessing admin)
 // =========================================================================
-const RoleGuard = ({ allowedRoles, children }: { allowedRoles: string[]; children: React.ReactNode }) => {
-  const user = getUser();
-  const role = user?.role?.toLowerCase() || '';
-  if (!allowedRoles.includes(role)) {
-    const fallback = role === 'doctor' ? '/doctor-dashboard'
-                   : role === 'admin' ? '/admin/dashboard'
-                   : role === 'staff' ? '/staff/dashboard'
-                   : '/patient-dashboard';
-    return <Navigate to={fallback} replace />;
-  }
-  return <>{children}</>;
-};
-
 // =========================================================================
 // 🔒 ROUTE PROTECTOR: Blocks unauthenticated URL guessing + HIPAA session
 // =========================================================================
-const ProtectedRoute = () => {
-  if (!isAuthenticated()) {
-    return <Navigate to="/auth" replace />;
-  }
-
-  return (
+const ProtectedRoute = () => (
+  <VerifiedSession>
     <CheckoutProvider>
       <SubscriptionProvider>
-        <HipaaGuard>
-          <Outlet />
-        </HipaaGuard>
+        <HipaaGuard><Outlet /></HipaaGuard>
       </SubscriptionProvider>
     </CheckoutProvider>
-  );
-};
+  </VerifiedSession>
+);
 
 // =========================================================================
 // 🚦 MAIN ROUTER CONTENT

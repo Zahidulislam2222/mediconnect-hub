@@ -1,0 +1,9 @@
+{
+  "checkIn": "/appointments",
+  "cancel": "/appointments/cancel",
+  "consultation": "/consultation",
+  "book": "/appointments",
+  "availability": "/appointments",
+  "doctors": "/doctors",
+  "schedule": "/schedule"
+}

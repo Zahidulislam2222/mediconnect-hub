@@ -4,7 +4,7 @@
  * Tests the service URL routing logic that directs requests to the correct
  * backend microservice based on URL prefix. Also verifies region header inclusion.
  */
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 
 // ─── Mock AWS Amplify ───────────────────────────────────────────────────
 vi.mock('aws-amplify/auth', () => ({
@@ -22,6 +22,8 @@ vi.mock('../secure-storage', () => ({
 
 // ─── Stub VITE env vars for service URLs ────────────────────────────────
 const SERVICE_URLS = {
+  VITE_API_PRIMARY_TIMEOUT_MS: '25',
+  VITE_API_BACKUP_TIMEOUT_MS: '25',
   VITE_PATIENT_SERVICE_URL_US: 'https://patient.us.example.com',
   VITE_PATIENT_SERVICE_URL_EU: 'https://patient.eu.example.com',
   VITE_PATIENT_SERVICE_URL_US_BACKUP: 'https://patient.us.backup.example.com',
@@ -46,7 +48,7 @@ const SERVICE_URLS = {
   VITE_STAFF_SERVICE_URL_EU: 'https://staff.eu.example.com',
   VITE_STAFF_SERVICE_URL_US_BACKUP: 'https://staff.us.backup.example.com',
   VITE_STAFF_SERVICE_URL_EU_BACKUP: 'https://staff.eu.backup.example.com',
-  VITE_STORAGE_CIPHER_KEY: 'test-cipher-key-for-api-tests-32char',
+  VITE_STORAGE_CIPHER_KEY: 'test-key',
 };
 
 for (const [key, value] of Object.entries(SERVICE_URLS)) {
@@ -320,6 +322,39 @@ describe('API Failover', () => {
     localStorage.setItem('userRegion', 'US');
   });
 
+  it.each(['post', 'put', 'delete'] as const)('never replays %s on an ambiguous server error', async (method) => {
+    mockFetch.mockResolvedValue({ ok: false, status: 503, json: async () => ({}) });
+    await expect(api[method]('/appointments', { id: 'test-appointment' })).rejects.toThrow();
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it.each(['post', 'put', 'delete'] as const)('never replays %s after a transport failure', async (method) => {
+    mockFetch.mockRejectedValue(new TypeError('test network failure'));
+    await expect(api[method]('/appointments', { id: 'test-appointment' })).rejects.toThrow();
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([400, 401, 403, 404, 409, 429])('does not fail over GET on HTTP %s', async (status) => {
+    mockFetch.mockResolvedValue({ ok: false, status, json: async () => ({}) });
+    await expect(api.get('/appointments')).rejects.toThrow();
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not replay a successful response with malformed JSON', async () => {
+    mockFetch.mockResolvedValue({ ok: true, status: 200, json: async () => { throw new SyntaxError('test invalid JSON'); } });
+    await expect(api.get('/appointments')).rejects.toThrow();
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('fails over GET once without crossing the selected region', async () => {
+    localStorage.setItem('userRegion', 'EU');
+    mockFetch.mockRejectedValueOnce(new TypeError('test network failure'))
+      .mockResolvedValueOnce({ ok: true, status: 200, json: async () => ({ source: 'backup' }) });
+    await expect(api.get('/appointments')).resolves.toEqual({ source: 'backup' });
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+    expect(mockFetch.mock.calls[1][0]).toBe('https://booking.eu.backup.example.com/appointments');
+  });
+
   it('fails over to backup on 5xx response', async () => {
     mockFetch
       .mockResolvedValueOnce({
@@ -338,5 +373,52 @@ describe('API Failover', () => {
     // Should have made 2 calls: primary (failed) + backup
     expect(mockFetch).toHaveBeenCalledTimes(2);
     expect(mockFetch.mock.calls[1][0]).toBe('https://patient.us.backup.example.com/patients/123');
+  });
+});
+
+describe('Full response deadlines and uncertain writes', () => {
+  beforeEach(() => {
+    mockFetch.mockReset();
+    localStorage.setItem('userRegion', 'EU');
+    vi.useFakeTimers();
+  });
+  afterEach(() => { vi.useRealTimers(); });
+
+  it('times out a stalled successful body and permits a same-region read fallback', async () => {
+    mockFetch.mockResolvedValueOnce({ ok: true, status: 200, json: () => new Promise(() => {}) })
+      .mockResolvedValueOnce({ ok: true, status: 200, json: async () => ({ source: 'backup' }) });
+    let result: unknown;
+    const request = api.get('/appointments').then(value => { result = value; });
+    await vi.advanceTimersByTimeAsync(100);
+    expect(result).toEqual({ source: 'backup' });
+    await request;
+    expect(mockFetch.mock.calls[1][0]).toBe('https://booking.eu.backup.example.com/appointments');
+    expect(mockFetch.mock.calls[0][1].signal.aborted).toBe(true);
+  });
+
+  it('settles a stalled write body as outcome unknown without replay', async () => {
+    mockFetch.mockResolvedValue({ ok: true, status: 200, json: () => new Promise(() => {}) });
+    let failure: unknown;
+    const request = api.post('/billing/pay', { billId: 'test-bill' }).catch(error => { failure = error; });
+    await vi.advanceTimersByTimeAsync(100);
+    expect(failure).toMatchObject({ code: 'OUTCOME_UNKNOWN' });
+    await request;
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not bypass a known authorization denial when its error body stalls', async () => {
+    mockFetch.mockResolvedValue({ ok: false, status: 403, json: () => new Promise(() => {}) });
+    let failure: unknown;
+    const request = api.get('/appointments').catch(error => { failure = error; });
+    await vi.advanceTimersByTimeAsync(100);
+    expect(failure).toBeInstanceOf(Error);
+    await request;
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('labels an unreadable write acknowledgement as outcome unknown', async () => {
+    mockFetch.mockResolvedValue({ ok: true, status: 200, json: async () => { throw new SyntaxError('test-invalid-json'); } });
+    await expect(api.post('/billing/pay', { billId: 'test-bill' })).rejects.toMatchObject({ code: 'OUTCOME_UNKNOWN' });
+    expect(mockFetch).toHaveBeenCalledTimes(1);
   });
 });

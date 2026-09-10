@@ -16,7 +16,7 @@ test.describe('Auth Page', () => {
     await page.goto('/auth');
 
     // The region selector uses Radix Tabs with US and EU options
-    const regionSection = page.getByText('Region');
+    const regionSection = page.getByText('Region', { exact: true });
     await expect(regionSection).toBeVisible();
 
     const usTab = page.getByRole('tab', { name: /US/i });
