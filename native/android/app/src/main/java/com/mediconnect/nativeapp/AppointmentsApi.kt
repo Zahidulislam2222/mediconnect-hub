@@ -44,9 +44,9 @@ object AppointmentDecoder {
 }
 
 class AppointmentsApi(config: MobileConfiguration, private val contract: MobileContract,
-                      sessions: SessionProvider, client: OkHttpClient) : CancellationService {
+                      sessions: SessionProvider, client: OkHttpClient) : WorkspaceAppointments {
     private val transport = NativeApi(config, sessions, client)
-    suspend fun load(identity: Identity, cursor: String? = null): AppointmentPage {
+    override suspend fun load(identity: Identity, cursor: String?): AppointmentPage {
         val subjectKey = contract.appointmentQueries[identity.role] ?: throw ApiFailure(403)
         val query = mutableMapOf(subjectKey to identity.subject)
         if (cursor != null) query["startKey"] = cursor

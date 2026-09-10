@@ -23,23 +23,26 @@ final class WorkspaceModel: ObservableObject {
     let recovery: PasswordRecovery
     let profile: ProfileEnrollment
     private var profileObservation: AnyCancellable?
-    private let auth: CognitoSession?
-    private let api: AppointmentsAPI?
-    private var operation: Task<Void, Never>?
+    private let auth: WorkspaceSession?
+    private let api: WorkspaceAppointments?
+    private let signInLatch: ExplicitSignInLatch
+    private(set) var operation: Task<Void, Never>?
     private var expiry: Task<Void, Never>?
     private var generation = 0
     var configured: Bool { auth != nil && api != nil }
 
     // A non-sensitive logout latch. Credentials remain managed by Amplify/Keychain.
     private var requiresExplicitSignIn: Bool {
-        get { UserDefaults.standard.bool(forKey: "requires-explicit-sign-in") }
-        set { UserDefaults.standard.set(newValue, forKey: "requires-explicit-sign-in") }
+        get { signInLatch.required }
+        set { signInLatch.required = newValue }
     }
 
-    init() {
-        residency = Bundle.main.object(forInfoDictionaryKey: "MediConnectResidency") as? String ?? ""
-        content = try? MobileContent(data: BundledAssets.data("mobile-content"))
-        policies = try? MobilePolicies(legal: BundledAssets.data("legal"), consent: BundledAssets.data("consent"))
+    convenience init() {
+        let residency = Bundle.main.object(forInfoDictionaryKey: "MediConnectResidency") as? String ?? ""
+        let content = try? MobileContent(data: BundledAssets.data("mobile-content"))
+        let policies = try? MobilePolicies(legal: BundledAssets.data("legal"), consent: BundledAssets.data("consent"))
+        var auth: WorkspaceSession?
+        var api: WorkspaceAppointments?
         var profileService: ProfileAPI?
         var cancellationService: AppointmentCancellationAPI?
         var cancellationPolicy: CancellationContract?
@@ -54,6 +57,17 @@ final class WorkspaceModel: ObservableObject {
             cancellationService = AppointmentCancellationAPI(appointments: appointments, transport: NativeAPI(config: config), contract: contract, fetch: { try await session.fetch() })
             cancellationPolicy = contract.cancellation
         } catch { auth = nil; api = nil }
+        self.init(residency: residency, content: content, policies: policies, auth: auth, api: api,
+                  profileService: profileService, cancellationService: cancellationService,
+                  cancellationPolicy: cancellationPolicy, signInLatch: StoredSignInLatch(defaults: .standard))
+    }
+
+    // Tests inject services into the same production model without configuring the SDK.
+    init(residency: String, content: MobileContent?, policies: MobilePolicies?, auth: WorkspaceSession?,
+         api: WorkspaceAppointments?, profileService: ProfileService?, cancellationService: CancellationService?,
+         cancellationPolicy: CancellationContract?, signInLatch: ExplicitSignInLatch) {
+        self.residency = residency; self.content = content; self.policies = policies
+        self.auth = auth; self.api = api; self.signInLatch = signInLatch
         cancellation = AppointmentCancellation(service: cancellationService, policy: cancellationPolicy)
         profile = ProfileEnrollment(service: profileService, policyVersion: policies?.policyVersion ?? "")
         recovery = PasswordRecovery(service: auth)

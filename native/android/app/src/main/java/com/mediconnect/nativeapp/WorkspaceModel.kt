@@ -7,6 +7,9 @@ import com.amplifyframework.auth.result.AuthSignInResult
 import com.amplifyframework.auth.MFAType
 import com.amplifyframework.auth.result.step.AuthSignInStep
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -28,15 +31,19 @@ data class WorkspaceState(
     val visible: Boolean = true,
 )
 
-class WorkspaceModel(application: Application) : AndroidViewModel(application) {
+class WorkspaceModel @JvmOverloads constructor(
+    application: Application,
+    private val runtime: WorkspaceServices? = (application as MediConnectApplication).runtime.getOrNull(),
+    injectedScope: CoroutineScope? = null,
+) : AndroidViewModel(application) {
     val content = (application as MediConnectApplication).content
     val policies = (application as MediConnectApplication).policies
-    private val runtime = (application as MediConnectApplication).runtime.getOrNull()
+    private val scope = injectedScope ?: viewModelScope
     val configured = runtime != null
-    val cancellation = AppointmentCancellation(runtime?.appointments, runtime?.contract?.cancellation, viewModelScope)
-    val recovery = PasswordRecovery(runtime?.sessions, viewModelScope)
-    val profile = ProfileEnrollment(runtime?.profiles, policies.policyVersion, viewModelScope)
-    val registration = AccountRegistration(runtime?.sessions, viewModelScope)
+    val cancellation = AppointmentCancellation(runtime?.appointments, runtime?.contract?.cancellation, scope)
+    val recovery = PasswordRecovery(runtime?.sessions, scope)
+    val profile = ProfileEnrollment(runtime?.profiles, policies.policyVersion, scope)
+    val registration = AccountRegistration(runtime?.sessions, scope)
     private val mutable = MutableStateFlow(WorkspaceState())
     val state = mutable.asStateFlow()
     private var operation: Job? = null
@@ -44,7 +51,7 @@ class WorkspaceModel(application: Application) : AndroidViewModel(application) {
     private var generation = 0L
 
     init {
-        viewModelScope.launch {
+        scope.launch {
             profile.state.collect { value ->
                 val identity = mutable.value.identity
                 if (value.step == ProfileStep.READY && identity != null && value.profile?.subject == identity.subject) refresh()
@@ -99,7 +106,9 @@ class WorkspaceModel(application: Application) : AndroidViewModel(application) {
         runtime.requiresExplicitSignIn = true
         runOperation("signInFailed") {
             runtime.sessions.signOut()
+            currentCoroutineContext().ensureActive()
             val result = runtime.sessions.signIn(email.trim(), password)
+            currentCoroutineContext().ensureActive()
             if (result.nextStep.signInStep == AuthSignInStep.CONFIRM_SIGN_UP) registration.resumeConfirmation(email)
             else completeSignIn(result)
         }
@@ -115,9 +124,11 @@ class WorkspaceModel(application: Application) : AndroidViewModel(application) {
     }
 
     private suspend fun completeSignIn(result: AuthSignInResult) {
+        currentCoroutineContext().ensureActive()
         val runtime = runtime ?: return
         if (result.isSignedIn) {
             val identity = runtime.sessions.fetch().identity
+            currentCoroutineContext().ensureActive()
             runtime.requiresExplicitSignIn = false
             accept(identity)
         } else {
@@ -131,10 +142,11 @@ class WorkspaceModel(application: Application) : AndroidViewModel(application) {
     }
 
     private suspend fun accept(identity: Identity) {
+        currentCoroutineContext().ensureActive()
         val runtime = runtime ?: return
         mutable.value = WorkspaceState(identity = identity, busy = true)
         expiry?.cancel()
-        expiry = viewModelScope.launch {
+        expiry = scope.launch {
             delay(Duration.between(Instant.now(), identity.expiresAt).toMillis().coerceAtLeast(0))
             reset()
             mutable.value = mutable.value.copy(error = "sessionExpired")
@@ -150,6 +162,7 @@ class WorkspaceModel(application: Application) : AndroidViewModel(application) {
         if (current.busy || profile.state.value.step != ProfileStep.READY || (more && current.next == null)) return
         runOperation("unavailable") {
             val page = runtime.appointments.load(identity, if (more) current.next else null)
+            currentCoroutineContext().ensureActive()
             mutable.value = mutable.value.copy(
                 appointments = (if (more) current.appointments + page.items else page.items).distinctBy { it.id },
                 next = page.next,
@@ -182,7 +195,7 @@ class WorkspaceModel(application: Application) : AndroidViewModel(application) {
         operation?.cancel()
         val current = ++generation
         mutable.value = mutable.value.copy(busy = true, error = null)
-        operation = viewModelScope.launch {
+        operation = scope.launch {
             try { block() }
             catch (cancelled: CancellationException) { throw cancelled }
             catch (failure: Exception) {

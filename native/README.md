@@ -5,7 +5,7 @@ existing Capacitor project remain separate and are preserved during migration.
 
 This is an **incomplete native implementation**. The first slice covers sign-in, code confirmation,
 password recovery, registration, canonical policy viewers, own-profile setup, secure password/new-password
-challenges, SDK-authorized MFA method selection and email setup, session handling, patient/doctor appointment lists and
+challenges, SDK-authorized MFA method selection, email and authenticator setup, session handling, patient/doctor appointment lists and
 patient cancellation with confirmation and status readback. Staff/admin workspaces,
 booking/rescheduling, billing, messaging, consultations, records and other web
 features still need native implementation. A successful build does not establish feature parity,
@@ -59,23 +59,23 @@ gates on a standard macOS runner only for public repositories. It does not uploa
 publish or deploy. Check runner eligibility and billing before enabling/dispatching it. The local
 presence of this workflow is not evidence that it has run.
 
-Verification run [34459508699](https://github.com/Zahidulislam2222/mediconnect-hub/actions/runs/34459508699)
-passed for commit `6255d9c56092aa099911cc984177e81ea1a6db0b`: both regional simulator schemes built
-and passed their unit and UI tests. Signed distribution builds, physical devices, live providers and
-independent review remain separate, incomplete gates.
+Verification run [34465839952](https://github.com/Zahidulislam2222/mediconnect-hub/actions/runs/34465839952)
+passed for commit `874b3d5567c32d193d44e789329de3e6ff9432bd`: both regional simulator schemes built
+and passed 104 unit and 44 UI tests in total. Signed distribution builds, physical devices, live providers and
+full feature parity remain separate, incomplete gates.
 
 UI tests expect the safe default blank configuration; use synthetic accounts/data for any added
 connected tests. Do not put patient data or authentication material in fixtures, screenshots or logs.
 
-That passing baseline covers registration, profiles, password challenges and cancellation. It fixes
-the preceding run's two Swift test enum-constructor errors. Newer MFA-selection/email-setup changes
-need their own matching successful Mac run. MFA selection offers only the methods supplied
+That passing baseline covers registration, profiles, password challenges, cancellation and MFA/email/authenticator setup.
+The production-workspace lifetime test follow-up requires its own matching successful Mac run.
+MFA selection offers only the methods supplied
 by the SDK. Authenticator enrollment keeps the SDK setup key in memory with redacted diagnostics,
 requires an explicit reveal action, and clears the visible key and typed code when switching apps.
 Only an idle pending enrollment survives the app switch; cancellation discards it.
 Other unsupported challenges still need implementation.
 Provider account, profile and cancellation tests use synthetic boundaries only.
 
-The authenticator-enrollment Android snapshot passes 152 unit/transport tests and 54 emulator UI tests across
+The workspace-lifetime Android snapshot passes 152 unit/transport tests and 72 emulator tests across
 US/EU, both debug and optimized unsigned release builds, lint (zero errors; 18 warnings per region),
 and both actual launcher checks. All four APKs were checked for blank provider configuration.

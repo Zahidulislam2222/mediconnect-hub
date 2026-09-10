@@ -17,7 +17,7 @@ import kotlin.coroutines.resumeWithException
 
 interface SessionProvider { suspend fun fetch(): SessionAccess }
 
-class CognitoSession(context: Context, private val config: MobileConfiguration, private val contract: MobileContract) : SessionProvider, PasswordRecoveryService, RegistrationService {
+class CognitoSession(context: Context, private val config: MobileConfiguration, private val contract: MobileContract) : SignInSession {
     init {
         val pool = JSONObject().put("PoolId", config.userPoolId).put("AppClientId", config.clientId).put("Region", config.awsRegion)
         val plugin = JSONObject()
@@ -41,19 +41,19 @@ class CognitoSession(context: Context, private val config: MobileConfiguration, 
         }, { if (continuation.isActive) continuation.resumeWithException(IllegalStateException("SESSION_UNAVAILABLE")) })
     }
 
-    suspend fun signIn(email: String, password: String): AuthSignInResult = suspendCancellableCoroutine { continuation ->
+    override suspend fun signIn(email: String, password: String): AuthSignInResult = suspendCancellableCoroutine { continuation ->
         Amplify.Auth.signIn(email, password,
             { if (continuation.isActive) continuation.resume(it) },
             { if (continuation.isActive) continuation.resumeWithException(IllegalStateException("SIGN_IN_FAILED")) })
     }
 
-    suspend fun confirm(code: String): AuthSignInResult = suspendCancellableCoroutine { continuation ->
+    override suspend fun confirm(code: String): AuthSignInResult = suspendCancellableCoroutine { continuation ->
         Amplify.Auth.confirmSignIn(code,
             { if (continuation.isActive) continuation.resume(it) },
             { if (continuation.isActive) continuation.resumeWithException(IllegalStateException("SIGN_IN_FAILED")) })
     }
 
-    suspend fun signOut() = suspendCancellableCoroutine { continuation ->
+    override suspend fun signOut() = suspendCancellableCoroutine { continuation ->
         Amplify.Auth.signOut { if (continuation.isActive) continuation.resume(Unit) }
     }
 

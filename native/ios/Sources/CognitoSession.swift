@@ -3,7 +3,7 @@ import AWSCognitoAuthPlugin
 import AWSPluginsCore
 import Foundation
 
-final class CognitoSession: PasswordRecoveryService, RegistrationService {
+final class CognitoSession: WorkspaceSession {
     private let config: MobileConfiguration
     private let contract: MobileContract
     init(config: MobileConfiguration, contract: MobileContract) throws {

@@ -38,7 +38,7 @@ enum AppointmentDecoder {
     }
 }
 
-final class AppointmentsAPI {
+final class AppointmentsAPI: WorkspaceAppointments {
     private let transport: NativeAPI
     private let contract: MobileContract
     init(config: MobileConfiguration, contract: MobileContract) {
