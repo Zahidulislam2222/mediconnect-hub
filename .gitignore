@@ -113,3 +113,5 @@ google-services.json
 
 # Claude Code
 CLAUDE.md
+# Vite cache belongs to this checkout, outside shared dependencies.
+/.vite/

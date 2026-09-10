@@ -5,6 +5,8 @@ import { componentTagger } from "lovable-tagger";
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
+  // Each checkout owns its dependency cache, even when node_modules is shared.
+  cacheDir: path.resolve(__dirname, ".vite"),
   base: './', // <--- THIS IS THE MAGIC LINE YOU WERE MISSING
   server: {
     host: "::",
