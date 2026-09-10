@@ -20,9 +20,16 @@ copy the same local assets. No remote image loader or new provider dependency is
 This welcome candidate passed 158 Android unit/transport tests, 80 emulator tests across both
 regions, debug and optimized unsigned release builds, and lint with zero errors and 18 warnings
 per region. A separate public-composable capture verified the rendered clinic story while the
-application's screenshot-protection flag remained enabled. The changed SwiftUI entry still
-requires its own macOS build and simulator run; the older successful iOS run below does not
-verify this new entry. Full route parity, actual providers, signing and physical devices remain open.
+application's screenshot-protection flag remained enabled. Its exact-commit macOS run passed
+128 unit and 46 UI tests across both regional schemes. Full route parity, actual providers,
+signing and physical devices remain open.
+
+The next candidate adds native knowledge and journal lists, knowledge search/category filters,
+empty/reset behavior and complete article views from the same canonical journey content.
+Typed parsers reject malformed articles and missing destination content. These new editorial
+changes pass 170 Android unit/transport tests and both regional debug/unsigned release builds.
+Editorial verification also requires its own emulator and macOS evidence; the entry-only
+verification result below applies to its named commit.
 
 ## Configuration
 
@@ -72,9 +79,9 @@ gates on a standard macOS runner only for public repositories. It does not uploa
 publish or deploy. Check runner eligibility and billing before enabling/dispatching it. The local
 presence of this workflow is not evidence that it has run.
 
-Verification run [34478030288](https://github.com/Zahidulislam2222/mediconnect-hub/actions/runs/34478030288)
-passed for commit `a6032a3765ee448f95174657e5f95a14cc950f20`: both regional simulator schemes built
-and passed 122 unit and 44 UI tests in total. Signed distribution builds, physical devices, live providers and
+Verification run [34523812126](https://github.com/Zahidulislam2222/mediconnect-hub/actions/runs/34523812126)
+passed for commit `3d2aca54c12ec64b4d901fad4ca45220cd5d6461`: both regional simulator schemes built
+and passed 128 unit and 46 UI tests in total. Signed distribution builds, physical devices, live providers and
 full feature parity remain separate, incomplete gates.
 
 UI tests expect the safe default blank configuration; use synthetic accounts/data for any added

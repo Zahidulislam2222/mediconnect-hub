@@ -16,10 +16,21 @@ struct JourneyWelcome: View {
     let content: MobileContent
     let signIn: () -> Void
     var body: some View {
+        NavigationStack {
+            home.navigationTitle(journey.home).navigationBarTitleDisplayMode(.inline)
+        }.tint(content.color("accent"))
+    }
+    private var home: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 24) {
                 Text(journey.brand).font(.title2.weight(.medium))
                 Button(journey.login, action: signIn).buttonStyle(.borderedProminent)
+                NavigationLink(journey.editorial.knowledgeLink) {
+                    JourneyLibrary(journey: journey, content: content, kind: .knowledge)
+                }
+                NavigationLink(journey.editorial.journalLink) {
+                    JourneyLibrary(journey: journey, content: content, kind: .journal)
+                }
                 copy(journey.hero)
                 poster(journey.poster)
                 Text(journey.illustration).font(.caption)

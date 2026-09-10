@@ -82,7 +82,11 @@ targets:
   NativeUITests:
     type: bundle.ui-testing
     platform: iOS
-    sources: [UITests, TestSupport/NativeUITestProtocol.swift]
+    sources:
+      - UITests
+      - TestSupport/NativeUITestProtocol.swift
+      - path: Resources/journey.json
+        buildPhase: resources
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.mediconnect.nativeapp.uitests

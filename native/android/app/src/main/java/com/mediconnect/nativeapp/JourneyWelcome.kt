@@ -20,6 +20,10 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.asImageBitmap
@@ -31,6 +35,14 @@ import androidx.compose.ui.unit.dp
 
 @Composable
 fun JourneyWelcome(journey: NativeJourney, onSignIn: () -> Unit) {
+    var library by rememberSaveable { mutableStateOf<EditorialKind?>(null) }
+    val kind = library
+    if (kind != null) JourneyLibrary(journey, kind) { library = null }
+    else JourneyHome(journey, onSignIn) { library = it }
+}
+
+@Composable
+private fun JourneyHome(journey: NativeJourney, onSignIn: () -> Unit, onLibrary: (EditorialKind) -> Unit) {
     Scaffold { inset ->
         LazyColumn(Modifier.fillMaxSize().padding(inset), contentPadding = PaddingValues(24.dp),
             verticalArrangement = Arrangement.spacedBy(24.dp)) {
@@ -38,6 +50,8 @@ fun JourneyWelcome(journey: NativeJourney, onSignIn: () -> Unit) {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Text(journey.brand, style = MaterialTheme.typography.titleLarge)
                     Button(onClick = onSignIn) { Text(journey.login) }
+                    Button(onClick = { onLibrary(EditorialKind.KNOWLEDGE) }) { Text(journey.editorial.knowledgeLink) }
+                    Button(onClick = { onLibrary(EditorialKind.JOURNAL) }) { Text(journey.editorial.journalLink) }
                 }
             }
             item { JourneyCopy(journey.hero) }
