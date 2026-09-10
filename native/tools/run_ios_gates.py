@@ -52,6 +52,18 @@ def prepare_packages(project, output):
     print(f"Verified {len(entries)} exact package plugin fingerprints; Xcode validation remains enabled.", flush=True)
 
 
+def run_schemes(project, output, destination, settings):
+    parallel = settings["iosParallelTesting"]
+    if not isinstance(parallel, bool):
+        raise ValueError("iOS parallel testing must be a configured boolean")
+    for scheme in settings["iosSchemes"]:
+        command = ["xcodebuild", "-project", str(project), "-scheme", scheme,
+                   "-destination", destination, "-derivedDataPath", str(output),
+                   "-parallel-testing-enabled", "YES" if parallel else "NO",
+                   "CODE_SIGNING_ALLOWED=NO", "test"]
+        subprocess.run(command, check=True, timeout=settings["gateTimeoutSeconds"])
+
+
 def main():
     if platform.system() != "Darwin":
         raise SystemExit("iOS gate requires macOS and Xcode; source inspection is not a build.")
@@ -67,11 +79,7 @@ def main():
     output.mkdir(exist_ok=True)
     project = NATIVE / "ios/MediConnect.xcodeproj"
     prepare_packages(project, output)
-    for scheme in CONFIG["iosSchemes"]:
-        command = ["xcodebuild", "-project", str(project), "-scheme", scheme,
-                   "-destination", destination, "-derivedDataPath", str(output),
-                   "CODE_SIGNING_ALLOWED=NO", "test"]
-        subprocess.run(command, check=True, timeout=CONFIG["gateTimeoutSeconds"])
+    run_schemes(project, output, destination, CONFIG)
     print("Both iOS simulator schemes passed. Physical-device and live-provider checks remain separate.")
 
 

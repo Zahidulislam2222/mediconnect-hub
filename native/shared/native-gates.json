@@ -1,5 +1,6 @@
 {
   "gateTimeoutSeconds": 2400,
+  "iosParallelTesting": false,
   "iosSchemes": ["MediConnect-US", "MediConnect-EU"],
   "iosPluginTrustStore": "Library/org.swift.swiftpm/security/plugins.json",
   "iosApprovedPlugins": [
