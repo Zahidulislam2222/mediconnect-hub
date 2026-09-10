@@ -1,5 +1,7 @@
 // Stable launch protocol shared by the app's DEBUG-only fixture and its UI test target.
 enum NativeUITestProtocol {
+    static let cancellation = "--native-cancellation-ui-test"
+    static let cancellationLostResponse = "--native-cancellation-lost-response"
     static let passwordChallenge = "--native-password-challenge-ui-test"
     static let existingPassword = "--native-existing-password-ui-test"
     static let challengeAccepted = "native-challenge-accepted"

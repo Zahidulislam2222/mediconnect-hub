@@ -30,6 +30,7 @@ class WorkspaceModel(application: Application) : AndroidViewModel(application) {
     val policies = (application as MediConnectApplication).policies
     private val runtime = (application as MediConnectApplication).runtime.getOrNull()
     val configured = runtime != null
+    val cancellation = AppointmentCancellation(runtime?.appointments, runtime?.contract?.cancellation, viewModelScope)
     val recovery = PasswordRecovery(runtime?.sessions, viewModelScope)
     val profile = ProfileEnrollment(runtime?.profiles, policies.policyVersion, viewModelScope)
     val registration = AccountRegistration(runtime?.sessions, viewModelScope)
@@ -49,6 +50,7 @@ class WorkspaceModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun reset(visible: Boolean = true) {
+        cancellation.close(clearSession = true)
         profile.close()
         generation++
         operation?.cancel()
@@ -137,6 +139,18 @@ class WorkspaceModel(application: Application) : AndroidViewModel(application) {
                 next = page.next,
             )
         }
+    }
+
+    fun openCancellation(appointment: Appointment) {
+        val current = mutable.value
+        val identity = current.identity ?: return
+        if (current.busy || profile.state.value.step != ProfileStep.READY || current.appointments.none { it.id == appointment.id }) return
+        cancellation.open(identity, appointment)
+    }
+    fun closeCancellation() {
+        val confirmed = cancellation.state.value.step == CancellationStep.CONFIRMED
+        cancellation.close()
+        if (confirmed) refresh()
     }
 
     fun signOut() {

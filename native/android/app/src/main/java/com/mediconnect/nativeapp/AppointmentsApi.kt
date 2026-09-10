@@ -44,7 +44,7 @@ object AppointmentDecoder {
 }
 
 class AppointmentsApi(config: MobileConfiguration, private val contract: MobileContract,
-                      sessions: SessionProvider, client: OkHttpClient) {
+                      sessions: SessionProvider, client: OkHttpClient) : CancellationService {
     private val transport = NativeApi(config, sessions, client)
     suspend fun load(identity: Identity, cursor: String? = null): AppointmentPage {
         val subjectKey = contract.appointmentQueries[identity.role] ?: throw ApiFailure(403)
@@ -52,4 +52,22 @@ class AppointmentsApi(config: MobileConfiguration, private val contract: MobileC
         if (cursor != null) query["startKey"] = cursor
         return AppointmentDecoder.decode(transport.request(identity, contract.appointmentService, contract.appointmentPath, query), identity, contract)
     }
+    override suspend fun find(identity: Identity, appointmentId: String): Appointment {
+        require(identity.role == Role.PATIENT)
+        var cursor: String? = null
+        val seen = mutableSetOf<String>()
+        repeat(contract.cancellation.maxLookupPages) {
+            val page = load(identity, cursor)
+            page.items.firstOrNull { it.id == appointmentId }?.let { return it }
+            cursor = page.next ?: throw ApiFailure(404)
+            require(seen.add(cursor!!))
+        }
+        throw ApiFailure()
+    }
+    override suspend fun cancel(identity: Identity, appointmentId: String) {
+        require(identity.role == Role.PATIENT && appointmentId.isNotBlank())
+        transport.request(identity, contract.appointmentService, contract.cancellation.path,
+            body = JSONObject().put("appointmentId", appointmentId))
+    }
+
 }

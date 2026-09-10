@@ -16,15 +16,16 @@ struct MediConnectApp: App {
     }
     @ViewBuilder private func root(_ content: MobileContent) -> some View {
         #if DEBUG
-        if ChallengeUITestFixture.requested() { ChallengeUITestFixture(content: content) }
+        if CancellationUITestFixture.requested() { CancellationUITestFixture(content: content) }
+        else if ChallengeUITestFixture.requested() { ChallengeUITestFixture(content: content) }
         else if ProfileUITestFixture.requested(), let policies = model.policies {
             ProfileUITestFixture(content: content, policies: policies)
         } else if RegistrationUITestFixture.requested(), let policies = model.policies {
             RegistrationUITestFixture(content: content, policies: policies)
         } else if RecoveryUITestFixture.requested() { RecoveryUITestFixture(content: content) }
-        else { WorkspaceView(model: model, content: content, recovery: model.recovery, registration: model.registration, profile: model.profile) }
+        else { WorkspaceView(model: model, content: content, recovery: model.recovery, registration: model.registration, profile: model.profile, cancellation: model.cancellation) }
         #else
-        WorkspaceView(model: model, content: content, recovery: model.recovery, registration: model.registration, profile: model.profile)
+        WorkspaceView(model: model, content: content, recovery: model.recovery, registration: model.registration, profile: model.profile, cancellation: model.cancellation)
         #endif
     }
 }
@@ -44,6 +45,7 @@ struct WorkspaceView: View {
     @ObservedObject var recovery: PasswordRecovery
     @ObservedObject var registration: AccountRegistration
     @ObservedObject var profile: ProfileEnrollment
+    @ObservedObject var cancellation: AppointmentCancellation
     @State private var email = ""
     @State private var password = ""
     @State private var code = ""
@@ -78,6 +80,9 @@ struct WorkspaceView: View {
             .background(content.color("background"))
             .foregroundStyle(content.color("foreground"))
             .tint(content.color("accent"))
+            .sheet(isPresented: Binding(get: { cancellation.state.step != .closed }, set: { if !$0 { model.closeCancellation() } })) {
+                CancellationView(model: cancellation, content: content, close: model.closeCancellation)
+            }
             .onChange(of: model.challengeInput) { _ in code = "" }
             .onChange(of: model.visible) { visible in if !visible { email = ""; password = ""; code = "" } }
         }
@@ -121,6 +126,9 @@ struct WorkspaceView: View {
             if !model.busy && model.message == nil && model.appointments.isEmpty { Text(content.text("emptyAppointments")) }
             ForEach(model.appointments) { appointment in
                 VStack(alignment: .leading, spacing: 8) {
+                    if identity.role == .patient {
+                        Button(content.text("cancelAppointment")) { model.openCancellation(appointment) }.disabled(model.busy)
+                    }
                     Text(appointment.person ?? content.text("unknown")).font(.headline)
                     if let time = appointment.time { Text(time, format: .dateTime) }
                     else { Text(content.text("unknown")) }

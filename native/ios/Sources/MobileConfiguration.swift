@@ -57,6 +57,13 @@ struct ProfileContract: Decodable {
     let subjectField: String
 }
 
+struct CancellationContract: Decodable {
+    let path: String
+    let cancellableStatuses: Set<String>
+    let cancelledStatuses: Set<String>
+    let maxLookupPages: Int
+}
+
 struct MobileContract {
     struct AppointmentContract: Decodable {
         let service: String
@@ -68,13 +75,17 @@ struct MobileContract {
     let defaultRole: Role
     let appointments: AppointmentContract
     let profiles: [String: ProfileContract]
+    let cancellation: CancellationContract
 
     init(data: Data, policy: Data) throws {
-        struct Document: Decodable { let appointments: AppointmentContract; let profiles: [String: ProfileContract] }
+        struct Document: Decodable { let appointments: AppointmentContract; let profiles: [String: ProfileContract]; let cancellation: CancellationContract }
         struct Policy: Decodable { let groups: [String: Role]; let defaultRole: Role }
         let document = try JSONDecoder().decode(Document.self, from: data)
         appointments = document.appointments
         profiles = document.profiles
+        cancellation = document.cancellation
+        guard cancellation.maxLookupPages > 0, !cancellation.cancellableStatuses.isEmpty, !cancellation.cancelledStatuses.isEmpty,
+              cancellation.path.range(of: "^/[A-Za-z0-9/_-]+$", options: .regularExpression) != nil, !cancellation.path.contains("//") else { throw MobileFailure.configuration }
         let roles = try JSONDecoder().decode(Policy.self, from: policy)
         groups = roles.groups
         defaultRole = roles.defaultRole

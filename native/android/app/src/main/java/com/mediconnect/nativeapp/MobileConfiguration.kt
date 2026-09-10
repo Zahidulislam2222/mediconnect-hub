@@ -16,7 +16,14 @@ class MobileContent(private val source: JSONObject) {
 
 data class ProfileContract(val service: String, val readPath: String, val appendSubject: Boolean, val createPath: String, val subjectField: String)
 
+data class CancellationContract(val path: String, val cancellableStatuses: Set<String>, val cancelledStatuses: Set<String>, val maxLookupPages: Int)
+
 class MobileContract(source: JSONObject, policy: JSONObject) {
+    val cancellation = source.getJSONObject("cancellation").let { row ->
+        fun statuses(key: String) = row.getJSONArray(key).let { values -> (0 until values.length()).map { values.getString(it) }.toSet().also { require(it.isNotEmpty()) } }
+        CancellationContract(row.getString("path").also { require(it.matches(Regex("/[A-Za-z0-9/_-]+")) && !it.contains("//")) },
+            statuses("cancellableStatuses"), statuses("cancelledStatuses"), row.getInt("maxLookupPages").also { require(it > 0) })
+    }
     val profiles = source.getJSONObject("profiles").let { profiles ->
         profiles.keys().asSequence().associate { key ->
             val row = profiles.getJSONObject(key)

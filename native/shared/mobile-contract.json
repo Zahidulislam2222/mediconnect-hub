@@ -27,5 +27,15 @@
       "createPath": "/register-doctor",
       "subjectField": "doctorId"
     }
+  },
+  "cancellation": {
+    "path": "/appointments/cancel",
+    "cancellableStatuses": [
+      "CONFIRMED"
+    ],
+    "cancelledStatuses": [
+      "CANCELLED"
+    ],
+    "maxLookupPages": 20
   }
 }

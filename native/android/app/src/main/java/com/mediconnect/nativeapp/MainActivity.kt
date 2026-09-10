@@ -48,6 +48,7 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             val state by model.state.collectAsStateWithLifecycle()
+            val cancellation by model.cancellation.state.collectAsStateWithLifecycle()
             val recovery by model.recovery.state.collectAsStateWithLifecycle()
             val profile by model.profile.state.collectAsStateWithLifecycle()
             val registration by model.registration.state.collectAsStateWithLifecycle()
@@ -57,7 +58,8 @@ class MainActivity : ComponentActivity() {
                     recovery, model::openRecovery, model.recovery::request, model.recovery::confirm, model.recovery::close,
                     model.policies, registration, model::openRegistration, model.registration::accept, model.registration::register,
                     model.registration::confirm, model.registration::resend, model.registration::close,
-                    profile, model.profile::accept, model.profile::submit, model.profile::check)
+                    profile, model.profile::accept, model.profile::submit, model.profile::check,
+                    cancellation, model::openCancellation, model.cancellation::confirm, model.cancellation::check, model::closeCancellation)
             }
         }
     }
@@ -85,7 +87,10 @@ fun WorkspaceScreen(state: WorkspaceState, content: MobileContent, configured: B
                     acceptTerms: (Boolean) -> Unit, register: (String, String, String) -> Unit,
                     confirmRegistration: (String) -> Unit, resendRegistration: () -> Unit, closeRegistration: () -> Unit,
                     profile: ProfileState = ProfileState(), acceptProfile: (Boolean) -> Unit = {},
-                    saveProfile: (String, String, String) -> Unit = { _, _, _ -> }, checkProfile: () -> Unit = {}) {
+                    saveProfile: (String, String, String) -> Unit = { _, _, _ -> }, checkProfile: () -> Unit = {},
+                    cancellation: CancellationState = CancellationState(), openCancellation: (Appointment) -> Unit = {},
+                    confirmCancellation: () -> Unit = {}, checkCancellation: () -> Unit = {}, closeCancellation: () -> Unit = {}) {
+    CancellationDialog(cancellation, content, confirmCancellation, checkCancellation, closeCancellation)
     Scaffold { padding ->
         LazyColumn(Modifier.fillMaxSize().padding(padding), contentPadding = PaddingValues(24.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
             item {
@@ -133,7 +138,14 @@ fun WorkspaceScreen(state: WorkspaceState, content: MobileContent, configured: B
                     if (!state.busy && state.error == null && state.appointments.isEmpty()) {
                         item { Text(content.text("emptyAppointments")) }
                     }
-                    items(state.appointments, key = { it.id }) { appointment -> AppointmentCard(appointment, content) }
+                    items(state.appointments, key = { it.id }) { appointment ->
+                        Column {
+                            AppointmentCard(appointment, content)
+                            if (state.identity.role == Role.PATIENT) TextButton(onClick = { openCancellation(appointment) }, enabled = !state.busy) {
+                                Text(content.text("cancelAppointment"))
+                            }
+                        }
+                    }
                     if (state.next != null) item {
                         Button(onClick = { refresh(true) }, enabled = !state.busy) { Text(content.text("loadMore")) }
                     }

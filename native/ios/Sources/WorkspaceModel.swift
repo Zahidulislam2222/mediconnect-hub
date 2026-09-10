@@ -17,6 +17,7 @@ final class WorkspaceModel: ObservableObject {
     let content: MobileContent?
     let policies: MobilePolicies?
     let registration: AccountRegistration
+    let cancellation: AppointmentCancellation
     let recovery: PasswordRecovery
     let profile: ProfileEnrollment
     private var profileObservation: AnyCancellable?
@@ -38,14 +39,20 @@ final class WorkspaceModel: ObservableObject {
         content = try? MobileContent(data: BundledAssets.data("mobile-content"))
         policies = try? MobilePolicies(legal: BundledAssets.data("legal"), consent: BundledAssets.data("consent"))
         var profileService: ProfileAPI?
+        var cancellationService: AppointmentCancellationAPI?
+        var cancellationPolicy: CancellationContract?
         do {
             let config = try MobileConfiguration(data: BundledAssets.data("mobile-config"), residency: residency)
             let contract = try MobileContract(data: BundledAssets.data("mobile-contract"), policy: BundledAssets.data("session-policy"))
             let session = try CognitoSession(config: config, contract: contract)
             auth = session
             profileService = ProfileAPI(transport: NativeAPI(config: config), contract: contract, fetch: { try await session.fetch() })
-            api = AppointmentsAPI(config: config, contract: contract)
+            let appointments = AppointmentsAPI(config: config, contract: contract)
+            api = appointments
+            cancellationService = AppointmentCancellationAPI(appointments: appointments, transport: NativeAPI(config: config), contract: contract, fetch: { try await session.fetch() })
+            cancellationPolicy = contract.cancellation
         } catch { auth = nil; api = nil }
+        cancellation = AppointmentCancellation(service: cancellationService, policy: cancellationPolicy)
         profile = ProfileEnrollment(service: profileService, policyVersion: policies?.policyVersion ?? "")
         recovery = PasswordRecovery(service: auth)
         registration = AccountRegistration(service: policies == nil ? nil : auth)
@@ -58,6 +65,7 @@ final class WorkspaceModel: ObservableObject {
     }
 
     private func clear(visible: Bool = true) {
+        cancellation.close(clearSession: true)
         profile.close()
         generation += 1
         operation?.cancel()
@@ -155,6 +163,15 @@ final class WorkspaceModel: ObservableObject {
             self?.appointments = (previous + page.items).filter { ids.insert($0.id).inserted }
             self?.next = page.next
         }
+    }
+    func openCancellation(_ appointment: Appointment) {
+        guard !busy, profile.state.step == .ready, let identity, appointments.contains(where: { $0.id == appointment.id }) else { return }
+        cancellation.open(identity, appointment: appointment)
+    }
+    func closeCancellation() {
+        let confirmed = cancellation.state.step == .confirmed
+        cancellation.close()
+        if confirmed { refresh() }
     }
     func signOut() {
         registration.close()

@@ -67,5 +67,12 @@
   "specialization": "Specialization",
   "saveProfile": "Save profile",
   "profileCheckFailed": "Your profile could not be confirmed. Check its status before trying to create it again.",
-  "checkProfile": "Check profile status"
+  "checkProfile": "Check profile status",
+  "cancelAppointment": "Cancel appointment",
+  "confirmCancellation": "Confirm cancellation",
+  "keepAppointment": "Keep appointment",
+  "cancelConfirmation": "Cancel this appointment? Any refund is subject to the payment provider's confirmed status.",
+  "cancellationConfirmed": "Cancellation was confirmed. This does not verify that a refund has completed.",
+  "cancellationUnconfirmed": "Cancellation could not be confirmed. Check its status before taking further action.",
+  "checkCancellation": "Check cancellation status"
 }

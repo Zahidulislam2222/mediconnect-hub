@@ -5,10 +5,10 @@ import XCTest
 final class PasswordChallengeTests: XCTestCase {
     func testSupportedSDKChallengesOnly() {
         XCTAssertEqual(SignInChallenge.input(.confirmSignInWithPassword), .password)
-        XCTAssertEqual(SignInChallenge.input(.confirmSignInWithNewPassword(additionalInfo: nil)), .newPassword)
+        XCTAssertEqual(SignInChallenge.input(.confirmSignInWithNewPassword(nil)), .newPassword)
         XCTAssertEqual(SignInChallenge.input(.confirmSignInWithTOTPCode), .code)
         XCTAssertNil(SignInChallenge.input(.done))
-        XCTAssertNil(SignInChallenge.input(.confirmSignInWithCustomChallenge(additionalInfo: nil)))
+        XCTAssertNil(SignInChallenge.input(.confirmSignInWithCustomChallenge(nil)))
     }
     func testExactPasswordsAndTrimmedCodes() {
         for input in [ChallengeInput.password, .newPassword] {

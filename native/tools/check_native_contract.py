@@ -49,6 +49,11 @@ def main():
         assert re.fullmatch(r"[A-Za-z]+", route["subjectField"])
         for key in ("readPath", "createPath"):
             assert re.fullmatch(r"/[A-Za-z0-9/_-]+", route[key]) and "//" not in route[key]
+    cancellation = contract["cancellation"]
+    assert re.fullmatch(r"/[A-Za-z0-9/_-]+", cancellation["path"]) and "//" not in cancellation["path"]
+    assert isinstance(cancellation["maxLookupPages"], int) and cancellation["maxLookupPages"] > 0
+    assert cancellation["cancellableStatuses"] and cancellation["cancelledStatuses"]
+    assert not set(cancellation["cancellableStatuses"]) & set(cancellation["cancelledStatuses"])
     count = 0
     roots = (NATIVE / "android/app/src/main/java", NATIVE / "ios/Sources")
     for root in roots:
