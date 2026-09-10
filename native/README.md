@@ -59,16 +59,16 @@ gates on a standard macOS runner only for public repositories. It does not uploa
 publish or deploy. Check runner eligibility and billing before enabling/dispatching it. The local
 presence of this workflow is not evidence that it has run.
 
-Verification run [34465839952](https://github.com/Zahidulislam2222/mediconnect-hub/actions/runs/34465839952)
-passed for commit `874b3d5567c32d193d44e789329de3e6ff9432bd`: both regional simulator schemes built
-and passed 104 unit and 44 UI tests in total. Signed distribution builds, physical devices, live providers and
+Verification run [34478030288](https://github.com/Zahidulislam2222/mediconnect-hub/actions/runs/34478030288)
+passed for commit `a6032a3765ee448f95174657e5f95a14cc950f20`: both regional simulator schemes built
+and passed 122 unit and 44 UI tests in total. Signed distribution builds, physical devices, live providers and
 full feature parity remain separate, incomplete gates.
 
 UI tests expect the safe default blank configuration; use synthetic accounts/data for any added
 connected tests. Do not put patient data or authentication material in fixtures, screenshots or logs.
 
 That passing baseline covers registration, profiles, password challenges, cancellation and MFA/email/authenticator setup.
-The production-workspace lifetime test follow-up requires its own matching successful Mac run.
+That run also covers production-workspace lifetime tests with injected synthetic service responses.
 MFA selection offers only the methods supplied
 by the SDK. Authenticator enrollment keeps the SDK setup key in memory with redacted diagnostics,
 requires an explicit reveal action, and clears the visible key and typed code when switching apps.
