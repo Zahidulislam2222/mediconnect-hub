@@ -11,6 +11,19 @@ booking/rescheduling, billing, messaging, consultations, records and other web
 features still need native implementation. A successful build does not establish feature parity,
 live-provider behavior, clinical readiness or physical-device behavior.
 
+The native public welcome now uses the approved clinic-to-home story and the existing React
+journey's poster assets. Its Log in action opens the regional authentication flow; a configured
+signed-in session keeps its guarded workspace. The public story remains explicitly fictional.
+`src/content/journey.json` owns its copy and media paths, and both native resource packagers
+copy the same local assets. No remote image loader or new provider dependency is involved.
+
+This welcome candidate passed 158 Android unit/transport tests, 80 emulator tests across both
+regions, debug and optimized unsigned release builds, and lint with zero errors and 18 warnings
+per region. A separate public-composable capture verified the rendered clinic story while the
+application's screenshot-protection flag remained enabled. The changed SwiftUI entry still
+requires its own macOS build and simulator run; the older successful iOS run below does not
+verify this new entry. Full route parity, actual providers, signing and physical devices remain open.
+
 ## Configuration
 
 `shared/mobile-config.example.json` describes public settings. Copy it to the ignored

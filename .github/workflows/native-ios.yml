@@ -9,6 +9,8 @@ on:
       - "src/content/session-policy.json"
       - "src/content/consent.json"
       - "src/content/legal.json"
+      - "src/content/journey.json"
+      - "public/media/journey/**"
       - ".github/workflows/native-ios.yml"
 
 permissions:

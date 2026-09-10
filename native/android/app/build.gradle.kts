@@ -10,6 +10,14 @@ val prepareMobileAssets by tasks.registering(Sync::class) {
     from("../../../src/content/session-policy.json")
     from("../../../src/content/legal.json")
     from("../../../src/content/consent.json")
+    from("../../../src/content/journey.json")
+    val journey = groovy.json.JsonSlurper().parse(file("../../../src/content/journey.json")) as Map<*, *>
+    val media = journey["media"] as Map<*, *>
+    for (key in listOf("poster", "homePoster")) {
+        val asset = media[key] as String
+        require(Regex("^/media/journey/[A-Za-z0-9_-]+\\.webp$").matches(asset))
+        from("../../../public$asset")
+    }
     val localConfig = file("../../local/mobile-config.json")
     if (localConfig.exists()) {
         from(localConfig) { rename { "mobile-config.json" } }

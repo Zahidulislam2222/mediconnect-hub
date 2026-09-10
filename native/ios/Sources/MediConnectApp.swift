@@ -4,6 +4,7 @@ import SwiftUI
 @MainActor
 struct MediConnectApp: App {
     @StateObject private var model = WorkspaceModel()
+    private let journey = try? NativeJourney(data: BundledAssets.data("journey"))
     @Environment(\.scenePhase) private var phase
     var body: some Scene {
         WindowGroup {
@@ -26,14 +27,14 @@ struct MediConnectApp: App {
         } else if RegistrationUITestFixture.requested(), let policies = model.policies {
             RegistrationUITestFixture(content: content, policies: policies)
         } else if RecoveryUITestFixture.requested() { RecoveryUITestFixture(content: content) }
-        else { WorkspaceView(model: model, content: content, recovery: model.recovery, registration: model.registration, profile: model.profile, cancellation: model.cancellation) }
+        else { NativeEntry(model: model, content: content, journey: journey) }
         #else
-        WorkspaceView(model: model, content: content, recovery: model.recovery, registration: model.registration, profile: model.profile, cancellation: model.cancellation)
+        NativeEntry(model: model, content: content, journey: journey)
         #endif
     }
 }
 
-private extension MobileContent {
+extension MobileContent {
     func color(_ key: String) -> Color {
         let value = label("theme", key).trimmingCharacters(in: CharacterSet(charactersIn: "#"))
         guard let rgb = UInt32(value, radix: 16) else { return .primary }

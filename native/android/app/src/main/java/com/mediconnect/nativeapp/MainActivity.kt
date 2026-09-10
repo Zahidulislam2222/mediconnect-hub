@@ -3,6 +3,7 @@ package com.mediconnect.nativeapp
 import android.os.Bundle
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
@@ -52,19 +53,29 @@ class MainActivity : ComponentActivity() {
         window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
         enableEdgeToEdge()
         setContent {
+            var welcome by remember { mutableStateOf(true) }
+            val journey = (application as MediConnectApplication).journey
             val state by model.state.collectAsStateWithLifecycle()
             val cancellation by model.cancellation.state.collectAsStateWithLifecycle()
             val recovery by model.recovery.state.collectAsStateWithLifecycle()
             val profile by model.profile.state.collectAsStateWithLifecycle()
             val registration by model.registration.state.collectAsStateWithLifecycle()
             MobileTheme(model.content) {
+                val canReturnHome = state.identity == null && !state.busy && !state.challenge &&
+                    recovery.step == RecoveryStep.CLOSED && registration.step == RegistrationStep.CLOSED
+                BackHandler(enabled = !welcome && canReturnHome) { welcome = true }
+                if (welcome && state.identity == null && !state.challenge) {
+                    JourneyWelcome(journey) { welcome = false }
+                } else {
                 WorkspaceScreen(state, model.content, model.configured, BuildConfig.RESIDENCY,
                     model::signIn, model::confirm, model::signOut, model::refresh,
                     recovery, model::openRecovery, model.recovery::request, model.recovery::confirm, model.recovery::close,
                     model.policies, registration, model::openRegistration, model.registration::accept, model.registration::register,
                     model.registration::confirm, model.registration::resend, model.registration::close,
                     profile, model.profile::accept, model.profile::submit, model.profile::check,
-                    cancellation, model::openCancellation, model.cancellation::confirm, model.cancellation::check, model::closeCancellation)
+                    cancellation, model::openCancellation, model.cancellation::confirm, model.cancellation::check, model::closeCancellation,
+                    homeLabel = journey.home, returnHome = if (canReturnHome) ({ welcome = true }) else null)
+                }
             }
         }
     }
@@ -94,7 +105,8 @@ fun WorkspaceScreen(state: WorkspaceState, content: MobileContent, configured: B
                     profile: ProfileState = ProfileState(), acceptProfile: (Boolean) -> Unit = {},
                     saveProfile: (String, String, String) -> Unit = { _, _, _ -> }, checkProfile: () -> Unit = {},
                     cancellation: CancellationState = CancellationState(), openCancellation: (Appointment) -> Unit = {},
-                    confirmCancellation: () -> Unit = {}, checkCancellation: () -> Unit = {}, closeCancellation: () -> Unit = {}) {
+                    confirmCancellation: () -> Unit = {}, checkCancellation: () -> Unit = {}, closeCancellation: () -> Unit = {},
+                    homeLabel: String = "", returnHome: (() -> Unit)? = null) {
     CancellationDialog(cancellation, content, confirmCancellation, checkCancellation, closeCancellation)
     Scaffold { padding ->
         LazyColumn(Modifier.fillMaxSize().padding(padding), contentPadding = PaddingValues(24.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
@@ -106,6 +118,7 @@ fun WorkspaceScreen(state: WorkspaceState, content: MobileContent, configured: B
                 }
             }
             if (!state.visible) return@LazyColumn
+            if (returnHome != null) item { TextButton(onClick = returnHome) { Text(homeLabel) } }
             item { PolicyLinks(policies, content) }
             if (!configured) {
                 item { Text(content.text("configurationUnavailable")) }

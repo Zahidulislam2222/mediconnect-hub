@@ -7,6 +7,7 @@ import org.json.JSONObject
 class MediConnectApplication : Application() {
     val runtime by lazy { runCatching { MobileRuntime(this) } }
     val content by lazy { MobileContent(JSONObject(assets.open("mobile-content.json").bufferedReader().use { it.readText() })) }
+    val journey by lazy { NativeJourney(JSONObject(assets.open("journey.json").bufferedReader().use { it.readText() })) }
     val policies by lazy { MobilePolicies(
         JSONObject(assets.open("legal.json").bufferedReader().use { it.readText() }),
         JSONObject(assets.open("consent.json").bufferedReader().use { it.readText() })) }
