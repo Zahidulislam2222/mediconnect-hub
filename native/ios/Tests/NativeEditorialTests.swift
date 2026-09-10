@@ -36,6 +36,16 @@ final class NativeEditorialTests: XCTestCase {
         XCTAssertTrue(content.filtered(.knowledge, query: "missing-test-search").isEmpty)
         XCTAssertEqual(content.filtered(.journal).map(\.slug), content.filtered(.journal, query: "ignored-test-query", category: "ignored-test-category").map(\.slug))
     }
+    func testEmptyQueryIncludesAllKnowledgeAndStillHonorsCategory() throws {
+        let content = try editorial(document())
+        let expected = content.articles.filter { $0.kind == .knowledge }
+        XCTAssertFalse(expected.isEmpty)
+        XCTAssertEqual(content.filtered(.knowledge, query: "").map(\.slug), expected.map(\.slug))
+        let category = try XCTUnwrap(expected.first).category
+        XCTAssertEqual(content.filtered(.knowledge, query: "", category: category).map(\.slug),
+                       expected.filter { $0.category == category }.map(\.slug))
+        XCTAssertTrue(content.filtered(.knowledge, query: "", category: "missing-test-category").isEmpty)
+    }
     func testRejectsDuplicateSlugsAndUnknownKinds() throws {
         var source = try document(); var articles = try XCTUnwrap(source["articles"] as? [[String: Any]])
         articles.append(try XCTUnwrap(articles.first)); source["articles"] = articles

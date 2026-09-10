@@ -61,9 +61,13 @@ struct NativeEditorial {
         articles.first { $0.kind == kind && $0.slug == slug }
     }
     func filtered(_ kind: EditorialKind, query: String = "", category: String? = nil) -> [EditorialArticle] {
-        articles.filter {
-            $0.kind == kind && (kind == .journal || ((category == nil || $0.category == category) &&
-                "\($0.title) \($0.summary) \($0.category) \($0.audience)".lowercased().contains(query.lowercased())))
+        articles.filter { article in
+            guard article.kind == kind else { return false }
+            if kind == .journal { return true }
+            guard category == nil || article.category == category else { return false }
+            if query.isEmpty { return true }
+            return "\(article.title) \(article.summary) \(article.category) \(article.audience)"
+                .lowercased().contains(query.lowercased())
         }
     }
 }

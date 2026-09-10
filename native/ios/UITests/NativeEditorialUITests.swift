@@ -23,6 +23,9 @@ final class NativeEditorialUITests: XCTestCase {
         }
         XCTAssertTrue(element.isHittable)
     }
+    private func text(_ label: String, in app: XCUIApplication) -> XCUIElement {
+        app.staticTexts.matching(NSPredicate(format: "label == %@", label)).firstMatch
+    }
     func testKnowledgeSearchArticleAndBackPreserveQuery() throws {
         let source = try fixture(); let article = try XCTUnwrap(source.articles.first { $0.kind == "knowledge" })
         let app = XCUIApplication(); app.launch()
@@ -32,7 +35,7 @@ final class NativeEditorialUITests: XCTestCase {
         search.tap(); search.typeText(article.title.uppercased() + "\n")
         let card = app.buttons["editorial-article-\(article.slug)"]
         reveal(card, in: app); card.tap()
-        let lastBody = app.staticTexts[try XCTUnwrap(article.sections.last).body]
+        let lastBody = text(try XCTUnwrap(article.sections.last).body, in: app)
         reveal(lastBody, in: app)
         let back = app.buttons.matching(identifier: source.library.back).element(boundBy: 1)
         reveal(back, in: app); back.tap()
@@ -64,7 +67,7 @@ final class NativeEditorialUITests: XCTestCase {
         XCTAssertFalse(app.textFields[source.library.search].exists)
         let card = app.buttons["editorial-article-\(article.slug)"]
         reveal(card, in: app); card.tap()
-        reveal(app.staticTexts[source.journal.disclaimer], in: app)
-        reveal(app.staticTexts[try XCTUnwrap(article.sections.last).body], in: app)
+        reveal(text(source.journal.disclaimer, in: app), in: app)
+        reveal(text(try XCTUnwrap(article.sections.last).body, in: app), in: app)
     }
 }
