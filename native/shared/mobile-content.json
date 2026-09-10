@@ -19,6 +19,8 @@
   "mfaAuthenticator": "Authenticator app",
   "mfaSms": "Text message",
   "mfaEmail": "Email code",
+  "mfaEmailAddress": "Email for verification",
+  "mfaEmailSetupInstructions": "Enter the email address you want to use for verification. You will need to confirm the code sent to it.",
   "verify": "Verify",
   "cancel": "Cancel",
   "loading": "Please wait\u2026",

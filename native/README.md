@@ -5,7 +5,7 @@ existing Capacitor project remain separate and are preserved during migration.
 
 This is an **incomplete native implementation**. The first slice covers sign-in, code confirmation,
 password recovery, registration, canonical policy viewers, own-profile setup, secure password/new-password
-challenges, SDK-authorized MFA method selection, session handling, patient/doctor appointment lists and
+challenges, SDK-authorized MFA method selection and email setup, session handling, patient/doctor appointment lists and
 patient cancellation with confirmation and status readback. Staff/admin workspaces,
 booking/rescheduling, billing, messaging, consultations, records and other web
 features still need native implementation. A successful build does not establish feature parity,
@@ -59,21 +59,20 @@ gates on a standard macOS runner only for public repositories. It does not uploa
 publish or deploy. Check runner eligibility and billing before enabling/dispatching it. The local
 presence of this workflow is not evidence that it has run.
 
-Verification run [34399561053](https://github.com/Zahidulislam2222/mediconnect-hub/actions/runs/34399561053)
-passed for commit `a2538198dec2b3fcd0b6328fde4b60bd8ba05cc8`: both regional simulator schemes built
+Verification run [34459508699](https://github.com/Zahidulislam2222/mediconnect-hub/actions/runs/34459508699)
+passed for commit `6255d9c56092aa099911cc984177e81ea1a6db0b`: both regional simulator schemes built
 and passed their unit and UI tests. Signed distribution builds, physical devices, live providers and
 independent review remain separate, incomplete gates.
 
 UI tests expect the safe default blank configuration; use synthetic accounts/data for any added
 connected tests. Do not put patient data or authentication material in fixtures, screenshots or logs.
 
-The corrected registration/profile/password-challenge/cancellation snapshot is being verified in
-[run 34459508699](https://github.com/Zahidulislam2222/mediconnect-hub/actions/runs/34459508699).
-The preceding run failed on two Swift test enum-constructor labels, corrected in that snapshot.
-Newer MFA-selection source is not covered by that run. MFA selection offers only the methods supplied
-by the SDK; TOTP/email enrollment and other unsupported challenges still need implementation.
+That passing baseline covers registration, profiles, password challenges and cancellation. It fixes
+the preceding run's two Swift test enum-constructor errors. Newer MFA-selection/email-setup changes
+need their own matching successful Mac run. MFA selection offers only the methods supplied
+by the SDK; TOTP enrollment and other unsupported challenges still need implementation.
 Provider account, profile and cancellation tests use synthetic boundaries only.
 
-The MFA-selection Android snapshot passes 138 unit/transport tests and 40 emulator UI tests across
+The MFA-selection/email-setup Android snapshot passes 144 unit/transport tests and 46 emulator UI tests across
 US/EU, both debug and optimized unsigned release builds, lint (zero errors; 18 warnings per region),
 and both actual launcher checks. All four APKs were checked for blank provider configuration.

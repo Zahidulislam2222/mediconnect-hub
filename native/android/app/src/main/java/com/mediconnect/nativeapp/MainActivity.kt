@@ -34,6 +34,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import java.time.ZoneId
@@ -174,11 +175,18 @@ private fun SignInForm(state: WorkspaceState, content: MobileContent,
             }
             TextButton(onClick = cancel) { Text(content.text("cancel")) }
         } else if (state.challenge) {
+            if (state.challengeInput == ChallengeInput.EMAIL) Text(content.text("mfaEmailSetupInstructions"))
             OutlinedTextField(code, { code = it }, Modifier.fillMaxWidth(), enabled = !state.busy,
                 label = { Text(content.text(when (state.challengeInput) {
                     ChallengeInput.CODE -> "code"; ChallengeInput.PASSWORD -> "password"; ChallengeInput.NEW_PASSWORD -> "newPassword"
-                })) }, singleLine = true, visualTransformation = PasswordVisualTransformation(),
-                keyboardOptions = KeyboardOptions(keyboardType = if (state.challengeInput == ChallengeInput.CODE) KeyboardType.NumberPassword else KeyboardType.Password))
+                    ChallengeInput.EMAIL -> "mfaEmailAddress"
+                })) }, singleLine = true,
+                visualTransformation = if (state.challengeInput == ChallengeInput.EMAIL) VisualTransformation.None else PasswordVisualTransformation(),
+                keyboardOptions = KeyboardOptions(keyboardType = when (state.challengeInput) {
+                    ChallengeInput.CODE -> KeyboardType.NumberPassword
+                    ChallengeInput.EMAIL -> KeyboardType.Email
+                    else -> KeyboardType.Password
+                }))
             Button(onClick = { val value = code; code = ""; confirm(value) }, enabled = !state.busy && code.isNotBlank()) { Text(content.text("verify")) }
             TextButton(onClick = cancel) { Text(content.text("cancel")) }
         } else {

@@ -17,6 +17,7 @@ struct MediConnectApp: App {
     @ViewBuilder private func root(_ content: MobileContent) -> some View {
         #if DEBUG
         if CancellationUITestFixture.requested() { CancellationUITestFixture(content: content) }
+        else if EmailMfaSetupUITestFixture.requested() { EmailMfaSetupUITestFixture(content: content) }
         else if MfaSelectionUITestFixture.requested() { MfaSelectionUITestFixture(content: content) }
         else if ChallengeUITestFixture.requested() { ChallengeUITestFixture(content: content) }
         else if ProfileUITestFixture.requested(), let policies = model.policies {

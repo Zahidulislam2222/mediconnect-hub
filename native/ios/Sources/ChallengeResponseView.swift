@@ -17,6 +17,10 @@ struct ChallengeResponseView: View {
                 ForEach(choices, id: \.self) { choice in
                     Button(content.text(SignInChallenge.label(choice))) { confirm(choice.challengeResponse) }
                 }
+            } else if input == .email {
+                Text(content.text("mfaEmailSetupInstructions"))
+                TextField(content.text("mfaEmailAddress"), text: $response).textContentType(.emailAddress)
+                    .keyboardType(.emailAddress).textInputAutocapitalization(.never).autocorrectionDisabled()
             } else if input == .code {
                 SecureField(content.text("code"), text: $response).textContentType(.oneTimeCode).keyboardType(.numberPad)
             } else {
