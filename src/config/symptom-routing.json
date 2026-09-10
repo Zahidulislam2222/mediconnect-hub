@@ -1,0 +1,5 @@
+{
+  "assessment": "/ai/symptoms",
+  "profile": "/register-patient",
+  "auth": "/auth"
+}
