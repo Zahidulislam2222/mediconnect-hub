@@ -1,3 +1,4 @@
+import { publicEnv } from "@/config/env";
 import { useEffect, useState, useRef, useCallback } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
@@ -204,7 +205,7 @@ export default function LiveMonitoring() {
         if (!patientId) return;
 
         // Connect to your Patient Service Port
-        const socket = io(import.meta.env.VITE_PATIENT_SERVICE_URL || "http://localhost:8081");
+        const socket = io(publicEnv("VITE_PATIENT_SERVICE_URL"));
 
         socket.emit('join_monitoring', patientId);
 

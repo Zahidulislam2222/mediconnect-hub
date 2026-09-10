@@ -1,3 +1,4 @@
+import { optionalStripePublishableKey } from "@/config/env";
 /**
  * Subscription Page — Plan selection and checkout
  *
@@ -18,7 +19,8 @@ import { PlanCard } from '@/components/subscription/PlanCard';
 import { SubscriptionCheckout } from '@/components/subscription/SubscriptionCheckout';
 import { PLAN_DISPLAY, PlanId, subscriptionApi } from '@/lib/subscription';
 
-const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || '');
+const stripeKey = optionalStripePublishableKey();
+const stripePromise = stripeKey ? loadStripe(stripeKey) : null;
 
 export default function Subscription() {
     const { subscription, isLoading, refresh, isSubscribed, planName } = useSubscription();

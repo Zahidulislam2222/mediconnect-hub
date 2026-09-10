@@ -1,3 +1,4 @@
+import { publicEnv } from "@/config/env";
 import { useState, useEffect, useRef } from "react";
 import { useNavigate, useLocation, useSearchParams } from "react-router-dom";
 import { getCurrentUser, fetchAuthSession } from 'aws-amplify/auth'; // Updated import
@@ -78,8 +79,8 @@ export default function ConsultationRoom() {
 
         const userRegion = localStorage.getItem('userRegion') || 'US';
         const wsBaseUrl = userRegion === 'EU' 
-            ? import.meta.env.VITE_COMMUNICATION_WS_URL_EU 
-            : import.meta.env.VITE_COMMUNICATION_WS_URL_US; 
+            ? publicEnv("VITE_COMMUNICATION_WS_URL_EU")
+            : publicEnv("VITE_COMMUNICATION_WS_URL_US");
 
         const wsUrl = `${wsBaseUrl}?token=${token}&appointmentId=${appointmentId}`;
         ws = new WebSocket(wsUrl);

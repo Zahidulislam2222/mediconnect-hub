@@ -1,3 +1,4 @@
+import { publicEnv, isProductionBuild } from "@/config/env";
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 // AWS Imports
@@ -83,11 +84,11 @@ export default function Auth() {
     Amplify.configure({
       Auth: {
         Cognito: {
-          userPoolId: isEU ? import.meta.env.VITE_COGNITO_USER_POOL_ID_EU : import.meta.env.VITE_COGNITO_USER_POOL_ID_US,
+          userPoolId: isEU ? publicEnv("VITE_COGNITO_USER_POOL_ID_EU") : publicEnv("VITE_COGNITO_USER_POOL_ID_US"),
           userPoolClientId: isEU 
-            ? (userType === 'provider' ? import.meta.env.VITE_COGNITO_CLIENT_DOCTOR_EU : import.meta.env.VITE_COGNITO_CLIENT_PATIENT_EU)
-            : (userType === 'provider' ? import.meta.env.VITE_COGNITO_CLIENT_DOCTOR_US : import.meta.env.VITE_COGNITO_CLIENT_PATIENT_US),
-          identityPoolId: isEU ? import.meta.env.VITE_COGNITO_IDENTITY_POOL_ID_EU : import.meta.env.VITE_COGNITO_IDENTITY_POOL_ID_US,
+            ? (userType === 'provider' ? publicEnv("VITE_COGNITO_CLIENT_DOCTOR_EU") : publicEnv("VITE_COGNITO_CLIENT_PATIENT_EU"))
+            : (userType === 'provider' ? publicEnv("VITE_COGNITO_CLIENT_DOCTOR_US") : publicEnv("VITE_COGNITO_CLIENT_PATIENT_US")),
+          identityPoolId: isEU ? publicEnv("VITE_COGNITO_IDENTITY_POOL_ID_EU") : publicEnv("VITE_COGNITO_IDENTITY_POOL_ID_US"),
         }
       }
     });
@@ -491,7 +492,7 @@ export default function Auth() {
 
   const handleSkip = () => {
     // 🟢 SECURITY FIX: Completely disable this button in Production!
-    if (import.meta.env.MODE === 'production' || import.meta.env.PROD) {
+    if (isProductionBuild) {
       toast({ variant: "destructive", title: "Action Blocked", description: "Demo mode is disabled in production." });
       return;
     }

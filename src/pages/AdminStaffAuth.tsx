@@ -1,3 +1,4 @@
+import { publicEnv } from "@/config/env";
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Amplify } from 'aws-amplify';
@@ -47,20 +48,20 @@ export default function AdminStaffAuth() {
     const getClientId = () => {
       if (portalType === 'admin') {
         return isEU
-          ? import.meta.env.VITE_COGNITO_CLIENT_ADMIN_EU
-          : import.meta.env.VITE_COGNITO_CLIENT_ADMIN_US;
+          ? publicEnv("VITE_COGNITO_CLIENT_ADMIN_EU")
+          : publicEnv("VITE_COGNITO_CLIENT_ADMIN_US");
       }
       return isEU
-        ? import.meta.env.VITE_COGNITO_CLIENT_STAFF_EU
-        : import.meta.env.VITE_COGNITO_CLIENT_STAFF_US;
+        ? publicEnv("VITE_COGNITO_CLIENT_STAFF_EU")
+        : publicEnv("VITE_COGNITO_CLIENT_STAFF_US");
     };
 
     Amplify.configure({
       Auth: {
         Cognito: {
-          userPoolId: isEU ? import.meta.env.VITE_COGNITO_USER_POOL_ID_EU : import.meta.env.VITE_COGNITO_USER_POOL_ID_US,
+          userPoolId: isEU ? publicEnv("VITE_COGNITO_USER_POOL_ID_EU") : publicEnv("VITE_COGNITO_USER_POOL_ID_US"),
           userPoolClientId: getClientId(),
-          identityPoolId: isEU ? import.meta.env.VITE_COGNITO_IDENTITY_POOL_ID_EU : import.meta.env.VITE_COGNITO_IDENTITY_POOL_ID_US,
+          identityPoolId: isEU ? publicEnv("VITE_COGNITO_IDENTITY_POOL_ID_EU") : publicEnv("VITE_COGNITO_IDENTITY_POOL_ID_US"),
         }
       }
     });

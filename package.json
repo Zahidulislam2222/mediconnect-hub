@@ -4,6 +4,7 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
+    "verify:config": "node scripts/verify_frontend_config.mjs",
     "dev": "vite",
     "build": "vite build",
     "build:dev": "vite build --mode development",

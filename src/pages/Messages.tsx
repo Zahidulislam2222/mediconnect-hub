@@ -1,3 +1,4 @@
+import { publicEnv } from "@/config/env";
 import { useState, useEffect, useRef } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { getCurrentUser, fetchAuthSession } from 'aws-amplify/auth';
@@ -170,8 +171,8 @@ export default function Messages() {
             // 🟢 FIX: REGIONAL LOGIC (Matches ConsultationRoom.tsx)
             const userRegion = localStorage.getItem('userRegion') || 'US';
             const wsBaseUrl = userRegion === 'EU'
-                ? import.meta.env.VITE_COMMUNICATION_WS_URL_EU
-                : import.meta.env.VITE_COMMUNICATION_WS_URL_US;
+                ? publicEnv("VITE_COMMUNICATION_WS_URL_EU")
+                : publicEnv("VITE_COMMUNICATION_WS_URL_US");
 
             // 🟢 SECURITY FIX: Get token via Amplify, not localStorage scan
             const token = await getAuthTokenAsync();

@@ -161,3 +161,19 @@ export function configuredCognitoIssuer(region: 'US' | 'EU'): string {
   const pool = publicEnv(region === 'EU' ? 'VITE_COGNITO_USER_POOL_ID_EU' : 'VITE_COGNITO_USER_POOL_ID_US');
   return `https://cognito-idp.${awsRegion}.amazonaws.com/${pool}`;
 }
+
+/** CMS is optional until a configured integration actually uses it. */
+export function optionalCmsUrl(): string | undefined {
+  const raw = rawPublicEnvironment.VITE_STRAPI_API_URL;
+  if (raw === undefined || (typeof raw === 'string' && raw.trim() === '')) return undefined;
+  return publicEnv('VITE_STRAPI_API_URL');
+}
+
+export const isProductionBuild = import.meta.env.MODE === 'production' || import.meta.env.PROD;
+
+/** Subscription UI may be imported without enabling Stripe. */
+export function optionalStripePublishableKey(): string | undefined {
+  const raw = rawPublicEnvironment.VITE_STRIPE_PUBLISHABLE_KEY;
+  if (raw === undefined || (typeof raw === 'string' && raw.trim() === '')) return undefined;
+  return publicEnv('VITE_STRIPE_PUBLISHABLE_KEY');
+}

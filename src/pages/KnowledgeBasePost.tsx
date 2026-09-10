@@ -1,3 +1,4 @@
+import { publicEnv, optionalBackupUrl, requestTimeout } from "@/config/env";
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
@@ -51,11 +52,11 @@ async function fetchArticleCrossRegion(slug: string): Promise<any> {
   const otherRegion = userRegion === 'EU' ? 'US' : 'EU';
 
   const otherPrimary = otherRegion === 'US'
-    ? import.meta.env.VITE_PATIENT_SERVICE_URL_US
-    : import.meta.env.VITE_PATIENT_SERVICE_URL_EU;
+    ? publicEnv("VITE_PATIENT_SERVICE_URL_US")
+    : publicEnv("VITE_PATIENT_SERVICE_URL_EU");
   const otherBackup = otherRegion === 'US'
-    ? import.meta.env.VITE_PATIENT_SERVICE_URL_US_BACKUP
-    : import.meta.env.VITE_PATIENT_SERVICE_URL_EU_BACKUP;
+    ? optionalBackupUrl("VITE_PATIENT_SERVICE_URL_US_BACKUP")
+    : optionalBackupUrl("VITE_PATIENT_SERVICE_URL_EU_BACKUP");
 
   const headers: HeadersInit = {
     'Content-Type': 'application/json',
@@ -87,9 +88,9 @@ async function fetchArticleCrossRegion(slug: string): Promise<any> {
     }
   }
 
-  let result = await tryFetch(otherPrimary, 5000);
+  let result = await tryFetch(otherPrimary, requestTimeout('VITE_API_PRIMARY_TIMEOUT_MS'));
   if (!result && otherBackup) {
-    result = await tryFetch(otherBackup, 15000);
+    result = await tryFetch(otherBackup, requestTimeout('VITE_API_BACKUP_TIMEOUT_MS'));
   }
 
   return result;

@@ -1,3 +1,4 @@
+import { publicEnv, optionalBackupUrl, requestTimeout } from "@/config/env";
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Search, Heart, TrendingUp, Brain, Syringe, Apple, Pill, Moon, ArrowRight, BookOpen, Activity, Loader2 } from "lucide-react";
@@ -37,10 +38,10 @@ const MOCK_CATEGORIES = [
 // This page shows ALL articles globally by querying both regions.
 // =========================================================================
 async function fetchGlobalKnowledgeBase(): Promise<any[]> {
-  const usUrl = import.meta.env.VITE_PATIENT_SERVICE_URL_US;
-  const euUrl = import.meta.env.VITE_PATIENT_SERVICE_URL_EU;
-  const usBackup = import.meta.env.VITE_PATIENT_SERVICE_URL_US_BACKUP;
-  const euBackup = import.meta.env.VITE_PATIENT_SERVICE_URL_EU_BACKUP;
+  const usUrl = publicEnv("VITE_PATIENT_SERVICE_URL_US");
+  const euUrl = publicEnv("VITE_PATIENT_SERVICE_URL_EU");
+  const usBackup = optionalBackupUrl("VITE_PATIENT_SERVICE_URL_US_BACKUP");
+  const euBackup = optionalBackupUrl("VITE_PATIENT_SERVICE_URL_EU_BACKUP");
 
   async function fetchRegion(primaryUrl: string, backupUrl: string, region: string): Promise<any[]> {
     const headers: HeadersInit = {
@@ -78,9 +79,9 @@ async function fetchGlobalKnowledgeBase(): Promise<any[]> {
     }
 
     // Try primary, fallback to backup
-    let results = await tryFetch(primaryUrl, 5000);
+    let results = await tryFetch(primaryUrl, requestTimeout('VITE_API_PRIMARY_TIMEOUT_MS'));
     if (results.length === 0 && backupUrl) {
-      results = await tryFetch(backupUrl, 15000);
+      results = await tryFetch(backupUrl, requestTimeout('VITE_API_BACKUP_TIMEOUT_MS'));
     }
     return results;
   }
