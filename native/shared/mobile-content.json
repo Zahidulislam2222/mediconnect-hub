@@ -71,6 +71,8 @@
   "resendCode": "Request another code",
   "registrationCodeRequested": "A new confirmation code was requested. Check your registered contact.",
   "close": "Close",
+  "policyUpdated": "Updated",
+  "policyLinkFailed": "This source could not be opened. You can continue reading here or try the link again.",
   "profileSetup": "Set up your profile",
   "profileSetupInstructions": "Enter your details and review the current policies to create your profile. Clinical access may require separate verification.",
   "specialization": "Specialization",

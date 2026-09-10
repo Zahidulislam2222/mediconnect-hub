@@ -19,8 +19,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.KeyboardType
@@ -29,23 +32,40 @@ import androidx.compose.ui.unit.dp
 
 @Composable
 fun PolicyLinks(policies: MobilePolicies, content: MobileContent) {
-    var selected by remember { mutableStateOf<String?>(null) }
+    var selected by rememberSaveable { mutableStateOf<String?>(null) }
+    val uriHandler = LocalUriHandler.current
     Column {
         policies.pages.forEach { (key, page) ->
-            TextButton(onClick = { selected = key }) { Text(page.title) }
+            TextButton(onClick = { selected = key }, modifier = Modifier.testTag("policy-$key")) { Text(page.title) }
         }
     }
     selected?.let { key ->
         val page = policies.pages.getValue(key)
+        var linkFailed by remember(key) { mutableStateOf(false) }
         AlertDialog(onDismissRequest = { selected = null }, title = { Text(page.title) }, text = {
-            LazyColumn(Modifier.heightIn(max = 480.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            LazyColumn(Modifier.heightIn(max = 480.dp).testTag("policy-body"), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                item { Text("${content.text("policyUpdated")} ${policies.updated}", Modifier.testTag("policy-updated")) }
                 item { Text(policies.notice) }
-                page.sections.forEach { section -> item {
-                    Column { Text(section.title, style = MaterialTheme.typography.titleSmall); Text(section.body) }
+                page.sections.forEachIndexed { index, section -> item {
+                    Column { Text(section.title, style = MaterialTheme.typography.titleSmall); Text(section.body, Modifier.testTag("policy-section-$index")) }
                 } }
-                page.sources.forEach { source -> item { Column { Text(source.label); Text(source.url) } } }
+                page.sources.forEachIndexed { index, source -> item {
+                    TextButton(onClick = {
+                        linkFailed = false
+                        try { uriHandler.openUri(source.url) }
+                        catch (_: IllegalArgumentException) { linkFailed = true }
+                        catch (_: SecurityException) { linkFailed = true }
+                    }, modifier = Modifier.testTag("policy-source-$index")) {
+                        Column { Text(source.label); Text(source.url) }
+                    }
+                } }
             }
-        }, confirmButton = { TextButton(onClick = { selected = null }) { Text(content.text("close")) } })
+        }, confirmButton = {
+            Column {
+                if (linkFailed) Text(content.text("policyLinkFailed"), Modifier.testTag("policy-link-failed"), color = MaterialTheme.colorScheme.error)
+                TextButton(onClick = { selected = null }, modifier = Modifier.testTag("policy-close")) { Text(content.text("close")) }
+            }
+        })
     }
 }
 

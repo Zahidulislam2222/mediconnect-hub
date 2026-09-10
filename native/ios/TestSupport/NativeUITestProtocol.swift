@@ -15,4 +15,7 @@ enum NativeUITestProtocol {
     static let profileFailure = "--native-profile-failure-ui-test"
     static let passwordRecovery = "--native-password-recovery-ui-test"
     static let registration = "--native-registration-ui-test"
+    static let policyURLHandled = "--native-policy-url-handled"
+    static let policyURLUnavailable = "--native-policy-url-unavailable"
+    static let policyOpenedURL = "native-policy-opened-url"
 }

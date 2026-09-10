@@ -8,27 +8,53 @@ struct PolicyLinks: View {
         VStack(alignment: .leading) {
             ForEach(policies.pages.keys.sorted(), id: \.self) { key in
                 Button(policies.pages[key]?.title ?? key) { selected = key }
+                    .accessibilityIdentifier("policy-\(key)")
             }
         }
         .sheet(isPresented: Binding(get: { selected != nil }, set: { if !$0 { selected = nil } })) {
             if let key = selected, let page = policies.pages[key] {
-                NavigationStack {
-                    ScrollView {
-                        VStack(alignment: .leading, spacing: 20) {
-                            Text(policies.notice)
-                            ForEach(page.sections.indices, id: \.self) { index in
-                                Text(page.sections[index].title).font(.headline)
-                                Text(page.sections[index].body)
-                            }
-                            ForEach(page.sources.indices, id: \.self) { index in
-                                Text(page.sources[index].label).font(.headline)
-                                Text(page.sources[index].url).textSelection(.enabled)
-                            }
-                        }.padding()
-                    }.navigationTitle(page.title)
-                        .toolbar { Button(content.text("close")) { selected = nil } }
-                }
+                PolicyReader(page: page, policies: policies, content: content) { selected = nil }.id(key)
             }
+        }
+    }
+}
+
+private struct PolicyReader: View {
+    let page: PolicyPage
+    let policies: MobilePolicies
+    let content: MobileContent
+    let close: () -> Void
+    @Environment(\.openURL) private var openURL
+    @State private var linkFailed = false
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 20) {
+                    Text("\(content.text("policyUpdated")) \(policies.updated)")
+                        .accessibilityIdentifier("policy-updated")
+                    Text(policies.notice)
+                    ForEach(page.sections.indices, id: \.self) { index in
+                        Text(page.sections[index].title).font(.headline)
+                        Text(page.sections[index].body).accessibilityIdentifier("policy-section-\(index)")
+                    }
+                    ForEach(page.sources.indices, id: \.self) { index in
+                        Button {
+                            guard let url = URL(string: page.sources[index].url) else { linkFailed = true; return }
+                            openURL(url) { accepted in linkFailed = !accepted }
+                        } label: {
+                            VStack(alignment: .leading) {
+                                Text(page.sources[index].label).font(.headline)
+                                Text(page.sources[index].url)
+                            }
+                        }.accessibilityIdentifier("policy-source-\(index)")
+                    }
+                }.padding()
+            }.accessibilityIdentifier("policy-body")
+                .navigationTitle(page.title)
+                .safeAreaInset(edge: .bottom) {
+                    if linkFailed { Text(content.text("policyLinkFailed")).padding().accessibilityIdentifier("policy-link-failed") }
+                }
+                .toolbar { Button(content.text("close"), action: close).accessibilityIdentifier("policy-close") }
         }
     }
 }

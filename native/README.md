@@ -31,6 +31,13 @@ changes pass 170 Android unit/transport tests and both regional debug/unsigned r
 Editorial verification also requires its own emulator and macOS evidence; the entry-only
 verification result below applies to its named commit.
 
+Policy pages use the canonical legal and consent resources, including the update date. Both
+parsers require nonblank typed copy, nonempty sections and HTTPS citations without embedded
+credentials. Citations open through the platform URL handler only after a tap; an unavailable
+handler shows an error while keeping the page readable. Opening or closing a policy does not
+accept registration consent. Native policy changes require their own regional build and UI gates;
+the historical verification results here do not establish that new code's iOS behavior.
+
 ## Configuration
 
 `shared/mobile-config.example.json` describes public settings. Copy it to the ignored

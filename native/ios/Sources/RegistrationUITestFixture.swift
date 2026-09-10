@@ -13,6 +13,7 @@ private final class SyntheticRegistrationService: RegistrationService {
 struct RegistrationUITestFixture: View {
     @StateObject private var model = AccountRegistration(service: SyntheticRegistrationService())
     @Environment(\.scenePhase) private var phase
+    @State private var openedURL = ""
     let content: MobileContent
     let policies: MobilePolicies
     static func requested() -> Bool {
@@ -29,7 +30,16 @@ struct RegistrationUITestFixture: View {
         ScrollView {
             if model.state.step == .closed { Button(content.text("createAccount")) { model.open() } }
             else { RegistrationView(model: model, content: content, policies: policies).id(model.state.step) }
+            if !openedURL.isEmpty { Text(openedURL).accessibilityIdentifier(NativeUITestProtocol.policyOpenedURL) }
         }.padding()
+            .environment(\.openURL, OpenURLAction { url in
+                let arguments = ProcessInfo.processInfo.arguments
+                if arguments.contains(NativeUITestProtocol.policyURLUnavailable) { return .discarded }
+                if arguments.contains(NativeUITestProtocol.policyURLHandled) {
+                    openedURL = url.absoluteString; return .handled
+                }
+                return .systemAction
+            })
             .onDisappear { model.close() }
             .onChange(of: phase) { value in if value != .active { model.close() } }
     }

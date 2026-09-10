@@ -87,6 +87,10 @@ targets:
       - TestSupport/NativeUITestProtocol.swift
       - path: Resources/journey.json
         buildPhase: resources
+      - path: Resources/legal.json
+        buildPhase: resources
+      - path: Resources/mobile-content.json
+        buildPhase: resources
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.mediconnect.nativeapp.uitests
