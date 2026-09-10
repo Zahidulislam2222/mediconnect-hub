@@ -17,6 +17,7 @@ struct MediConnectApp: App {
     @ViewBuilder private func root(_ content: MobileContent) -> some View {
         #if DEBUG
         if CancellationUITestFixture.requested() { CancellationUITestFixture(content: content) }
+        else if AuthenticatorSetupUITestFixture.requested() { AuthenticatorSetupUITestFixture(content: content) }
         else if EmailMfaSetupUITestFixture.requested() { EmailMfaSetupUITestFixture(content: content) }
         else if MfaSelectionUITestFixture.requested() { MfaSelectionUITestFixture(content: content) }
         else if ChallengeUITestFixture.requested() { ChallengeUITestFixture(content: content) }
@@ -94,7 +95,7 @@ struct WorkspaceView: View {
             if model.challenge {
                 ChallengeResponseView(input: model.challengeInput, content: content, busy: model.busy,
                                       confirm: { model.confirm(code: $0) }, cancel: model.signOut,
-                                      choices: model.challengeChoices).id(model.challengeInput)
+                                      choices: model.challengeChoices, setup: model.authenticatorSetup).id(model.challengeInput)
             } else {
                 TextField(content.text("email"), text: $email).textContentType(.username)
                     .keyboardType(.emailAddress).textInputAutocapitalization(.never).autocorrectionDisabled()

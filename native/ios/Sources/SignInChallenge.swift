@@ -2,7 +2,7 @@ import Amplify
 import AWSCognitoAuthPlugin
 import Foundation
 
-enum ChallengeInput: Hashable { case code, password, newPassword, email }
+enum ChallengeInput: Hashable { case code, password, newPassword, email, totpSetup }
 enum SignInChallenge {
     static func choices(_ step: AuthSignInStep) -> [MFAType] {
         switch step {
@@ -27,12 +27,16 @@ enum SignInChallenge {
         case .confirmSignInWithPassword: return .password
         case .confirmSignInWithNewPassword: return .newPassword
         case .continueSignInWithEmailMFASetup: return .email
+        case .continueSignInWithTOTPSetup: return .totpSetup
         default: return nil
         }
     }
     static func response(_ input: ChallengeInput, value: String) -> String? {
         let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return nil }
-        return input == .code || input == .email ? trimmed : value
+        return input == .password || input == .newPassword ? value : trimmed
+    }
+    static func retainForAuthenticator(challenge: Bool, input: ChallengeInput, setup: AuthenticatorSetup?, busy: Bool, authenticated: Bool) -> Bool {
+        challenge && input == .totpSetup && setup != nil && !busy && !authenticated
     }
 }

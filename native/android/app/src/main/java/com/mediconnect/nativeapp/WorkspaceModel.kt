@@ -24,6 +24,7 @@ data class WorkspaceState(
     val challenge: Boolean = false,
     val challengeInput: ChallengeInput = ChallengeInput.CODE,
     val challengeChoices: List<MFAType> = emptyList(),
+    val authenticatorSetup: AuthenticatorSetup? = null,
     val visible: Boolean = true,
 )
 
@@ -60,7 +61,14 @@ class WorkspaceModel(application: Application) : AndroidViewModel(application) {
         mutable.value = WorkspaceState(visible = visible)
     }
 
-    fun hide() { registration.close(); recovery.close(); reset(visible = false) }
+    fun hide() {
+        registration.close(); recovery.close()
+        val current = mutable.value
+        if (SignInChallenge.retainForAuthenticator(current.challenge, current.challengeInput, current.authenticatorSetup, current.busy, current.identity != null)) {
+            generation++; operation?.cancel()
+            mutable.value = current.copy(visible = false)
+        } else reset(visible = false)
+    }
 
     fun openRegistration() {
         val runtime = runtime ?: return
@@ -113,11 +121,12 @@ class WorkspaceModel(application: Application) : AndroidViewModel(application) {
             runtime.requiresExplicitSignIn = false
             accept(identity)
         } else {
-            val input = SignInChallenge.input(result.nextStep.signInStep)
+            val setup = AuthenticatorSetup.fromSdk(result.nextStep)
+            val input = SignInChallenge.input(result.nextStep.signInStep)?.takeUnless { it == ChallengeInput.TOTP_SETUP && setup == null }
             val choices = SignInChallenge.choices(result.nextStep)
             val supported = input != null || choices.isNotEmpty()
             mutable.value = mutable.value.copy(challenge = supported, challengeInput = input ?: ChallengeInput.CODE,
-                challengeChoices = choices, error = if (supported) null else "additionalStep")
+                challengeChoices = choices, authenticatorSetup = setup, error = if (supported) null else "additionalStep")
         }
     }
 

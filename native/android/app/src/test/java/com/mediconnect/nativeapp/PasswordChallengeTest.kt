@@ -9,7 +9,7 @@ class PasswordChallengeTest {
         assertEquals(ChallengeInput.PASSWORD, SignInChallenge.input(AuthSignInStep.CONFIRM_SIGN_IN_WITH_PASSWORD))
         assertEquals(ChallengeInput.NEW_PASSWORD, SignInChallenge.input(AuthSignInStep.CONFIRM_SIGN_IN_WITH_NEW_PASSWORD))
         assertEquals(ChallengeInput.CODE, SignInChallenge.input(AuthSignInStep.CONFIRM_SIGN_IN_WITH_TOTP_CODE))
-        assertNull(SignInChallenge.input(AuthSignInStep.CONTINUE_SIGN_IN_WITH_TOTP_SETUP))
+        assertEquals(ChallengeInput.TOTP_SETUP, SignInChallenge.input(AuthSignInStep.CONTINUE_SIGN_IN_WITH_TOTP_SETUP))
         assertNull(SignInChallenge.input(AuthSignInStep.CONFIRM_SIGN_IN_WITH_CUSTOM_CHALLENGE))
         assertNull(SignInChallenge.input(AuthSignInStep.DONE))
     }

@@ -5,7 +5,7 @@ import com.amplifyframework.auth.result.step.AuthNextSignInStep
 import com.amplifyframework.auth.MFAType
 import com.amplifyframework.auth.cognito.challengeResponse
 
-enum class ChallengeInput { CODE, PASSWORD, NEW_PASSWORD, EMAIL }
+enum class ChallengeInput { CODE, PASSWORD, NEW_PASSWORD, EMAIL, TOTP_SETUP }
 
 object SignInChallenge {
     fun choices(step: AuthNextSignInStep): List<MFAType> = when (step.signInStep) {
@@ -26,10 +26,14 @@ object SignInChallenge {
         step == AuthSignInStep.CONFIRM_SIGN_IN_WITH_PASSWORD -> ChallengeInput.PASSWORD
         step == AuthSignInStep.CONFIRM_SIGN_IN_WITH_NEW_PASSWORD -> ChallengeInput.NEW_PASSWORD
         step == AuthSignInStep.CONTINUE_SIGN_IN_WITH_EMAIL_MFA_SETUP -> ChallengeInput.EMAIL
+        step == AuthSignInStep.CONTINUE_SIGN_IN_WITH_TOTP_SETUP -> ChallengeInput.TOTP_SETUP
         else -> null
     }
     fun response(input: ChallengeInput, value: String): String? =
-        if (value.isBlank()) null else if (input == ChallengeInput.CODE || input == ChallengeInput.EMAIL) value.trim() else value
+        if (value.isBlank()) null else if (input == ChallengeInput.PASSWORD || input == ChallengeInput.NEW_PASSWORD) value else value.trim()
+
+    fun retainForAuthenticator(challenge: Boolean, input: ChallengeInput, setup: AuthenticatorSetup?, busy: Boolean, authenticated: Boolean): Boolean =
+        challenge && input == ChallengeInput.TOTP_SETUP && setup != null && !busy && !authenticated
 
     fun needsCode(step: AuthSignInStep): Boolean = when (step) {
         AuthSignInStep.CONFIRM_SIGN_IN_WITH_SMS_MFA_CODE,

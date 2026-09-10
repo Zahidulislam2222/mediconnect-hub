@@ -1,5 +1,7 @@
 // Stable launch protocol shared by the app's DEBUG-only fixture and its UI test target.
 enum NativeUITestProtocol {
+    static let authenticatorSetup = "--native-authenticator-setup-ui-test"
+    static let authenticatorCodeAccepted = "native-authenticator-code-accepted"
     static let emailMfaSetup = "--native-email-mfa-setup-ui-test"
     static let emailMfaBusy = "--native-email-mfa-busy"
     static let mfaSelection = "--native-mfa-selection-ui-test"

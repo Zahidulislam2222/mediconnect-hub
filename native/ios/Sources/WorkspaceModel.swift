@@ -13,6 +13,7 @@ final class WorkspaceModel: ObservableObject {
     @Published private(set) var challenge = false
     @Published private(set) var challengeInput: ChallengeInput = .code
     @Published private(set) var challengeChoices: [MFAType] = []
+    @Published private(set) var authenticatorSetup: AuthenticatorSetup?
     @Published private(set) var visible = true
     let residency: String
     let content: MobileContent?
@@ -78,10 +79,16 @@ final class WorkspaceModel: ObservableObject {
         challenge = false
         challengeInput = .code
         challengeChoices = []
+        authenticatorSetup = nil
         message = nil
         self.visible = visible
     }
-    func hide() { registration.close(); recovery.close(); clear(visible: false) }
+    func hide() {
+        registration.close(); recovery.close()
+        if SignInChallenge.retainForAuthenticator(challenge: challenge, input: challengeInput, setup: authenticatorSetup, busy: busy, authenticated: identity != nil) {
+            generation += 1; operation?.cancel(); visible = false
+        } else { clear(visible: false) }
+    }
     func openRegistration() {
         guard configured, policies != nil else { return }
         requiresExplicitSignIn = true
@@ -135,7 +142,9 @@ final class WorkspaceModel: ObservableObject {
             requiresExplicitSignIn = false
             try await accept(access)
         } else {
-            let input = SignInChallenge.input(result.nextStep)
+            authenticatorSetup = AuthenticatorSetup.fromSDK(result.nextStep)
+            var input = SignInChallenge.input(result.nextStep)
+            if input == .totpSetup && authenticatorSetup == nil { input = nil }
             challengeChoices = SignInChallenge.choices(result.nextStep)
             challenge = input != nil || !challengeChoices.isEmpty
             challengeInput = input ?? .code
@@ -146,6 +155,7 @@ final class WorkspaceModel: ObservableObject {
         identity = access.identity
         challenge = false
         challengeChoices = []
+        authenticatorSetup = nil
         expiry?.cancel()
         let expiresAt = access.identity.expiresAt
         expiry = Task { [weak self] in

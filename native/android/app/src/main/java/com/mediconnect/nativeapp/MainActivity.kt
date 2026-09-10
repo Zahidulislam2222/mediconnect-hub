@@ -35,8 +35,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
+import androidx.lifecycle.Lifecycle
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
@@ -165,6 +168,10 @@ private fun SignInForm(state: WorkspaceState, content: MobileContent,
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var code by remember(state.challenge, state.challengeInput, state.challengeChoices) { mutableStateOf("") }
+    var revealSetup by remember(state.challengeInput, state.authenticatorSetup) { mutableStateOf(false) }
+    LifecycleEventEffect(Lifecycle.Event.ON_STOP) {
+        email = ""; password = ""; code = ""; revealSetup = false
+    }
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
         if (state.challenge && state.challengeChoices.isNotEmpty()) {
             Text(content.text("chooseMfa"), style = MaterialTheme.typography.titleMedium)
@@ -175,20 +182,31 @@ private fun SignInForm(state: WorkspaceState, content: MobileContent,
             }
             TextButton(onClick = cancel) { Text(content.text("cancel")) }
         } else if (state.challenge) {
+            if (state.challengeInput == ChallengeInput.TOTP_SETUP) {
+                Text(content.text("authenticatorSetupInstructions"))
+                state.authenticatorSetup?.let { setup ->
+                    TextButton(onClick = { revealSetup = !revealSetup }, enabled = !state.busy) {
+                        Text(content.text(if (revealSetup) "hideSetupKey" else "revealSetupKey"))
+                    }
+                    if (revealSetup) Text(setup.displayKey(), fontFamily = FontFamily.Monospace)
+                }
+            }
             if (state.challengeInput == ChallengeInput.EMAIL) Text(content.text("mfaEmailSetupInstructions"))
             OutlinedTextField(code, { code = it }, Modifier.fillMaxWidth(), enabled = !state.busy,
                 label = { Text(content.text(when (state.challengeInput) {
                     ChallengeInput.CODE -> "code"; ChallengeInput.PASSWORD -> "password"; ChallengeInput.NEW_PASSWORD -> "newPassword"
                     ChallengeInput.EMAIL -> "mfaEmailAddress"
+                    ChallengeInput.TOTP_SETUP -> "code"
                 })) }, singleLine = true,
                 visualTransformation = if (state.challengeInput == ChallengeInput.EMAIL) VisualTransformation.None else PasswordVisualTransformation(),
                 keyboardOptions = KeyboardOptions(keyboardType = when (state.challengeInput) {
-                    ChallengeInput.CODE -> KeyboardType.NumberPassword
+                    ChallengeInput.CODE, ChallengeInput.TOTP_SETUP -> KeyboardType.NumberPassword
                     ChallengeInput.EMAIL -> KeyboardType.Email
                     else -> KeyboardType.Password
                 }))
-            Button(onClick = { val value = code; code = ""; confirm(value) }, enabled = !state.busy && code.isNotBlank()) { Text(content.text("verify")) }
-            TextButton(onClick = cancel) { Text(content.text("cancel")) }
+            Button(onClick = { val value = code; code = ""; revealSetup = false; confirm(value) },
+                enabled = !state.busy && code.isNotBlank() && (state.challengeInput != ChallengeInput.TOTP_SETUP || state.authenticatorSetup != null)) { Text(content.text("verify")) }
+            TextButton(onClick = { code = ""; revealSetup = false; cancel() }) { Text(content.text("cancel")) }
         } else {
             OutlinedTextField(email, { email = it }, Modifier.fillMaxWidth(), enabled = !state.busy,
                 label = { Text(content.text("email")) }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email))

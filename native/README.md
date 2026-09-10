@@ -70,9 +70,12 @@ connected tests. Do not put patient data or authentication material in fixtures,
 That passing baseline covers registration, profiles, password challenges and cancellation. It fixes
 the preceding run's two Swift test enum-constructor errors. Newer MFA-selection/email-setup changes
 need their own matching successful Mac run. MFA selection offers only the methods supplied
-by the SDK; TOTP enrollment and other unsupported challenges still need implementation.
+by the SDK. Authenticator enrollment keeps the SDK setup key in memory with redacted diagnostics,
+requires an explicit reveal action, and clears the visible key and typed code when switching apps.
+Only an idle pending enrollment survives the app switch; cancellation discards it.
+Other unsupported challenges still need implementation.
 Provider account, profile and cancellation tests use synthetic boundaries only.
 
-The MFA-selection/email-setup Android snapshot passes 144 unit/transport tests and 46 emulator UI tests across
+The authenticator-enrollment Android snapshot passes 152 unit/transport tests and 54 emulator UI tests across
 US/EU, both debug and optimized unsigned release builds, lint (zero errors; 18 warnings per region),
 and both actual launcher checks. All four APKs were checked for blank provider configuration.
