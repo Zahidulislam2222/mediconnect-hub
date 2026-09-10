@@ -12,6 +12,7 @@ final class WorkspaceModel: ObservableObject {
     @Published private(set) var message: String?
     @Published private(set) var challenge = false
     @Published private(set) var challengeInput: ChallengeInput = .code
+    @Published private(set) var challengeChoices: [MFAType] = []
     @Published private(set) var visible = true
     let residency: String
     let content: MobileContent?
@@ -76,6 +77,7 @@ final class WorkspaceModel: ObservableObject {
         busy = false
         challenge = false
         challengeInput = .code
+        challengeChoices = []
         message = nil
         self.visible = visible
     }
@@ -115,7 +117,10 @@ final class WorkspaceModel: ObservableObject {
         }
     }
     func confirm(code: String) {
-        guard !busy, challenge, let response = SignInChallenge.response(challengeInput, value: code), let auth else { return }
+        guard !busy, challenge, let auth else { return }
+        let selected = challengeChoices.isEmpty ? SignInChallenge.response(challengeInput, value: code)
+            : SignInChallenge.selectionResponse(challengeChoices, value: code)
+        guard let response = selected else { return }
         run(message: "signInFailed") { [weak self] in
             let result = try await auth.confirm(code: response)
             try Task.checkCancellation()
@@ -131,14 +136,16 @@ final class WorkspaceModel: ObservableObject {
             try await accept(access)
         } else {
             let input = SignInChallenge.input(result.nextStep)
-            challenge = input != nil
+            challengeChoices = SignInChallenge.choices(result.nextStep)
+            challenge = input != nil || !challengeChoices.isEmpty
             challengeInput = input ?? .code
-            message = input == nil ? "additionalStep" : nil
+            message = challenge ? nil : "additionalStep"
         }
     }
     private func accept(_ access: SessionAccess) async throws {
         identity = access.identity
         challenge = false
+        challengeChoices = []
         expiry?.cancel()
         let expiresAt = access.identity.expiresAt
         expiry = Task { [weak self] in

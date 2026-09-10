@@ -4,6 +4,7 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.amplifyframework.auth.result.AuthSignInResult
+import com.amplifyframework.auth.MFAType
 import com.amplifyframework.auth.result.step.AuthSignInStep
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
@@ -22,6 +23,7 @@ data class WorkspaceState(
     val error: String? = null,
     val challenge: Boolean = false,
     val challengeInput: ChallengeInput = ChallengeInput.CODE,
+    val challengeChoices: List<MFAType> = emptyList(),
     val visible: Boolean = true,
 )
 
@@ -98,7 +100,9 @@ class WorkspaceModel(application: Application) : AndroidViewModel(application) {
     fun confirm(code: String) {
         val runtime = runtime ?: return
         if (!mutable.value.challenge || code.isBlank() || mutable.value.busy) return
-        val response = SignInChallenge.response(mutable.value.challengeInput, code) ?: return
+        val current = mutable.value
+        val response = (if (current.challengeChoices.isNotEmpty()) SignInChallenge.selectionResponse(current.challengeChoices, code)
+            else SignInChallenge.response(current.challengeInput, code)) ?: return
         runOperation("signInFailed") { completeSignIn(runtime.sessions.confirm(response)) }
     }
 
@@ -110,7 +114,10 @@ class WorkspaceModel(application: Application) : AndroidViewModel(application) {
             accept(identity)
         } else {
             val input = SignInChallenge.input(result.nextStep.signInStep)
-            mutable.value = mutable.value.copy(challenge = input != null, challengeInput = input ?: ChallengeInput.CODE, error = if (input != null) null else "additionalStep")
+            val choices = SignInChallenge.choices(result.nextStep)
+            val supported = input != null || choices.isNotEmpty()
+            mutable.value = mutable.value.copy(challenge = supported, challengeInput = input ?: ChallengeInput.CODE,
+                challengeChoices = choices, error = if (supported) null else "additionalStep")
         }
     }
 

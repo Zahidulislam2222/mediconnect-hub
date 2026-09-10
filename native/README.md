@@ -4,8 +4,10 @@ Android uses Kotlin and Jetpack Compose. iOS uses Swift and SwiftUI. The React w
 existing Capacitor project remain separate and are preserved during migration.
 
 This is an **incomplete native implementation**. The first slice covers sign-in, code confirmation,
-password recovery, registration, canonical policy viewers, own-profile setup, secure password/new-password challenges, session handling and read-only patient/doctor appointments. Staff/admin workspaces,
-appointment mutations, billing, messaging, consultations, records and other web
+password recovery, registration, canonical policy viewers, own-profile setup, secure password/new-password
+challenges, SDK-authorized MFA method selection, session handling, patient/doctor appointment lists and
+patient cancellation with confirmation and status readback. Staff/admin workspaces,
+booking/rescheduling, billing, messaging, consultations, records and other web
 features still need native implementation. A successful build does not establish feature parity,
 live-provider behavior, clinical readiness or physical-device behavior.
 
@@ -65,4 +67,13 @@ independent review remain separate, incomplete gates.
 UI tests expect the safe default blank configuration; use synthetic accounts/data for any added
 connected tests. Do not put patient data or authentication material in fixtures, screenshots or logs.
 
-Registration, profile and password-challenge changes after that iOS run are not yet compiled on macOS. Current Android source passes104unit/HTTPS tests and28UI tests across the two regions, both debug/optimized unsigned release builds, lint and real blank-config launch checks. Provider registration/profile tests use synthetic boundaries only.
+The corrected registration/profile/password-challenge/cancellation snapshot is being verified in
+[run 34459508699](https://github.com/Zahidulislam2222/mediconnect-hub/actions/runs/34459508699).
+The preceding run failed on two Swift test enum-constructor labels, corrected in that snapshot.
+Newer MFA-selection source is not covered by that run. MFA selection offers only the methods supplied
+by the SDK; TOTP/email enrollment and other unsupported challenges still need implementation.
+Provider account, profile and cancellation tests use synthetic boundaries only.
+
+The MFA-selection Android snapshot passes 138 unit/transport tests and 40 emulator UI tests across
+US/EU, both debug and optimized unsigned release builds, lint (zero errors; 18 warnings per region),
+and both actual launcher checks. All four APKs were checked for blank provider configuration.

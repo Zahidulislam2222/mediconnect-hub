@@ -39,6 +39,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
+import com.amplifyframework.auth.cognito.challengeResponse
 
 class MainActivity : ComponentActivity() {
     private val model: WorkspaceModel by viewModels()
@@ -162,9 +163,17 @@ private fun SignInForm(state: WorkspaceState, content: MobileContent,
     // Deliberately remember, not rememberSaveable: credentials must never enter saved instance state.
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
-    var code by remember(state.challenge, state.challengeInput) { mutableStateOf("") }
+    var code by remember(state.challenge, state.challengeInput, state.challengeChoices) { mutableStateOf("") }
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        if (state.challenge) {
+        if (state.challenge && state.challengeChoices.isNotEmpty()) {
+            Text(content.text("chooseMfa"), style = MaterialTheme.typography.titleMedium)
+            state.challengeChoices.forEach { choice ->
+                Button(onClick = { confirm(choice.challengeResponse) }, enabled = !state.busy) {
+                    Text(content.text(SignInChallenge.label(choice)))
+                }
+            }
+            TextButton(onClick = cancel) { Text(content.text("cancel")) }
+        } else if (state.challenge) {
             OutlinedTextField(code, { code = it }, Modifier.fillMaxWidth(), enabled = !state.busy,
                 label = { Text(content.text(when (state.challengeInput) {
                     ChallengeInput.CODE -> "code"; ChallengeInput.PASSWORD -> "password"; ChallengeInput.NEW_PASSWORD -> "newPassword"
