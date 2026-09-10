@@ -1,0 +1,20 @@
+{
+  "preview": {
+    "home": "/",
+    "knowledge": "/knowledge",
+    "blog": "/blog",
+    "auth": "/auth",
+    "adminAuth": "/admin-auth",
+    "workspace": "/demo",
+    "storyboard": "/storyboard"
+  },
+  "application": {
+    "home": "/",
+    "knowledge": "/demo/knowledge",
+    "blog": "/blog",
+    "auth": "/auth",
+    "adminAuth": "/admin-auth",
+    "workspace": "/demo",
+    "storyboard": "/storyboard"
+  }
+}

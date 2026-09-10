@@ -2,8 +2,11 @@ import { z } from "zod";
 import httpDefaults from "./http-defaults.json";
 import appointmentRoutes from "./appointment-routing.json";
 import symptomRoutes from "./symptom-routing.json";
+import pushRoutes from "./push-routing.json";
 
 const applicationPath = z.string().regex(/^\/[A-Za-z0-9/_-]+$/).refine(value => !value.includes('//'));
+export const pushRouting = z.object({ patient: applicationPath, doctor: applicationPath }).strict().parse(pushRoutes);
+
 export const symptomRouting = z.object({
   assessment: applicationPath, profile: applicationPath, auth: applicationPath,
 }).strict().parse(symptomRoutes);

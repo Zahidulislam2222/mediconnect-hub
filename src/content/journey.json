@@ -1,0 +1,454 @@
+{
+  "brand": "MediConnect",
+  "tagline": "People first. Care connected.",
+  "notice": "Interactive portfolio demo · Fictional people and sample information. No real appointments or medical advice. This is not a claim of regulatory certification.",
+  "labels": {
+    "mainNavigation": "Main navigation",
+    "workspace": "Demo workspace",
+    "loginRole": "Choose a login role",
+    "categories": "Guide categories",
+    "minutesRead": "min read",
+    "minutes": "min",
+    "guides": "guides",
+    "stories": "stories",
+    "clinicComposition": "Clinic arrival composition",
+    "homeComposition": "Home follow-up composition",
+    "noScript": "JavaScript is needed for this interactive local preview. No real care or account access is provided.",
+    "loading": "Preparing the care journey…"
+  },
+  "navigation": {
+    "skip": "Skip to page content",
+    "journey": "The care journey",
+    "knowledge": "Knowledge base",
+    "blog": "Journal",
+    "login": "Log in",
+    "menu": "Open navigation",
+    "close": "Close navigation",
+    "home": "Home",
+    "explore": "Explore MediConnect"
+  },
+  "hero": {
+    "eyebrow": "From your first hello, to what comes next.",
+    "title": "Care that stays",
+    "emphasis": "with you.",
+    "body": "A conversation in the clinic. A familiar face at home. One connected care journey.",
+    "primary": "Explore the patient demo",
+    "secondary": "Meet the care team",
+    "scroll": "Scroll to follow the story",
+    "skip": "Skip the journey",
+    "motionOff": "Reduce motion",
+    "motionOn": "Enable motion",
+    "motionStatic": "Static journey",
+    "openDetail": "Open appointment detail",
+    "closeDetail": "Close appointment detail",
+    "chapters": "Journey chapters",
+    "knowledgeLink": "Find a clearer next step.",
+    "journalLink": "Read the thinking behind the care.",
+    "illustration": "AI-generated fictional care story",
+    "blockout": "Motion study · Blender previsualization"
+  },
+  "stages": [
+    {
+      "id": "arrive",
+      "at": 0,
+      "label": "A place to begin",
+      "title": "Care that stays",
+      "emphasis": "with you.",
+      "body": "A conversation in the clinic. A familiar face at home. One connected care journey.",
+      "cardLabel": "Your next conversation",
+      "cardTitle": "Start with what matters to you.",
+      "cardBody": "Make room for your questions, your concerns, and your story.",
+      "cardStatus": "Appointment preview"
+    },
+    {
+      "id": "listen",
+      "at": 0.12,
+      "label": "Someone who listens",
+      "title": "More than a visit.",
+      "emphasis": "A connection.",
+      "body": "Space to ask. Time to understand. A care plan shaped around the conversation.",
+      "cardLabel": "Your conversation, connected",
+      "cardTitle": "Bring your questions with you.",
+      "cardBody": "The same appointment stays in view as patient and clinician come together.",
+      "cardStatus": "Illustrative consultation"
+    },
+    {
+      "id": "connect",
+      "at": 0.46,
+      "label": "Beyond the clinic",
+      "title": "Different places.",
+      "emphasis": "The same care.",
+      "body": "Follow the story from the consultation room to a familiar space at home.",
+      "cardLabel": "A familiar face, wherever you are",
+      "cardTitle": "Keep the conversation going.",
+      "cardBody": "Explore how a video visit and shared appointment information could fit together.",
+      "cardStatus": "Video visit preview"
+    },
+    {
+      "id": "continue",
+      "at": 0.8,
+      "label": "Room for what comes next",
+      "title": "Leave with a plan.",
+      "emphasis": "Stay connected.",
+      "body": "Find your next step, revisit useful information, and return with new questions.",
+      "cardLabel": "Your next step",
+      "cardTitle": "A little more clarity.",
+      "cardBody": "Explore the patient workspace or learn how to prepare for a conversation.",
+      "cardStatus": "Follow-up preview"
+    }
+  ],
+  "motion": {
+    "scrollHeightVh": 680,
+    "mobileScrollHeightVh": 500,
+    "seekToleranceSeconds": 0.035,
+    "seekWatchdogMs": 1200,
+    "minimumHeight": 760,
+    "cardTravelPx": 28,
+    "cardTiltDegrees": 5,
+    "chapterFadeFraction": 0.035
+  },
+  "media": {
+    "film": "/media/journey/connected-care-v1.mp4",
+    "poster": "/media/journey/connected-care-v1.webp",
+    "homePoster": "/media/journey/home-followup-v1.webp",
+    "finished": true,
+    "alt": "An illustrative consultation space connected to a warm home environment.",
+    "duration": 22.333333,
+    "storyboard": [
+      "/media/journey/clinic-blockout-v1.webp",
+      "/media/journey/home-blockout-v1.webp"
+    ]
+  },
+  "explore": {
+    "eyebrow": "One connection. Different perspectives.",
+    "title": "Find your place in the story.",
+    "body": "Explore the experience as a patient, clinician, or member of the clinic team. Every workspace below uses fictional local data.",
+    "roles": [
+      {
+        "id": "patient",
+        "label": "For patients",
+        "title": "Your care, easier to follow.",
+        "body": "Explore appointments, prepare a question, and see what a follow-up could look like.",
+        "action": "Open patient demo",
+        "number": "01"
+      },
+      {
+        "id": "doctor",
+        "label": "For clinicians",
+        "title": "More room for the conversation.",
+        "body": "See a sample queue, review a visit brief, and move into a consultation preview.",
+        "action": "Open clinician demo",
+        "number": "02"
+      },
+      {
+        "id": "staff",
+        "label": "For clinic teams",
+        "title": "Help each visit come together.",
+        "body": "Coordinate the sample schedule and appointment readiness, without exposing clinical notes.",
+        "action": "Open staff demo",
+        "number": "03"
+      }
+    ]
+  },
+  "library": {
+    "title": "A little knowledge.\nA clearer next step.",
+    "body": "Practical guides for patients, clinicians, clinic teams, and anyone exploring connected care.",
+    "eyebrow": "The public knowledge base",
+    "search": "Search the knowledge base",
+    "placeholder": "Try appointments, privacy, or video…",
+    "all": "All guides",
+    "empty": "No guides match your search.",
+    "clear": "Clear filters",
+    "back": "Back to the knowledge base",
+    "read": "Read the guide",
+    "disclaimer": "Product-demo guides, not clinical advice. Features described here are illustrative and may not be connected to a live service."
+  },
+  "journal": {
+    "eyebrow": "The MediConnect journal",
+    "title": "Thoughts on care.\nDesigned around people.",
+    "body": "Stories about the decisions behind this connected-care concept—from human relationships to useful technology.",
+    "back": "Back to the journal",
+    "read": "Read the story",
+    "disclaimer": "Concept journal · These articles describe design intentions, not verified clinical outcomes or live-service capabilities."
+  },
+  "articles": [
+    {
+      "slug": "prepare-for-your-visit",
+      "kind": "knowledge",
+      "category": "Appointments",
+      "audience": "Patients",
+      "title": "Make space for your questions.",
+      "summary": "A simple way to organize what you want to discuss at your next appointment.",
+      "minutes": 3,
+      "sections": [
+        {
+          "heading": "Start with your priorities",
+          "body": "Write down the topics you would like to discuss and put your most important question first. Your clinician can help decide what can be covered during the appointment."
+        },
+        {
+          "heading": "Keep practical details nearby",
+          "body": "Have the appointment time, location or video link, and any information the clinic has asked you to bring. Ask the clinic directly if you are unsure what is needed."
+        },
+        {
+          "heading": "Leave room for clarification",
+          "body": "If an explanation is unclear, ask for it in different words. Before leaving, check that you understand the agreed next step and whom to contact with questions."
+        }
+      ]
+    },
+    {
+      "slug": "video-visit-basics",
+      "kind": "knowledge",
+      "category": "Video visits",
+      "audience": "Everyone",
+      "title": "Feel ready for a video conversation.",
+      "summary": "Check your setup, choose a private space, and know what to do if the connection fails.",
+      "minutes": 3,
+      "sections": [
+        {
+          "heading": "Choose your space",
+          "body": "Find somewhere private where you can hear and be heard. Place the device on a stable surface and check the lighting before your appointment."
+        },
+        {
+          "heading": "Check the invitation",
+          "body": "Use the joining instructions supplied by your clinic. Confirm whether the service needs a supported browser or app and which camera and microphone permissions it requests."
+        },
+        {
+          "heading": "Have a backup route",
+          "body": "Ask your clinic how to reconnect or contact them if a video call drops. This portfolio's consultation view is an illustration: it does not connect a real call or request device permissions."
+        }
+      ]
+    },
+    {
+      "slug": "understanding-the-demo",
+      "kind": "knowledge",
+      "category": "Using MediConnect",
+      "audience": "Everyone",
+      "title": "What this demonstration does—and does not do.",
+      "summary": "An honest guide to sample appointments, local-only controls, and the limits of this preview.",
+      "minutes": 2,
+      "sections": [
+        {
+          "heading": "Fictional information",
+          "body": "All names, appointments, and consultation scenes in this preview are fictional. They are provided to demonstrate interface design, not to represent available clinicians or real patient records."
+        },
+        {
+          "heading": "Local interaction",
+          "body": "Changing a sample appointment time or readiness status affects only the running demonstration. Reloading the page resets it. No booking, notification, payment, or medical record is created."
+        },
+        {
+          "heading": "No real sign-in",
+          "body": "The login design does not send credentials to a server. Do not enter a real password. Use the direct demo links to explore each role without signing in."
+        }
+      ]
+    },
+    {
+      "slug": "role-aware-workspaces",
+      "kind": "knowledge",
+      "category": "Using MediConnect",
+      "audience": "Clinic teams",
+      "title": "Different roles. Different information.",
+      "summary": "Why patients, clinicians, and clinic coordinators need different views of an appointment.",
+      "minutes": 3,
+      "sections": [
+        {
+          "heading": "Patient view",
+          "body": "The sample patient workspace puts appointment details, a preparation note, and the next step close together."
+        },
+        {
+          "heading": "Clinician view",
+          "body": "The clinician demonstration brings the sample queue and visit context together. It illustrates a workflow; it is not a connected electronic health record."
+        },
+        {
+          "heading": "Clinic-team view",
+          "body": "The staff demonstration shows scheduling and readiness information without clinical notes. A real implementation also requires server-enforced authorization; hiding a panel alone is not access control."
+        }
+      ]
+    },
+    {
+      "slug": "privacy-in-a-preview",
+      "kind": "knowledge",
+      "category": "Privacy",
+      "audience": "Everyone",
+      "title": "Keep real information out of a demo.",
+      "summary": "How to explore safely without sharing personal health details or account credentials.",
+      "minutes": 2,
+      "sections": [
+        {
+          "heading": "Use sample information",
+          "body": "Do not enter personal health information, real credentials, or identifying details in a portfolio demonstration. The controls are here to explain an interaction, not to collect your records."
+        },
+        {
+          "heading": "Know the boundary",
+          "body": "This preview does not connect the retained backend or authentication infrastructure. Production privacy and security require their own verification before accepting real data."
+        }
+      ]
+    },
+    {
+      "slug": "care-team-coordination",
+      "kind": "knowledge",
+      "category": "Appointments",
+      "audience": "Clinic teams",
+      "title": "Help the next conversation start clearly.",
+      "summary": "Explore a coordination workflow focused on appointment details, not clinical decisions.",
+      "minutes": 2,
+      "sections": [
+        {
+          "heading": "Keep the schedule understandable",
+          "body": "In the demonstration, one appointment is shared across the three role views. Changing its time updates the sample display so you can inspect the relationship between those interfaces."
+        },
+        {
+          "heading": "Readiness is not a medical status",
+          "body": "The sample readiness control is an operational illustration. It does not confirm clinical suitability, notify anyone, or authorize treatment."
+        }
+      ]
+    },
+    {
+      "slug": "care-between-places",
+      "kind": "blog",
+      "category": "People & care",
+      "audience": "Everyone",
+      "title": "Care is a relationship, not a location.",
+      "summary": "Why our visual story moves from a clinic conversation into the familiarity of home.",
+      "minutes": 4,
+      "sections": [
+        {
+          "heading": "Begin with two people",
+          "body": "A room full of impressive technology tells us little about whether someone feels heard. This concept begins with a patient and a clinician at the same eye level, with enough space for a conversation."
+        },
+        {
+          "heading": "Carry the relationship forward",
+          "body": "The clinic-to-home transition is a visual metaphor for continuity. We keep the same characters and care-plan card in view so the interface has a story, not just a collection of features."
+        },
+        {
+          "heading": "Let the product earn the attention",
+          "body": "The cinematic homepage invites exploration. The workspaces and guides then need to make sense without the film. That balance is a design intention—not a claim of improved health outcomes."
+        }
+      ]
+    },
+    {
+      "slug": "motion-with-a-purpose",
+      "kind": "blog",
+      "category": "Design notes",
+      "audience": "Everyone",
+      "title": "What should a scroll actually reveal?",
+      "summary": "A look at connecting camera movement, readable information, and a visitor's control.",
+      "minutes": 3,
+      "sections": [
+        {
+          "heading": "Movement should explain a relationship",
+          "body": "In this concept, moving toward the consultation brings people into focus. Travelling through the display connects two places. A care-plan card stays recognizable while its context changes."
+        },
+        {
+          "heading": "Keep the visitor in control",
+          "body": "The journey follows ordinary scrolling and can be skipped. A reduced-motion reading layout presents the same story without making movement a prerequisite."
+        },
+        {
+          "heading": "A film is not an interface",
+          "body": "Navigation, text, and actions remain real page elements. Generated footage supplies atmosphere and human moments; it does not replace the controls people need to use."
+        }
+      ]
+    },
+    {
+      "slug": "learning-is-part-of-care",
+      "kind": "blog",
+      "category": "Product thinking",
+      "audience": "Everyone",
+      "title": "A useful guide belongs outside the login wall.",
+      "summary": "Why the knowledge base is a public destination rather than a hidden dashboard extra.",
+      "minutes": 3,
+      "sections": [
+        {
+          "heading": "Make discovery simple",
+          "body": "A visitor may be a patient, clinician, coordinator, or someone simply exploring. Public guides should be easy to find from the main navigation, without requiring a demo account."
+        },
+        {
+          "heading": "Separate public learning from private work",
+          "body": "Public product information and personal appointment records serve different purposes. The concept keeps learning open while reserving role-specific workspaces for their intended context."
+        },
+        {
+          "heading": "Be clear about editorial status",
+          "body": "These guides explain a portfolio concept. A live medical knowledge base would need appropriate sourcing, clinical review, ownership, and an update process before publishing health guidance."
+        }
+      ]
+    }
+  ],
+  "sample": {
+    "patient": "Alex Rahman",
+    "patientInitials": "AR",
+    "doctorInitials": "SA",
+    "doctor": "Dr Samir Ahmed",
+    "date": "Tuesday, 15 September",
+    "year": "2026",
+    "timezone": "Sample schedule · UTC",
+    "appointment": "MC-1042",
+    "slots": [
+      "09:30",
+      "10:30",
+      "14:00"
+    ],
+    "defaultSlot": "10:30",
+    "note": "I would like to understand the next step and have time to ask questions."
+  },
+  "workspace": {
+    "eyebrow": "A connected-care demonstration",
+    "greeting": "Welcome to your space.",
+    "notice": "Local demo only. Changes reset on reload. No booking, message, or consultation is sent.",
+    "appointment": "Your next conversation",
+    "choose": "Choose a sample time",
+    "notes": "What would you like to discuss?",
+    "noteHint": "Use fictional text only. This note stays in memory and clears on reload.",
+    "save": "Keep sample note",
+    "saved": "Sample note updated locally.",
+    "ready": "Ready for visit",
+    "pending": "Needs confirmation",
+    "toggle": "Change sample readiness",
+    "reset": "Reset demo",
+    "consult": "Open consultation preview",
+    "close": "Back to the appointment",
+    "callTitle": "A familiar face. A focused conversation.",
+    "callNotice": "Illustrative consultation only. No camera, microphone, or live call is connected.",
+    "micOn": "Microphone illustration on",
+    "micOff": "Microphone illustration off",
+    "camOn": "Camera illustration on",
+    "camOff": "Camera illustration off",
+    "followup": "Your next step",
+    "followupBody": "This is a sample follow-up, not a prescription or medical instruction. Revisit the preparation guide or return to the appointment.",
+    "queue": "Today's sample queue",
+    "staff": "Help the visit come together.",
+    "doctor": "Make room for the conversation.",
+    "patient": "Your care, in one place.",
+    "details": "Appointment details",
+    "noteMaxLength": 500
+  },
+  "auth": {
+    "eyebrow": "Welcome back",
+    "title": "Your next conversation\nstarts here.",
+    "body": "Choose your workspace and explore a more connected care experience.",
+    "notice": "Login design preview—not connected to authentication. Do not enter a real password. No credentials are sent or saved.",
+    "email": "Demo email",
+    "password": "Demo password",
+    "emailPlaceholder": "person@example.test",
+    "passwordPlaceholder": "Use a made-up password",
+    "submit": "Preview sign-in",
+    "result": "Preview checked. No sign-in request was sent. Open a workspace below to continue with sample data.",
+    "show": "Show password",
+    "hide": "Hide password",
+    "forgot": "Forgot password?",
+    "resetNotice": "Password reset is not connected in this preview. No email was sent.",
+    "signup": "New to MediConnect?",
+    "signupAction": "Explore without an account",
+    "invite": "Staff access is invitation-only. This preview does not issue invitations.",
+    "error": "Use a valid sample email and a made-up password of at least 8 characters.",
+    "minimumPasswordLength": 8
+  },
+  "footer": {
+    "title": "The next step starts\nwith a conversation.",
+    "body": "Explore a workspace, learn something useful, or revisit the journey.",
+    "credit": "MediConnect · Connected-care portfolio concept",
+    "notFound": "This page is not in the preview.",
+    "return": "Return home",
+    "storyboard": "View the storyboard",
+    "storyboardTitle": "The journey, before the finishing touches.",
+    "storyboardBody": "Original Blender previsualization establishes the camera, clinic, and home. Clay figures are placement guides, not finished realistic people. Seedance footage is reviewed separately."
+  }
+}

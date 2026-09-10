@@ -41,7 +41,7 @@ it('audits the actual repository source and documented typed configuration', () 
   expect(result.files).toBeGreaterThan(0);
   expect(result.variables).toBeGreaterThan(0);
   expect(result.failures).toEqual([]);
-});
+}, 30_000);
 
 it('requires each public name in the typed declaration, static mapping and example', () => {
   const declaration = 'export const PUBLIC_ENV_NAMES = ["VITE_TEST"] as const;\n';

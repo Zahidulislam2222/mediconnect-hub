@@ -2,16 +2,18 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, HashRouter, Routes, Route, Outlet, Navigate, useNavigate } from "react-router-dom";
+import { BrowserRouter, HashRouter, Routes, Route, Outlet, Navigate, useNavigate, useLocation } from "react-router-dom";
 import { Capacitor } from "@capacitor/core";
-import { useEffect, useState } from "react";
-import { PushNotifications } from '@capacitor/push-notifications';
-import { api } from "./lib/api";
+import { lazy, Suspense, useEffect, useState } from "react";
+import { PushInitializer } from './components/app/PushInitializer';
 import { signOut } from 'aws-amplify/auth';
 import { clearAllSensitive, getUser } from "./lib/secure-storage";
 
 // Page Imports
-import Index from "./pages/Index";
+import { isJourneyApplicationPath } from './config/journey-routing';
+import { journey } from './content/journey';
+const JourneyApp = lazy(() => import('./components/journey/JourneyApp'));
+import './styles/journey.css';
 import Auth from "./pages/Auth";
 import PatientDashboard from "./pages/PatientDashboard";
 import DoctorDashboard from "./pages/DoctorDashboard";
@@ -144,46 +146,6 @@ const GdprBanner = () => {
 // =========================================================================
 // 📱 PUSH INITIALIZER (Fixed Role Routing Bug & Added GDPR Block)
 // =========================================================================
-const PushInitializer = () => {
-  useEffect(() => {
-    // GDPR Check: Do not initialize push without functional consent
-    try {
-      const consent = getGdprConsent();
-      if (!consent?.functional) return;
-    } catch { return; }
-    if (!Capacitor.isNativePlatform()) return;
-
-    const setupPush = async () => {
-      let perm = await PushNotifications.checkPermissions();
-      if (perm.receive === 'prompt') {
-        perm = await PushNotifications.requestPermissions();
-      }
-      if (perm.receive !== 'granted') return;
-
-      await PushNotifications.register();
-
-      await PushNotifications.addListener('registration', async (token) => {
-        // FCM token registered — not logged for HIPAA compliance
-        const savedUser = getUser();
-        if (savedUser) {
-          const { id, role } = savedUser;
-          // 🟢 BUG FIX: Prevent Doctor Tokens from being sent to Patient Table
-          const endpoint = role === 'doctor' ? `/doctors/${id}` : `/patients/${id}`;
-          await api.put(endpoint, { fcmToken: token.value }).catch(console.error);
-        }
-      });
-
-      await PushNotifications.addListener('pushNotificationActionPerformed', (notification) => {
-        // Notification tapped — navigate handled below
-      });
-    };
-
-    setupPush();
-  }, []);
-
-  return null;
-};
-
 // =========================================================================
 // 🏥 HIPAA GUARD: 15-Min Auto-Logout & Tab Blur Visual Privacy
 // =========================================================================
@@ -254,6 +216,7 @@ const HipaaGuard = ({ children }: { children: React.ReactNode }) => {
 // =========================================================================
 const ProtectedRoute = () => (
   <VerifiedSession>
+    <PushInitializer enabled={getGdprConsent()?.functional === true} />
     <CheckoutProvider>
       <SubscriptionProvider>
         <HipaaGuard><Outlet /></HipaaGuard>
@@ -266,10 +229,10 @@ const ProtectedRoute = () => (
 // 🚦 MAIN ROUTER CONTENT
 // =========================================================================
 const AppContent = () => {
+  const location = useLocation();
   return (
     <Routes>
       {/* PUBLIC ZONE — no HIPAA guard needed */}
-      <Route path="/" element={<Index />} />
       <Route path="/auth" element={<Auth />} />
       <Route path="/admin-auth" element={<AdminStaffAuth />} />
       <Route path="/knowledge" element={<KnowledgeBase role="patient" />} />
@@ -322,21 +285,26 @@ const AppContent = () => {
       </Route>
 
       {/* Catch-all */}
-      <Route path="*" element={<NotFound />} />
+      <Route path="*" element={isJourneyApplicationPath(location.pathname)
+        ? <Suspense fallback={<div className="jy-app"><main className="jy-inner jy-section"><p role="status">{journey.labels.loading}</p></main></div>}><JourneyApp mode="application" /></Suspense> : <NotFound />} />
     </Routes>
   );
+};
+
+const RuntimeServices = () => {
+  const location = useLocation();
+  if (isJourneyApplicationPath(location.pathname)) return null;
+  return <><GdprBanner /><ChatWidget /></>;
 };
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
-      <GdprBanner />
-      <PushInitializer />
       <Toaster />
       <Sonner />
       <Router>
         <AppContent />
-        <ChatWidget />
+        <RuntimeServices />
       </Router>
     </TooltipProvider>
   </QueryClientProvider>
