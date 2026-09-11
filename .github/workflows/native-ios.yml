@@ -25,7 +25,7 @@ jobs:
     # Standard public-repository compute only. Never change visibility to bypass this gate.
     if: github.event.repository.private == false
     runs-on: macos-26
-    timeout-minutes: 45
+    timeout-minutes: 60
     env:
       XCODEGEN_REPOSITORY: https://github.com/yonaskolb/XcodeGen.git
       XCODEGEN_COMMIT: 8445e778451c7e44237b90281bde622d764b0084

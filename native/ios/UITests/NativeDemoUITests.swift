@@ -31,7 +31,34 @@ final class NativeDemoUITests: XCTestCase {
         XCTAssertTrue(element.isHittable)
     }
     private func tap(_ title: String, in app: XCUIApplication, down: Bool = false) {
-        let button = app.buttons[title]; reveal(button, in: app, down: down); button.tap()
+        let button = app.buttons[title]
+        for _ in 0..<30 {
+            let exists = button.exists
+            let frame = exists ? button.frame : .zero
+            let navigation = app.navigationBars.firstMatch
+            let top = navigation.exists ? navigation.frame.maxY : app.frame.minY
+            let keyboard = app.keyboards.firstMatch
+            let bottom = keyboard.exists ? keyboard.frame.minY : app.frame.maxY
+            if exists, button.isHittable, frame.minY >= top, frame.maxY <= bottom,
+               frame.minX >= app.frame.minX, frame.maxX <= app.frame.maxX {
+                button.tap(); return
+            }
+            if exists, frame.minY < top { app.swipeDown() }
+            else if exists, frame.maxY > bottom { app.swipeUp() }
+            else if down { app.swipeDown() }
+            else { app.swipeUp() }
+        }
+        XCTFail("Control is not fully visible: \(title)")
+    }
+    private func replaceNote(_ note: XCUIElement, with text: String, in app: XCUIApplication) {
+        reveal(note, in: app); note.tap(); note.press(forDuration: 1)
+        let menuItem = app.menuItems["Select All"]
+        let menuButton = app.buttons["Select All"]
+        if menuItem.waitForExistence(timeout: 5) { menuItem.tap() }
+        else if menuButton.waitForExistence(timeout: 5) { menuButton.tap() }
+        else { XCTFail("Native Select All action is unavailable"); return }
+        note.typeText(text)
+        XCTAssertEqual(note.value as? String, text)
     }
     private func role(_ id: String, fixture: Fixture) throws -> Fixture.Explore.Role {
         try XCTUnwrap(fixture.explore.roles.first { $0.id == id })
@@ -51,9 +78,7 @@ final class NativeDemoUITests: XCTestCase {
         let patient = try role("patient", fixture: source), doctor = try role("doctor", fixture: source), staff = try role("staff", fixture: source)
         tap(patient.action, in: app)
         let note = app.descendants(matching: .any).matching(identifier: "demo-note").firstMatch
-        reveal(note, in: app); note.tap()
-        note.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: source.sample.note.count))
-        note.typeText("  Fictional handoff  ")
+        replaceNote(note, with: "  Fictional handoff  ", in: app)
         tap(source.workspace.save, in: app)
         tap(doctor.label, in: app, down: true)
         reveal(savedNote(app), in: app); XCTAssertEqual(savedNote(app).label, "Fictional handoff")
