@@ -29,8 +29,8 @@ private final class MethodRecordingProtocol: URLProtocol {
         }
         Self.lock.lock(); Self.captured.append(capturedRequest); Self.lock.unlock()
         guard let url = request.url,
-              let response = HTTPURLResponse(url: url, statusCode: 200, httpVersion: nil,
-                                             headerFields: ["Content-Type": "application/json"]) else {
+              let response = HTTPURLResponse(url: url, statusCode: url.path == "/metadata" ? 202 : (url.path == "/rejected" ? 409 : 200), httpVersion: nil,
+                                             headerFields: url.path == "/metadata" ? ["x-export-integrity": "test-unverified-integrity"] : [:]) else {
             client?.urlProtocol(self, didFailWithError: URLError(.badURL)); return
         }
         client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
@@ -93,5 +93,23 @@ final class NativeMethodsTransportTests: XCTestCase {
             } catch MobileFailure.configuration {} catch { XCTFail("Unexpected error type") }
         }
         XCTAssertTrue(MethodRecordingProtocol.drain().isEmpty)
+    }
+    func testSuccessfulResponseMetadataAndAbsentHeader() async throws {
+        for region in ["US", "EU"] {
+            let client = try api(region)
+            let response = try await client.requestResponse(access: access, service: "patient", path: "/metadata")
+            XCTAssertEqual(response.status, 202)
+            XCTAssertEqual(response.body, Data("{}".utf8))
+            XCTAssertEqual(response.exportIntegrity, "test-unverified-integrity")
+            let absent = try await client.requestResponse(access: access, service: "patient", path: "/me")
+            XCTAssertEqual(absent.status, 200)
+            XCTAssertNil(absent.exportIntegrity)
+        }
+    }
+    func testMetadataEntryStillRejectsNonSuccess() async throws {
+        do {
+            _ = try await api().requestResponse(access: access, service: "patient", path: "/rejected")
+            XCTFail("Non-success response accepted")
+        } catch let failure as HTTPFailure { XCTAssertEqual(failure.status, 409) }
     }
 }

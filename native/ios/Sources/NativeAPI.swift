@@ -9,6 +9,12 @@ enum NativeHTTPMethod: String {
     case get = "GET", post = "POST", put = "PUT", delete = "DELETE"
 }
 
+struct NativeResponse {
+    let body: Data
+    let status: Int
+    let exportIntegrity: String?
+}
+
 final class NativeAPI {
     private let config: MobileConfiguration
     private let session: URLSession
@@ -27,6 +33,11 @@ final class NativeAPI {
     deinit { session.invalidateAndCancel() }
 
     func request(access: SessionAccess, service: String, path: String, query: [String: String] = [:], body: [String: Any]? = nil, method: NativeHTTPMethod? = nil) async throws -> Data {
+        let response = try await requestResponse(access: access, service: service, path: path, query: query, body: body, method: method)
+        return response.body
+    }
+
+    func requestResponse(access: SessionAccess, service: String, path: String, query: [String: String] = [:], body: [String: Any]? = nil, method: NativeHTTPMethod? = nil) async throws -> NativeResponse {
         let selectedMethod = method ?? (body == nil ? .get : .post)
         switch selectedMethod {
         case .get: guard body == nil else { throw MobileFailure.configuration }
@@ -62,6 +73,7 @@ final class NativeAPI {
             guard data.count < config.maxResponseBytes else { throw MobileFailure.response }
             data.append(byte)
         }
-        return data
+        return NativeResponse(body: data, status: response.statusCode,
+                              exportIntegrity: response.value(forHTTPHeaderField: "X-Export-Integrity"))
     }
 }

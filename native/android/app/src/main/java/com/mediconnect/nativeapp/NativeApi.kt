@@ -17,8 +17,13 @@ import okhttp3.RequestBody.Companion.toRequestBody
 
 enum class NativeHttpMethod { GET, POST, PUT, DELETE }
 
+class NativeResponse(val body: String, val status: Int, val exportIntegrity: String?)
+
 class NativeApi(private val config: MobileConfiguration, private val sessions: SessionProvider, private val client: OkHttpClient) {
-    suspend fun request(identity: Identity, service: String, path: String, query: Map<String, String> = emptyMap(), body: JSONObject? = null, method: NativeHttpMethod? = null): String {
+    suspend fun request(identity: Identity, service: String, path: String, query: Map<String, String> = emptyMap(), body: JSONObject? = null, method: NativeHttpMethod? = null): String =
+        requestResponse(identity, service, path, query, body, method).body
+
+    suspend fun requestResponse(identity: Identity, service: String, path: String, query: Map<String, String> = emptyMap(), body: JSONObject? = null, method: NativeHttpMethod? = null): NativeResponse {
         val selectedMethod = method ?: if (body == null) NativeHttpMethod.GET else NativeHttpMethod.POST
         require(when (selectedMethod) {
             NativeHttpMethod.GET -> body == null
@@ -38,7 +43,7 @@ class NativeApi(private val config: MobileConfiguration, private val sessions: S
         return execute(client.newCall(builder.build()))
     }
 
-    private suspend fun execute(call: Call): String = suspendCancellableCoroutine { continuation ->
+    private suspend fun execute(call: Call): NativeResponse = suspendCancellableCoroutine { continuation ->
         continuation.invokeOnCancellation { call.cancel() }
         call.enqueue(object : Callback {
             override fun onFailure(call: Call, e: IOException) {
@@ -54,7 +59,7 @@ class NativeApi(private val config: MobileConfiguration, private val sessions: S
                         source.request(config.maxResponseBytes + 1)
                         if (source.buffer.size > config.maxResponseBytes) throw ApiFailure()
                         val text = source.readUtf8()
-                        if (continuation.isActive) continuation.resume(text)
+                        if (continuation.isActive) continuation.resume(NativeResponse(text, it.code, it.header("X-Export-Integrity")))
                     } catch (_: Exception) {
                         if (continuation.isActive) continuation.resumeWithException(ApiFailure(it.code))
                     }

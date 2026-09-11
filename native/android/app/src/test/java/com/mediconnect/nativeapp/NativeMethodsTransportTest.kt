@@ -72,4 +72,28 @@ class NativeMethodsTransportTest {
         assertEquals(0, fetchCount)
         assertEquals(0, server.requestCount)
     }
+    @Test fun responseMetadataPreservesStatusBodyAndOptionalHeader() = runBlocking {
+        for (region in listOf("US", "EU")) {
+            for (integrity in listOf(null, "test-unverified-integrity")) {
+                val fixture = MockResponse().setResponseCode(202).setBody("{\"status\":\"REVIEW_REQUIRED\"}")
+                if (integrity != null) fixture.setHeader("x-export-integrity", integrity)
+                server.enqueue(fixture)
+                val result = api(region).requestResponse(identity, "patient", "/me")
+                assertEquals(202, result.status)
+                assertEquals("REVIEW_REQUIRED", JSONObject(result.body).getString("status"))
+                assertEquals(integrity, result.exportIntegrity)
+            }
+        }
+    }
+    @Test fun metadataEntryStillRejectsNonSuccessAndOversizedBodies() {
+        server.enqueue(MockResponse().setResponseCode(409).setBody("{}"))
+        val failure = assertThrows(ApiFailure::class.java) {
+            runBlocking { api().requestResponse(identity, "patient", "/me") }
+        }
+        assertEquals(409, failure.status)
+        server.enqueue(MockResponse().setBody("12345"))
+        assertThrows(ApiFailure::class.java) {
+            runBlocking { api(maxBytes = 4).requestResponse(identity, "patient", "/me") }
+        }
+    }
 }
