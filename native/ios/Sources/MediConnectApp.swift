@@ -17,7 +17,11 @@ struct MediConnectApp: App {
     }
     @ViewBuilder private func root(_ content: MobileContent) -> some View {
         #if DEBUG
-        if CancellationUITestFixture.requested() { CancellationUITestFixture(content: content) }
+        if PatientSettingsUITestFixture.requested(),
+           let contractData = try? BundledAssets.data("mobile-contract"), let policyData = try? BundledAssets.data("session-policy"),
+           let contract = try? MobileContract(data: contractData, policy: policyData) {
+            PatientSettingsUITestFixture(content: content, contract: contract)
+        } else if CancellationUITestFixture.requested() { CancellationUITestFixture(content: content) }
         else if AuthenticatorSetupUITestFixture.requested() { AuthenticatorSetupUITestFixture(content: content) }
         else if EmailMfaSetupUITestFixture.requested() { EmailMfaSetupUITestFixture(content: content) }
         else if MfaSelectionUITestFixture.requested() { MfaSelectionUITestFixture(content: content) }
@@ -123,6 +127,9 @@ struct WorkspaceView: View {
             if profile.state.step != .ready, let policies = model.policies {
                 ProfileSetupView(model: profile, role: identity.role, content: content, policies: policies).id(profile.state.step)
             } else {
+            if identity.role == .patient, let settings = model.settings {
+                PatientSettingsEntry(model: settings, content: content, busy: model.busy, open: model.openSettings)
+            }
             HStack {
                 Text(content.text("appointments")).font(.title2.bold())
                 Spacer()

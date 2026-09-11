@@ -46,6 +46,14 @@ class WorkspaceModelLifetimeTest {
         override val appointments: WorkspaceAppointments get() = this
         override val contract = MobileContract(read("mobile-contract.json"), read("session-policy.json"))
         override var requiresExplicitSignIn = true
+        override val patientSettings = object : PatientSettingsService {
+            override suspend fun load(identity: Identity) = settingsLoad(identity)
+            override suspend fun save(identity: Identity, snapshot: PatientSettingsSnapshot, draft: PatientSettingsDraft) {}
+        }
+        var settingsLoad: suspend (Identity) -> PatientSettingsSnapshot = { owner ->
+            PatientSettingsSnapshot(owner.subject, "Test Patient", "test@example.invalid", null, null, null)
+        }
+        var appointmentFailure: ApiFailure? = null
         var confirmations = 0
         var fetches = 0
         var profileLoads = 0
@@ -59,7 +67,10 @@ class WorkspaceModelLifetimeTest {
         override suspend fun signOut() {}
         override suspend fun load(identity: Identity): OwnProfile { profileLoads++; return OwnProfile(identity.subject, "Test Patient", "test@example.invalid") }
         override suspend fun create(identity: Identity, details: ProfileDetails, policyVersion: String) = error("UNEXPECTED_TEST_CREATE")
-        override suspend fun load(identity: Identity, cursor: String?) = AppointmentPage(emptyList(), null)
+        override suspend fun load(identity: Identity, cursor: String?): AppointmentPage {
+            appointmentFailure?.let { throw it }
+            return AppointmentPage(emptyList(), null)
+        }
         override suspend fun find(identity: Identity, appointmentId: String): Appointment = error("UNEXPECTED_TEST_FIND")
         override suspend fun cancel(identity: Identity, appointmentId: String) = error("UNEXPECTED_TEST_CANCEL")
         override suspend fun requestReset(username: String): Boolean = error("UNEXPECTED_TEST_RESET")
@@ -143,4 +154,44 @@ class WorkspaceModelLifetimeTest {
         fake.confirmation = { result(true) }; model.confirm("654321")
         assertEquals(identity, model.state.value.identity); assertEquals(2, fake.confirmations)
     }
+    private fun settingsModel(fake: Fake): WorkspaceModel = model(fake).also {
+        it.confirm("123456")
+        assertEquals(ProfileStep.READY, it.profile.state.value.step)
+        it.openSettings()
+        assertEquals(SettingsStep.EDITING, it.settings!!.state.value.step)
+    }
+    @Test fun settingsPrivateDraftClearsOnBackgroundAndSignOut() {
+        val fake = Fake(); val model = settingsModel(fake)
+        val editor = model.settings!!
+        editor.edit(editor.state.value.draft!!.copy(address = "Test private draft"))
+        model.hide()
+        assertEquals(SettingsState(), editor.state.value)
+        model.resume(); model.openSettings()
+        assertEquals(SettingsStep.EDITING, editor.state.value.step)
+        assertNull(editor.state.value.draft!!.address)
+        model.signOut()
+        assertEquals(SettingsState(), editor.state.value)
+        assertNull(model.state.value.identity)
+    }
+    @Test fun workspaceUnauthorizedRefreshClearsSettingsAndIdentity() {
+        val fake = Fake(); val model = settingsModel(fake)
+        fake.appointmentFailure = ApiFailure(401)
+        model.refresh()
+        assertEquals(SettingsState(), model.settings!!.state.value)
+        assertNull(model.state.value.identity)
+        assertEquals("sessionExpired", model.state.value.error)
+    }
+    @Test fun lateSettingsLoadCannotRestorePrivateDataAfterBackground() {
+        val fake = Fake(); val model = settingsModel(fake)
+        model.settings!!.close()
+        val held = pending<PatientSettingsSnapshot>()
+        fake.settingsLoad = { held.await() }
+        model.openSettings()
+        assertEquals(SettingsStep.LOADING, model.settings!!.state.value.step)
+        model.hide()
+        held.complete(PatientSettingsSnapshot(identity.subject, "Test Patient", "test@example.invalid", null, null, null))
+        assertEquals(SettingsState(), model.settings!!.state.value)
+        assertNull(model.state.value.identity)
+    }
+
 }

@@ -42,6 +42,7 @@ class WorkspaceModel @JvmOverloads constructor(
     val configured = runtime != null
     val cancellation = AppointmentCancellation(runtime?.appointments, runtime?.contract?.cancellation, scope)
     val recovery = PasswordRecovery(runtime?.sessions, scope)
+    val settings = runtime?.patientSettings?.let { PatientSettingsEditor(it, runtime.contract.patientSettings.maxNameLength, scope) }
     val profile = ProfileEnrollment(runtime?.profiles, policies.policyVersion, scope)
     val registration = AccountRegistration(runtime?.sessions, scope)
     private val mutable = MutableStateFlow(WorkspaceState())
@@ -62,6 +63,7 @@ class WorkspaceModel @JvmOverloads constructor(
     private fun reset(visible: Boolean = true) {
         cancellation.close(clearSession = true)
         profile.close()
+        settings?.close()
         generation++
         operation?.cancel()
         expiry?.cancel()
@@ -142,6 +144,7 @@ class WorkspaceModel @JvmOverloads constructor(
     }
 
     private suspend fun accept(identity: Identity) {
+        settings?.close()
         currentCoroutineContext().ensureActive()
         val runtime = runtime ?: return
         mutable.value = WorkspaceState(identity = identity, busy = true)
@@ -168,6 +171,12 @@ class WorkspaceModel @JvmOverloads constructor(
                 next = page.next,
             )
         }
+    }
+
+    fun openSettings() {
+        val current = mutable.value
+        val identity = current.identity ?: return
+        if (current.visible && !current.busy && identity.role == Role.PATIENT && profile.state.value.step == ProfileStep.READY) settings?.open(identity)
     }
 
     fun openCancellation(appointment: Appointment) {
@@ -201,7 +210,7 @@ class WorkspaceModel @JvmOverloads constructor(
             catch (failure: Exception) {
                 if (current == generation) {
                     val authFailed = failure is ApiFailure && failure.status == 401
-                    if (authFailed) mutable.value = WorkspaceState(error = "sessionExpired")
+                    if (authFailed) { reset(); mutable.value = WorkspaceState(error = "sessionExpired") }
                     else mutable.value = mutable.value.copy(error = when {
                         failure is ApiFailure && failure.status == 403 -> "accessDenied"
                         mutable.value.identity != null -> "unavailable"

@@ -22,6 +22,7 @@ final class WorkspaceModel: ObservableObject {
     let cancellation: AppointmentCancellation
     let recovery: PasswordRecovery
     let profile: ProfileEnrollment
+    let settings: PatientSettingsEditor?
     private var profileObservation: AnyCancellable?
     private let auth: WorkspaceSession?
     private let api: WorkspaceAppointments?
@@ -44,6 +45,7 @@ final class WorkspaceModel: ObservableObject {
         var auth: WorkspaceSession?
         var api: WorkspaceAppointments?
         var profileService: ProfileAPI?
+        var settingsEditor: PatientSettingsEditor?
         var cancellationService: AppointmentCancellationAPI?
         var cancellationPolicy: CancellationContract?
         do {
@@ -52,6 +54,8 @@ final class WorkspaceModel: ObservableObject {
             let session = try CognitoSession(config: config, contract: contract)
             auth = session
             profileService = ProfileAPI(transport: NativeAPI(config: config), contract: contract, fetch: { try await session.fetch() })
+            settingsEditor = PatientSettingsEditor(service: PatientSettingsAPI(transport: NativeAPI(config: config),
+                contract: contract, fetch: { try await session.fetch() }), maxNameLength: contract.patientSettings.maxNameLength)
             let appointments = AppointmentsAPI(config: config, contract: contract)
             api = appointments
             cancellationService = AppointmentCancellationAPI(appointments: appointments, transport: NativeAPI(config: config), contract: contract, fetch: { try await session.fetch() })
@@ -59,15 +63,15 @@ final class WorkspaceModel: ObservableObject {
         } catch { auth = nil; api = nil }
         self.init(residency: residency, content: content, policies: policies, auth: auth, api: api,
                   profileService: profileService, cancellationService: cancellationService,
-                  cancellationPolicy: cancellationPolicy, signInLatch: StoredSignInLatch(defaults: .standard))
+                  cancellationPolicy: cancellationPolicy, signInLatch: StoredSignInLatch(defaults: .standard), settings: settingsEditor)
     }
 
     // Tests inject services into the same production model without configuring the SDK.
     init(residency: String, content: MobileContent?, policies: MobilePolicies?, auth: WorkspaceSession?,
          api: WorkspaceAppointments?, profileService: ProfileService?, cancellationService: CancellationService?,
-         cancellationPolicy: CancellationContract?, signInLatch: ExplicitSignInLatch) {
+         cancellationPolicy: CancellationContract?, signInLatch: ExplicitSignInLatch, settings: PatientSettingsEditor? = nil) {
         self.residency = residency; self.content = content; self.policies = policies
-        self.auth = auth; self.api = api; self.signInLatch = signInLatch
+        self.auth = auth; self.api = api; self.signInLatch = signInLatch; self.settings = settings
         cancellation = AppointmentCancellation(service: cancellationService, policy: cancellationPolicy)
         profile = ProfileEnrollment(service: profileService, policyVersion: policies?.policyVersion ?? "")
         recovery = PasswordRecovery(service: auth)
@@ -83,6 +87,7 @@ final class WorkspaceModel: ObservableObject {
     private func clear(visible: Bool = true) {
         cancellation.close(clearSession: true)
         profile.close()
+        settings?.close()
         generation += 1
         operation?.cancel()
         expiry?.cancel()
@@ -166,6 +171,8 @@ final class WorkspaceModel: ObservableObject {
         }
     }
     private func accept(_ access: SessionAccess) async throws {
+        try Task.checkCancellation()
+        settings?.close()
         identity = access.identity
         challenge = false
         challengeChoices = []
@@ -194,6 +201,10 @@ final class WorkspaceModel: ObservableObject {
             self?.appointments = (previous + page.items).filter { ids.insert($0.id).inserted }
             self?.next = page.next
         }
+    }
+    func openSettings() {
+        guard visible, !busy, profile.state.step == .ready, let identity, identity.role == .patient else { return }
+        settings?.open(identity)
     }
     func openCancellation(_ appointment: Appointment) {
         guard !busy, profile.state.step == .ready, let identity, appointments.contains(where: { $0.id == appointment.id }) else { return }
@@ -224,9 +235,7 @@ final class WorkspaceModel: ObservableObject {
             catch {
                 guard let self, current == generation, !Task.isCancelled else { return }
                 if (error as? HTTPFailure)?.status == 401 {
-                    identity = nil
-                    appointments = []
-                    next = nil
+                    clear()
                     self.message = "sessionExpired"
                 } else if (error as? HTTPFailure)?.status == 403 { self.message = "accessDenied" }
                 else { self.message = identity == nil ? message : "unavailable" }

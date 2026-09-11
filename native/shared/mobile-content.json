@@ -26,7 +26,7 @@
   "hideSetupKey": "Hide setup key",
   "verify": "Verify",
   "cancel": "Cancel",
-  "loading": "Please wait\u2026",
+  "loading": "Please wait…",
   "refresh": "Refresh",
   "appointments": "Appointments",
   "emptyAppointments": "No appointments to display.",
@@ -85,5 +85,36 @@
   "cancelConfirmation": "Cancel this appointment? Any refund is subject to the payment provider's confirmed status.",
   "cancellationConfirmed": "Cancellation was confirmed. This does not verify that a refund has completed.",
   "cancellationUnconfirmed": "Cancellation could not be confirmed. Check its status before taking further action.",
-  "checkCancellation": "Check cancellation status"
+  "checkCancellation": "Check cancellation status",
+  "settings": {
+    "title": "Account settings",
+    "open": "Edit account settings",
+    "phone": "Phone",
+    "address": "Address",
+    "save": "Save changes",
+    "discard": "Discard changes",
+    "close": "Close settings",
+    "reload": "Reload saved settings",
+    "invalid": "Check your name and notification choices before saving.",
+    "unset": "Not provided",
+    "emailReadOnly": "Email is managed by your sign-in account.",
+    "enabled": "Enabled",
+    "disabled": "Disabled"
+  },
+  "settingsPreferences": {
+    "email": "Email notifications",
+    "sms": "SMS notifications",
+    "promotional": "Promotional notifications"
+  },
+  "settingsStatus": {
+    "CLOSED": "Settings are closed.",
+    "LOADING": "Loading your saved settings…",
+    "EDITING": "Edit your profile and notification choices.",
+    "SAVING": "Saving and checking your changes…",
+    "SAVED": "Your changes were saved and checked.",
+    "LOAD_FAILED": "Your saved settings could not be loaded. Retry when ready.",
+    "SAVE_UNCERTAIN": "The save could not be confirmed. Reload your saved settings before trying again.",
+    "DENIED": "Access was denied. Your session or identity verification may need attention.",
+    "MISSING": "Your profile could not be found."
+  }
 }

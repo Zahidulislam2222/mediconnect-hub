@@ -49,6 +49,8 @@ struct MobileConfiguration {
     }
 }
 
+struct PatientSettingsContract: Decodable { let updatePath: String; let maxNameLength: Int }
+
 struct ProfileContract: Decodable {
     let service: String
     let readPath: String
@@ -75,13 +77,18 @@ struct MobileContract {
     let defaultRole: Role
     let appointments: AppointmentContract
     let profiles: [String: ProfileContract]
+    let patientSettings: PatientSettingsContract
     let cancellation: CancellationContract
 
     init(data: Data, policy: Data) throws {
-        struct Document: Decodable { let appointments: AppointmentContract; let profiles: [String: ProfileContract]; let cancellation: CancellationContract }
+        struct Document: Decodable { let appointments: AppointmentContract; let profiles: [String: ProfileContract]; let cancellation: CancellationContract; let patientSettings: PatientSettingsContract }
         struct Policy: Decodable { let groups: [String: Role]; let defaultRole: Role }
         let document = try JSONDecoder().decode(Document.self, from: data)
         appointments = document.appointments
+        patientSettings = document.patientSettings
+        guard patientSettings.maxNameLength > 0,
+              patientSettings.updatePath.range(of: "^/[A-Za-z0-9/_-]+$", options: .regularExpression) != nil,
+              !patientSettings.updatePath.contains("//"), !patientSettings.updatePath.hasSuffix("/") else { throw MobileFailure.configuration }
         profiles = document.profiles
         cancellation = document.cancellation
         guard cancellation.maxLookupPages > 0, !cancellation.cancellableStatuses.isEmpty, !cancellation.cancelledStatuses.isEmpty,

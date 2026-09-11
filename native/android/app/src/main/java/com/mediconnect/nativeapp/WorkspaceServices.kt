@@ -15,6 +15,7 @@ interface WorkspaceAppointments : CancellationService {
 /** Dependencies used by the production workspace; composition remains in MobileRuntime. */
 interface WorkspaceServices {
     val sessions: SignInSession
+    val patientSettings: PatientSettingsService? get() = null
     val profiles: ProfileService
     val appointments: WorkspaceAppointments
     val contract: MobileContract

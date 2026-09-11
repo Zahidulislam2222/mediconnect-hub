@@ -30,6 +30,7 @@ final class WorkspaceModelLifetimeTests: XCTestCase {
         var confirmations = 0
         var fetches = 0
         var profileLoads = 0
+        var appointmentFailure: HTTPFailure?
         let profileStarted = XCTestExpectation(description: "Current identity starts profile loading")
         let identity = Identity(subject: "test-patient", role: .patient, expiresAt: Date().addingTimeInterval(3600))
         var signInResult = AuthSignInResult(nextStep: .continueSignInWithTOTPSetup(TOTPSetupDetails(sharedSecret: "test-key", username: "test-user")))
@@ -49,7 +50,10 @@ final class WorkspaceModelLifetimeTests: XCTestCase {
             if let profileResponse { return try await profileResponse() }
             return OwnProfile(subject: identity.subject, name: "Test Patient", email: "test@example.invalid")
         }
-        func load(access: SessionAccess, cursor: String?) async throws -> AppointmentPage { AppointmentPage(items: [], next: nil) }
+        func load(access: SessionAccess, cursor: String?) async throws -> AppointmentPage {
+            if let appointmentFailure { throw appointmentFailure }
+            return AppointmentPage(items: [], next: nil)
+        }
         func create(identity: Identity, details: ProfileDetails, policyVersion: String) async throws { throw MobileFailure.configuration }
         func requestReset(username: String) async throws -> Bool { throw MobileFailure.configuration }
         func confirmReset(username: String, password: String, code: String) async throws { throw MobileFailure.configuration }
@@ -57,9 +61,9 @@ final class WorkspaceModelLifetimeTests: XCTestCase {
         func confirmRegistration(username: String, code: String) async throws -> Bool { throw MobileFailure.configuration }
         func resendRegistration(username: String) async throws { throw MobileFailure.configuration }
     }
-    @MainActor private func makeModel(_ fake: Fake) async -> WorkspaceModel {
+    @MainActor private func makeModel(_ fake: Fake, settings: PatientSettingsEditor? = nil) async -> WorkspaceModel {
         let model = WorkspaceModel(residency: "US", content: nil, policies: nil, auth: fake, api: fake,
-                                   profileService: fake, cancellationService: nil, cancellationPolicy: nil, signInLatch: fake)
+                                   profileService: fake, cancellationService: nil, cancellationPolicy: nil, signInLatch: fake, settings: settings)
         model.signIn(email: "test@example.invalid", password: "test-password")
         await model.operation?.value
         XCTAssertTrue(model.configured); XCTAssertTrue(model.challenge); XCTAssertFalse(model.busy)
@@ -171,4 +175,49 @@ final class WorkspaceModelLifetimeTests: XCTestCase {
         await fulfillment(of: [fake.profileStarted], timeout: 5)
         XCTAssertEqual(model.identity, fake.identity); XCTAssertEqual(fake.confirmations, 2)
     }
+    @MainActor private final class SettingsFake: PatientSettingsService {
+        func load(identity: Identity) async throws -> PatientSettingsSnapshot {
+            PatientSettingsSnapshot(subject: identity.subject, name: "Test Patient", email: "test@example.invalid",
+                                    phone: nil, address: nil, preferences: nil)
+        }
+        func save(identity: Identity, snapshot: PatientSettingsSnapshot, draft: PatientSettingsDraft) async throws {}
+    }
+    @MainActor private func settingsModel(_ fake: Fake) async throws -> WorkspaceModel {
+        let contract = try MobileContract(data: BundledAssets.data("mobile-contract"), policy: BundledAssets.data("session-policy"))
+        let editor = PatientSettingsEditor(service: SettingsFake(), maxNameLength: contract.patientSettings.maxNameLength)
+        let model = await makeModel(fake, settings: editor)
+        let ready = expectation(description: "Profile and initial workspace refresh are ready")
+        let workspaceObservation = model.$busy.filter { !$0 && model.profile.state.step == .ready }.prefix(1).sink { _ in ready.fulfill() }
+        model.confirm(code: "123456")
+        await fulfillment(of: [ready], timeout: 5)
+        workspaceObservation.cancel()
+        let editing = expectation(description: "Settings opens from the real ready workspace")
+        let settingsObservation = editor.$state.filter { $0.step == .editing }.prefix(1).sink { _ in editing.fulfill() }
+        model.openSettings()
+        await fulfillment(of: [editing], timeout: 5)
+        settingsObservation.cancel()
+        XCTAssertEqual(editor.state.snapshot?.subject, fake.identity.subject)
+        return model
+    }
+    @MainActor func testBackgroundClearsPrivateSettingsDraft() async throws {
+        let fake = Fake(); let model = try await settingsModel(fake); defer { model.hide() }
+        let editor = try XCTUnwrap(model.settings)
+        var draft = try XCTUnwrap(editor.state.draft); draft.address = "Test private draft"; editor.edit(draft)
+        model.hide()
+        XCTAssertEqual(editor.state, SettingsState()); XCTAssertNil(model.identity); XCTAssertFalse(model.visible)
+    }
+    @MainActor func testSignOutClearsPrivateSettingsAndRequiresExplicitSignIn() async throws {
+        let fake = Fake(); let model = try await settingsModel(fake); defer { model.hide() }
+        model.signOut(); await model.operation?.value
+        XCTAssertEqual(model.settings?.state, SettingsState()); XCTAssertNil(model.identity); XCTAssertTrue(fake.required)
+    }
+    @MainActor func testWorkspaceUnauthorizedRefreshClearsSettingsAndProfile() async throws {
+        let fake = Fake(); let model = try await settingsModel(fake); defer { model.hide() }
+        fake.appointmentFailure = HTTPFailure(status: 401)
+        model.refresh(); await model.operation?.value
+        XCTAssertEqual(model.settings?.state, SettingsState()); XCTAssertNil(model.identity)
+        XCTAssertEqual(model.profile.state.step, .closed); XCTAssertEqual(model.message, "sessionExpired")
+        XCTAssertFalse(model.busy)
+    }
+
 }

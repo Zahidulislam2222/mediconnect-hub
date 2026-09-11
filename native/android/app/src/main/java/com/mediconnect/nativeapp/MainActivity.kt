@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -60,6 +61,7 @@ class MainActivity : ComponentActivity() {
             val recovery by model.recovery.state.collectAsStateWithLifecycle()
             val profile by model.profile.state.collectAsStateWithLifecycle()
             val registration by model.registration.state.collectAsStateWithLifecycle()
+            val settings = model.settings?.state?.collectAsStateWithLifecycle()?.value ?: SettingsState()
             MobileTheme(model.content) {
                 val canReturnHome = state.identity == null && !state.busy && !state.challenge &&
                     recovery.step == RecoveryStep.CLOSED && registration.step == RegistrationStep.CLOSED
@@ -74,6 +76,10 @@ class MainActivity : ComponentActivity() {
                     model.registration::confirm, model.registration::resend, model.registration::close,
                     profile, model.profile::accept, model.profile::submit, model.profile::check,
                     cancellation, model::openCancellation, model.cancellation::confirm, model.cancellation::check, model::closeCancellation,
+                    settings = settings, openSettings = model::openSettings,
+                    editSettings = { model.settings?.edit(it) }, saveSettings = { model.settings?.save() },
+                    discardSettings = { model.settings?.discard() }, reloadSettings = { model.settings?.reload() },
+                    closeSettings = { model.settings?.close() }, settingsAvailable = model.settings != null,
                     homeLabel = journey.home, returnHome = if (canReturnHome) ({ welcome = true }) else null)
                 }
             }
@@ -106,10 +112,13 @@ fun WorkspaceScreen(state: WorkspaceState, content: MobileContent, configured: B
                     saveProfile: (String, String, String) -> Unit = { _, _, _ -> }, checkProfile: () -> Unit = {},
                     cancellation: CancellationState = CancellationState(), openCancellation: (Appointment) -> Unit = {},
                     confirmCancellation: () -> Unit = {}, checkCancellation: () -> Unit = {}, closeCancellation: () -> Unit = {},
+                    settings: SettingsState = SettingsState(), settingsAvailable: Boolean = false,
+                    openSettings: () -> Unit = {}, editSettings: (PatientSettingsDraft) -> Unit = {},
+                    saveSettings: () -> Unit = {}, discardSettings: () -> Unit = {}, reloadSettings: () -> Unit = {}, closeSettings: () -> Unit = {},
                     homeLabel: String = "", returnHome: (() -> Unit)? = null) {
     CancellationDialog(cancellation, content, confirmCancellation, checkCancellation, closeCancellation)
     Scaffold { padding ->
-        LazyColumn(Modifier.fillMaxSize().padding(padding), contentPadding = PaddingValues(24.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
+        LazyColumn(Modifier.fillMaxSize().padding(padding).imePadding(), contentPadding = PaddingValues(24.dp), verticalArrangement = Arrangement.spacedBy(20.dp)) {
             item {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(content.text("brand"), style = MaterialTheme.typography.headlineLarge)
@@ -146,6 +155,13 @@ fun WorkspaceScreen(state: WorkspaceState, content: MobileContent, configured: B
                     if (profile.step != ProfileStep.READY && profile.step != ProfileStep.CLOSED) {
                         item { ProfileSetup(profile, state.identity.role, content, policies, acceptProfile, saveProfile, checkProfile) }
                         return@LazyColumn
+                    }
+                    if (state.identity.role == Role.PATIENT && settingsAvailable && profile.step == ProfileStep.READY) {
+                        if (settings.step != SettingsStep.CLOSED) {
+                            item { PatientSettingsForm(settings, content, editSettings, saveSettings, discardSettings, reloadSettings, closeSettings) }
+                            return@LazyColumn
+                        }
+                        item { TextButton(onClick = openSettings, enabled = !state.busy) { Text(content.label("settings", "open")) } }
                     }
                     item {
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {

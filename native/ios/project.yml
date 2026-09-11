@@ -85,6 +85,8 @@ targets:
     sources:
       - UITests
       - TestSupport/NativeUITestProtocol.swift
+      - path: Resources/mobile-content.json
+        buildPhase: resources
       - path: Resources/journey.json
         buildPhase: resources
       - path: Resources/legal.json

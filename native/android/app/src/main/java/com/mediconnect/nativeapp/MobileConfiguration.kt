@@ -18,7 +18,15 @@ data class ProfileContract(val service: String, val readPath: String, val append
 
 data class CancellationContract(val path: String, val cancellableStatuses: Set<String>, val cancelledStatuses: Set<String>, val maxLookupPages: Int)
 
+data class PatientSettingsContract(val updatePath: String, val maxNameLength: Int)
+
 class MobileContract(source: JSONObject, policy: JSONObject) {
+    val patientSettings = source.getJSONObject("patientSettings").let { row ->
+        val path = row.get("updatePath"); val limit = row.get("maxNameLength")
+        require(path is String && path.matches(Regex("/[A-Za-z0-9/_-]+")) && !path.contains("//") && !path.endsWith('/'))
+        require(limit is Int && limit > 0)
+        PatientSettingsContract(path, limit)
+    }
     val cancellation = source.getJSONObject("cancellation").let { row ->
         fun statuses(key: String) = row.getJSONArray(key).let { values -> (0 until values.length()).map { values.getString(it) }.toSet().also { require(it.isNotEmpty()) } }
         CancellationContract(row.getString("path").also { require(it.matches(Regex("/[A-Za-z0-9/_-]+")) && !it.contains("//")) },

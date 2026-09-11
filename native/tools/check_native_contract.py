@@ -22,7 +22,14 @@ def main():
         assert set(region["services"]) == {"patient", "doctor", "booking", "communication", "staff", "admin"}
         assert all(value == "" for value in region["services"].values())
     content = read("mobile-content.json")
-    assert all(isinstance(value, str) and value for key, value in content.items() if key not in {"residency", "roles", "theme"})
+    settings_groups = {"settings", "settingsPreferences", "settingsStatus"}
+    assert all(isinstance(value, str) and value for key, value in content.items() if key not in {"residency", "roles", "theme"} | settings_groups)
+    for group in settings_groups:
+        assert isinstance(content[group], dict) and content[group]
+        assert all(isinstance(value, str) and value for value in content[group].values())
+    assert set(content["settings"]) == {"title", "open", "phone", "address", "save", "discard", "close", "reload", "invalid", "unset", "emailReadOnly", "enabled", "disabled"}
+    assert set(content["settingsPreferences"]) == {"email", "sms", "promotional"}
+    assert set(content["settingsStatus"]) == {"CLOSED", "LOADING", "EDITING", "SAVING", "SAVED", "LOAD_FAILED", "SAVE_UNCERTAIN", "DENIED", "MISSING"}
     assert set(content["residency"]) == {"US", "EU"}
     assert set(content["roles"]) == {"patient", "doctor", "staff", "admin"}
     assert all(re.fullmatch(r"#[0-9A-Fa-f]{6}", value) for value in content["theme"].values())
@@ -49,6 +56,9 @@ def main():
         assert re.fullmatch(r"[A-Za-z]+", route["subjectField"])
         for key in ("readPath", "createPath"):
             assert re.fullmatch(r"/[A-Za-z0-9/_-]+", route[key]) and "//" not in route[key]
+    settings = contract["patientSettings"]
+    assert re.fullmatch(r"/[A-Za-z0-9/_-]+", settings["updatePath"]) and "//" not in settings["updatePath"] and not settings["updatePath"].endswith("/")
+    assert type(settings["maxNameLength"]) is int and settings["maxNameLength"] > 0
     cancellation = contract["cancellation"]
     assert re.fullmatch(r"/[A-Za-z0-9/_-]+", cancellation["path"]) and "//" not in cancellation["path"]
     assert isinstance(cancellation["maxLookupPages"], int) and cancellation["maxLookupPages"] > 0
@@ -66,6 +76,8 @@ def main():
                 assert re.search(pattern, source) is None, f"Native source boundary violation: {path.name}"
             for key in re.findall(r'content\.text\("([A-Za-z]+)"\)', source):
                 assert isinstance(content.get(key), str), f"Unknown content key: {key}"
+            for group, key in re.findall(r'content\.label\("([A-Za-z]+)", "([A-Za-z]+)"\)', source):
+                assert isinstance(content.get(group, {}).get(key), str), f"Unknown content label: {group}/{key}"
             count += 1
     print(f"Native contract/configuration regression checks passed for {count} platform source files.")
 
