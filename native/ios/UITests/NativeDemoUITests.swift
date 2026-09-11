@@ -1,6 +1,10 @@
 import XCTest
 
 final class NativeDemoUITests: XCTestCase {
+    override func setUpWithError() throws {
+        try super.setUpWithError()
+        continueAfterFailure = false
+    }
     private struct Fixture: Decodable {
         struct Explore: Decodable {
             struct Role: Decodable { let id: String; let action: String; let label: String }
@@ -32,6 +36,7 @@ final class NativeDemoUITests: XCTestCase {
     }
     private func tap(_ title: String, in app: XCUIApplication, down: Bool = false) {
         let button = app.buttons[title]
+        var viewport = CGRect.zero
         for _ in 0..<30 {
             let exists = button.exists
             let frame = exists ? button.frame : .zero
@@ -39,16 +44,33 @@ final class NativeDemoUITests: XCTestCase {
             let top = navigation.exists ? navigation.frame.maxY : app.frame.minY
             let keyboard = app.keyboards.firstMatch
             let bottom = keyboard.exists ? keyboard.frame.minY : app.frame.maxY
+            viewport = CGRect(x: app.frame.minX, y: top, width: app.frame.width, height: bottom - top)
+            guard viewport.height > 0 else {
+                XCTFail("No usable viewport: \(viewport)"); return
+            }
             if exists, button.isHittable, frame.minY >= top, frame.maxY <= bottom,
                frame.minX >= app.frame.minX, frame.maxX <= app.frame.maxX {
                 button.tap(); return
             }
-            if exists, frame.minY < top { app.swipeDown() }
-            else if exists, frame.maxY > bottom { app.swipeUp() }
+            if exists, !frame.isEmpty {
+                if frame.maxY < top - viewport.height { app.swipeDown() }
+                else if frame.minY > bottom + viewport.height { app.swipeUp() }
+                else {
+                    let distance = max(-viewport.height / 3,
+                                       min(viewport.height / 3, frame.midY - viewport.midY))
+                    let origin = app.coordinate(withNormalizedOffset: .zero)
+                    let start = origin.withOffset(CGVector(dx: app.frame.width / 2,
+                                                          dy: viewport.midY - app.frame.minY))
+                    let end = start.withOffset(CGVector(dx: 0, dy: -distance))
+                    start.press(forDuration: 0.05, thenDragTo: end,
+                                withVelocity: .slow, thenHoldForDuration: 0.05)
+                }
+            }
             else if down { app.swipeDown() }
             else { app.swipeUp() }
         }
-        XCTFail("Control is not fully visible: \(title)")
+        let frame = button.exists ? button.frame : .zero
+        XCTFail("Control is not fully visible: \(title); target=\(frame); viewport=\(viewport); app=\(app.frame)")
     }
     private func replaceNote(_ note: XCUIElement, with text: String, in app: XCUIApplication) {
         reveal(note, in: app); note.tap(); note.press(forDuration: 1)
