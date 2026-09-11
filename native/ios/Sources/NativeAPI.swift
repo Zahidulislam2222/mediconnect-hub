@@ -5,12 +5,17 @@ final class RejectRedirects: NSObject, URLSessionTaskDelegate {
                     newRequest request: URLRequest, completionHandler: @escaping (URLRequest?) -> Void) { completionHandler(nil) }
 }
 
+enum NativeHTTPMethod: String {
+    case get = "GET", post = "POST", put = "PUT", delete = "DELETE"
+}
+
 final class NativeAPI {
     private let config: MobileConfiguration
     private let session: URLSession
-    init(config: MobileConfiguration) {
+    init(config: MobileConfiguration, protocolClasses: [AnyClass]? = nil) {
         self.config = config
         let settings = URLSessionConfiguration.ephemeral
+        if let protocolClasses { settings.protocolClasses = protocolClasses }
         settings.urlCache = nil
         settings.httpCookieStorage = nil
         settings.httpShouldSetCookies = false
@@ -21,7 +26,13 @@ final class NativeAPI {
     }
     deinit { session.invalidateAndCancel() }
 
-    func request(access: SessionAccess, service: String, path: String, query: [String: String] = [:], body: [String: Any]? = nil) async throws -> Data {
+    func request(access: SessionAccess, service: String, path: String, query: [String: String] = [:], body: [String: Any]? = nil, method: NativeHTTPMethod? = nil) async throws -> Data {
+        let selectedMethod = method ?? (body == nil ? .get : .post)
+        switch selectedMethod {
+        case .get: guard body == nil else { throw MobileFailure.configuration }
+        case .post, .put: guard body != nil else { throw MobileFailure.configuration }
+        case .delete: break
+        }
         guard access.identity.expiresAt > Date(), let base = config.services[service],
               var url = URLComponents(url: base, resolvingAgainstBaseURL: false),
               path.range(of: "^/[A-Za-z0-9/_.-]+$", options: .regularExpression) != nil,
@@ -31,7 +42,7 @@ final class NativeAPI {
         url.queryItems = query.isEmpty ? nil : query.map { URLQueryItem(name: $0.key, value: $0.value) }
         guard let endpoint = url.url else { throw MobileFailure.configuration }
         var request = URLRequest(url: endpoint)
-        request.httpMethod = body == nil ? "GET" : "POST"
+        request.httpMethod = selectedMethod.rawValue
         if let body {
             request.httpBody = try JSONSerialization.data(withJSONObject: body)
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")

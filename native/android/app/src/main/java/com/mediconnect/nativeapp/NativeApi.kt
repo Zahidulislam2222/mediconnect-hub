@@ -15,8 +15,16 @@ import kotlin.coroutines.resumeWithException
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.RequestBody.Companion.toRequestBody
 
+enum class NativeHttpMethod { GET, POST, PUT, DELETE }
+
 class NativeApi(private val config: MobileConfiguration, private val sessions: SessionProvider, private val client: OkHttpClient) {
-    suspend fun request(identity: Identity, service: String, path: String, query: Map<String, String> = emptyMap(), body: JSONObject? = null): String {
+    suspend fun request(identity: Identity, service: String, path: String, query: Map<String, String> = emptyMap(), body: JSONObject? = null, method: NativeHttpMethod? = null): String {
+        val selectedMethod = method ?: if (body == null) NativeHttpMethod.GET else NativeHttpMethod.POST
+        require(when (selectedMethod) {
+            NativeHttpMethod.GET -> body == null
+            NativeHttpMethod.POST, NativeHttpMethod.PUT -> body != null
+            NativeHttpMethod.DELETE -> true
+        })
         val session = sessions.fetch()
         require(session.identity.subject == identity.subject && session.identity.role == identity.role && session.identity.expiresAt > Instant.now())
         require(path.matches(Regex("/[A-Za-z0-9/_.-]+")) && !path.contains("//") && !path.split('/').contains(".."))
@@ -26,7 +34,7 @@ class NativeApi(private val config: MobileConfiguration, private val sessions: S
         val builder = Request.Builder().url(url.build())
             .header("Authorization", "Bearer ${session.token}").header("x-user-region", config.residency)
             .header("Accept", "application/json").header("Cache-Control", "no-store")
-        if (body == null) builder.get() else builder.post(body.toString().toRequestBody("application/json".toMediaType()))
+        builder.method(selectedMethod.name, body?.toString()?.toRequestBody("application/json".toMediaType()))
         return execute(client.newCall(builder.build()))
     }
 

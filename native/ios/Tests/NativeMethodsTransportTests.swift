@@ -1,0 +1,97 @@
+import Foundation
+import XCTest
+@testable import MediConnectApp
+
+private final class MethodRecordingProtocol: URLProtocol {
+    private static let lock = NSLock()
+    private static var captured: [URLRequest] = []
+    static func drain() -> [URLRequest] {
+        lock.lock(); defer { lock.unlock() }
+        let result = captured; captured = []; return result
+    }
+    override class func canInit(with request: URLRequest) -> Bool { true }
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+    override func startLoading() {
+        var capturedRequest = request
+        if capturedRequest.httpBody == nil, let stream = request.httpBodyStream {
+            stream.open(); defer { stream.close() }
+            var data = Data()
+            var buffer = [UInt8](repeating: 0, count: 1024)
+            while true {
+                let count = stream.read(&buffer, maxLength: buffer.count)
+                if count < 0 {
+                    client?.urlProtocol(self, didFailWithError: URLError(.cannotDecodeContentData)); return
+                }
+                if count == 0 { break }
+                data.append(contentsOf: buffer.prefix(count))
+            }
+            capturedRequest.httpBody = data
+        }
+        Self.lock.lock(); Self.captured.append(capturedRequest); Self.lock.unlock()
+        guard let url = request.url,
+              let response = HTTPURLResponse(url: url, statusCode: 200, httpVersion: nil,
+                                             headerFields: ["Content-Type": "application/json"]) else {
+            client?.urlProtocol(self, didFailWithError: URLError(.badURL)); return
+        }
+        client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+        client?.urlProtocol(self, didLoad: Data("{}".utf8))
+        client?.urlProtocolDidFinishLoading(self)
+    }
+    override func stopLoading() {}
+}
+
+final class NativeMethodsTransportTests: XCTestCase {
+    override func setUp() { super.setUp(); _ = MethodRecordingProtocol.drain() }
+    private var access: SessionAccess {
+        SessionAccess(identity: Identity(subject: "test-patient", role: .patient,
+                                        expiresAt: Date().addingTimeInterval(300)), token: "test-token")
+    }
+    private func api(_ residency: String = "US") throws -> NativeAPI {
+        let awsRegion = residency == "US" ? "us-east-1" : "eu-central-1"
+        let source: [String: Any] = ["requestTimeoutSeconds": 10, "maxResponseBytes": 1048576,
+            "regions": [residency: ["awsRegion": awsRegion, "userPoolId": awsRegion + "_testpool",
+                "clientId": "testclient", "issuer": "https://example.test/testpool",
+                "services": ["patient": "https://example.test"]]]]
+        let config = try MobileConfiguration(data: JSONSerialization.data(withJSONObject: source), residency: residency)
+        return NativeAPI(config: config, protocolClasses: [MethodRecordingProtocol.self])
+    }
+    func testExplicitMethodsAndRegionalHeadersThroughURLSession() async throws {
+        for region in ["US", "EU"] {
+            for method in [NativeHTTPMethod.get, .post, .put, .delete] {
+                let body: [String: Any]? = method == .get ? nil : ["name": "Test person"]
+                _ = try await api(region).request(access: access, service: "patient", path: "/me", body: body, method: method)
+                let sent = try XCTUnwrap(MethodRecordingProtocol.drain().first)
+                XCTAssertEqual(sent.httpMethod, method.rawValue)
+                XCTAssertEqual(sent.url?.path, "/me")
+                XCTAssertEqual(sent.value(forHTTPHeaderField: "x-user-region"), region)
+                XCTAssertEqual(sent.value(forHTTPHeaderField: "Authorization"), "Bearer test-token")
+                XCTAssertEqual(sent.value(forHTTPHeaderField: "Cache-Control"), "no-store")
+                if body != nil {
+                    let decoded = try JSONSerialization.jsonObject(with: XCTUnwrap(sent.httpBody)) as? [String: String]
+                    XCTAssertEqual(decoded, ["name": "Test person"])
+                    XCTAssertEqual(sent.value(forHTTPHeaderField: "Content-Type"), "application/json")
+                } else { XCTAssertTrue(sent.httpBody?.isEmpty ?? true) }
+            }
+        }
+    }
+    func testDeleteWithoutBodyAndLegacyInference() async throws {
+        let client = try api()
+        _ = try await client.request(access: access, service: "patient", path: "/me", method: .delete)
+        _ = try await client.request(access: access, service: "patient", path: "/me")
+        _ = try await client.request(access: access, service: "patient", path: "/me", body: [:])
+        let sent = MethodRecordingProtocol.drain()
+        XCTAssertEqual(sent.map(\.httpMethod), ["DELETE", "GET", "POST"])
+        XCTAssertTrue(sent.first?.httpBody?.isEmpty ?? true)
+    }
+    func testInvalidCombinationsNeverReachURLSession() async throws {
+        let client = try api()
+        let cases: [(NativeHTTPMethod, [String: Any]?)] = [(.get, [:]), (.post, nil), (.put, nil)]
+        for (method, body) in cases {
+            do {
+                _ = try await client.request(access: access, service: "patient", path: "/me", body: body, method: method)
+                XCTFail("Invalid method/body pair accepted")
+            } catch MobileFailure.configuration {} catch { XCTFail("Unexpected error type") }
+        }
+        XCTAssertTrue(MethodRecordingProtocol.drain().isEmpty)
+    }
+}
