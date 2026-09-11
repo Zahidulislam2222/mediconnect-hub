@@ -13,7 +13,7 @@ final class PatientSettingsUITests: XCTestCase {
         func text(_ key: String) throws -> String { try XCTUnwrap(settings[key]) }
         func status(_ key: String) throws -> String { try XCTUnwrap(settingsStatus[key]) }
     }
-    private func copy() throws -> Copy {
+    private func loadSettingsContent() throws -> Copy {
         let url = try XCTUnwrap(Bundle(for: Self.self).url(forResource: "mobile-content", withExtension: "json"))
         return try JSONDecoder().decode(Copy.self, from: Data(contentsOf: url))
     }
@@ -74,7 +74,7 @@ final class PatientSettingsUITests: XCTestCase {
         return single.exists ? single : app.textViews[title]
     }
     func testLargestTextWithKeyboardSavesSettingsAndPreservesReadOnlyEmail() throws {
-        let source = try copy(); let app = try open(source, large: true)
+        let source = try loadSettingsContent(); let app = try open(source, large: true)
         XCTAssertFalse(app.textFields[source.email].exists)
         let phone = field(try source.text("phone"), in: app)
         reveal(phone, in: app); phone.tap(); phone.typeText("5550100")
@@ -94,7 +94,7 @@ final class PatientSettingsUITests: XCTestCase {
         XCTAssertTrue(app.buttons[try source.text("open")].waitForExistence(timeout: 5))
     }
     func testUncertainSaveRequiresReloadAndCloseDiscardsUnsavedDraft() throws {
-        let source = try copy(); let app = try open(source, lostReadback: true)
+        let source = try loadSettingsContent(); let app = try open(source, lostReadback: true)
         let phone = field(try source.text("phone"), in: app)
         reveal(phone, in: app); phone.tap(); phone.typeText("5550100")
         tap(try source.text("save"), in: app)
