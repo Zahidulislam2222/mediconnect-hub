@@ -47,13 +47,18 @@ class AuthenticatorSetupScreenTest {
     }
     @Test fun revealRequiresActionAndSubmitHidesKeyAndClearsCode() {
         var submitted: String? = null
-        show(confirm = { submitted = SignInChallenge.response(ChallengeInput.TOTP_SETUP, it) })
+        var confirmCalls = 0
+        show(confirm = { confirmCalls++; submitted = SignInChallenge.response(ChallengeInput.TOTP_SETUP, it) })
         compose.onNodeWithText("test-key").assertDoesNotExist()
         compose.onNodeWithText(content.text("revealSetupKey")).performScrollTo().performClick()
         compose.onNodeWithText("test-key").performScrollTo().assertIsDisplayed()
         compose.onNodeWithText(content.text("code")).performScrollTo().performTextInput("123456")
-        compose.onNodeWithText(content.text("verify")).performScrollTo().performClick()
-        assertEquals("123456", submitted)
+        compose.onNodeWithText(content.text("code")).assertTextContains("123456")
+        compose.onNodeWithText(content.text("verify")).performScrollTo().assertIsEnabled().performClick()
+        compose.runOnIdle {
+            assertEquals("Verify must invoke exactly one confirmation callback", 1, confirmCalls)
+            assertEquals("123456", submitted)
+        }
         compose.onNodeWithText("test-key").assertDoesNotExist()
         compose.onNodeWithText(content.text("verify")).assertIsNotEnabled()
     }
