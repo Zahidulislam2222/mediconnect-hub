@@ -28,7 +28,7 @@ struct SettingsState: Equatable {
         identity = value; reload()
     }
     func edit(_ draft: PatientSettingsDraft) {
-        guard state.editable else { return }
+        guard state.editable, state.draft != draft else { return }
         state.step = .editing; state.draft = draft; state.invalid = false
     }
     func discard() {

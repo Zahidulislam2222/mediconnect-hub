@@ -42,6 +42,25 @@ final class PatientSettingsEditorTests: XCTestCase {
         await observe(model, step: .editing) { model.reload() }
         XCTAssertEqual(model.state.draft?.name, own.name); model.close()
     }
+    @MainActor func testUnchangedBindingValuePreservesVerifiedSavedState() async throws {
+        let service = Fake(snapshot: own); let model = PatientSettingsEditor(service: service, maxNameLength: 200)
+        await observe(model, step: .editing) { model.open(identity) }
+        var draft = PatientSettingsDraft(snapshot: own); draft.name = "Changed"
+        service.write = { value in service.read = {
+            PatientSettingsSnapshot(subject: "test-patient", name: value.name, email: "test@example.test",
+                                    phone: nil, address: nil, preferences: nil)
+        } }
+        model.edit(draft)
+        await observe(model, step: .saved) { model.save() }
+        let verified = model.state
+        model.edit(try XCTUnwrap(model.state.draft))
+        XCTAssertEqual(model.state, verified)
+        XCTAssertEqual(service.writes, 1)
+        draft.name = "Another change"; model.edit(draft)
+        XCTAssertEqual(model.state.step, .editing)
+        XCTAssertEqual(model.state.draft?.name, "Another change")
+        model.close()
+    }
     @MainActor func testInvalidDraftAndDiscardNeverWrite() async {
         let service = Fake(snapshot: own); let model = PatientSettingsEditor(service: service, maxNameLength: 200)
         await observe(model, step: .editing) { model.open(identity) }
