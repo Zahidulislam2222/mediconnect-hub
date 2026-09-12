@@ -58,7 +58,11 @@ enum class NativeFailureOutcome {
     }
 }
 
-class NativeResponse(val body: String, val status: Int, val exportIntegrity: String?)
+class NativeResponse(body: ByteArray, val status: Int, val exportIntegrity: String?) {
+    private val retainedBytes = body.copyOf()
+    val body: String get() = retainedBytes.toString(StandardCharsets.UTF_8)
+    val bytes: ByteArray get() = retainedBytes.copyOf()
+}
 
 class NativeApi(private val config: MobileConfiguration, private val sessions: SessionProvider, private val client: OkHttpClient) {
     suspend fun request(identity: Identity, service: String, path: String, query: Map<String, String> = emptyMap(), body: JSONObject? = null, method: NativeHttpMethod? = null): String =
@@ -98,12 +102,14 @@ class NativeApi(private val config: MobileConfiguration, private val sessions: S
                         val source = body.source()
                         source.request(config.maxResponseBytes + 1)
                         if (source.buffer.size > config.maxResponseBytes) throw ApiFailure()
-                        val text = if (it.isSuccessful) source.readUtf8() else StandardCharsets.UTF_8.newDecoder()
+                        val bytes = source.readByteArray()
+                        val text = if (it.isSuccessful) bytes.toString(StandardCharsets.UTF_8) else StandardCharsets.UTF_8.newDecoder()
                             .onMalformedInput(CodingErrorAction.REPORT)
                             .onUnmappableCharacter(CodingErrorAction.REPORT)
-                            .decode(ByteBuffer.wrap(source.readByteArray())).toString()
+                            .decode(ByteBuffer.wrap(bytes)).toString()
                         if (!it.isSuccessful) throw ApiFailure(it.code, NativeFailureOutcome.decode(it.code, text))
-                        if (continuation.isActive) continuation.resume(NativeResponse(text, it.code, it.header("X-Export-Integrity")))
+                        val integrity = it.headers.values("X-Export-Integrity").singleOrNull()
+                        if (continuation.isActive) continuation.resume(NativeResponse(bytes, it.code, integrity))
                     } catch (failure: Exception) {
                         if (continuation.isActive) continuation.resumeWithException(
                             if (failure is ApiFailure) ApiFailure(it.code, failure.outcome) else ApiFailure(it.code))

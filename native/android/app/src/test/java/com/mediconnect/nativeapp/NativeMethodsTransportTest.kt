@@ -25,6 +25,39 @@ import java.time.Instant
 import java.util.concurrent.TimeUnit
 
 class NativeMethodsTransportTest {
+    @Test fun exportChecksumUsesExactHttpsResponseBytes() = runBlocking {
+        for (region in listOf("US", "EU")) {
+            for (bytes in listOf("{ \"text\": \"é বাংলা\" }\n".toByteArray(), byteArrayOf(0xc3.toByte(), 0x28))) {
+                val hash = java.security.MessageDigest.getInstance("SHA-256").digest(bytes)
+                    .joinToString("") { "%02x".format(it) }
+                server.enqueue(MockResponse().setBody(okio.Buffer().write(bytes)).setHeader("X-Export-Integrity", hash))
+                val response = api(region).requestResponse(identity, "patient", "/me/export")
+                org.junit.Assert.assertArrayEquals(bytes, response.bytes)
+                org.junit.Assert.assertArrayEquals(bytes, ExportIntegrity.verifiedBytes(response))
+            }
+        }
+    }
+
+    @Test fun exportChecksumDoesNotAcceptTamperedHttpsBody(): Unit = runBlocking {
+        val bytes = "abc".toByteArray()
+        val hash = java.security.MessageDigest.getInstance("SHA-256").digest(bytes)
+            .joinToString("") { "%02x".format(it) }
+        server.enqueue(MockResponse().setBody("abd").setHeader("X-Export-Integrity", hash))
+        val response = api().requestResponse(identity, "patient", "/me/export")
+        assertThrows(ApiFailure::class.java) { ExportIntegrity.verifiedBytes(response) }
+    }
+
+    @Test fun exportRejectsRepeatedIntegrityHeaderFields(): Unit = runBlocking {
+        val hash = "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+        for (headers in listOf(listOf(hash, hash), listOf("invalid", hash), listOf(hash, "invalid"))) {
+            server.enqueue(MockResponse().setBody("abc")
+                .addHeader("X-Export-Integrity", headers[0]).addHeader("x-export-integrity", headers[1]))
+            val response = api().requestResponse(identity, "patient", "/me/export")
+            assertEquals(null, response.exportIntegrity)
+            assertThrows(ApiFailure::class.java) { ExportIntegrity.verifiedBytes(response) }
+        }
+    }
+
     private val certificate = HeldCertificate.Builder().addSubjectAlternativeName("localhost").build()
     private val serverCertificates = HandshakeCertificates.Builder().heldCertificate(certificate).build()
     private val clientCertificates = HandshakeCertificates.Builder().addTrustedCertificate(certificate.certificate).build()

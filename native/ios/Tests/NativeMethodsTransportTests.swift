@@ -1,4 +1,5 @@
 import Foundation
+import CryptoKit
 import XCTest
 @testable import MediConnectApp
 
@@ -29,6 +30,15 @@ private final class MethodRecordingProtocol: URLProtocol {
         }
         Self.lock.lock(); Self.captured.append(capturedRequest); Self.lock.unlock()
         guard let url = request.url else { return }
+        if url.path.hasPrefix("/export-bytes") {
+            let bytes = url.path.hasSuffix("invalid") ? Data([0xc3, 0x28]) : Data("{ \"text\": \"é বাংলা\" }\n".utf8)
+            let hash = SHA256.hash(data: bytes).map { String(format: "%02x", $0) }.joined()
+            let response = HTTPURLResponse(url: url, statusCode: 200, httpVersion: nil, headerFields: ["X-Export-Integrity": hash])!
+            client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+            client?.urlProtocol(self, didLoad: url.path.hasSuffix("tampered") ? Data("tampered".utf8) : bytes)
+            client?.urlProtocolDidFinishLoading(self)
+            return
+        }
         if url.path.hasPrefix("/failure/") {
             let pieces = url.path.split(separator: "/")
             let status = Int(pieces[1]) ?? 503
@@ -52,6 +62,21 @@ private final class MethodRecordingProtocol: URLProtocol {
 }
 
 final class NativeMethodsTransportTests: XCTestCase {
+    func testExportChecksumUsesExactURLSessionResponseBytes() async throws {
+        for region in ["US", "EU"] {
+            for (path, expected) in [("/export-bytes", Data("{ \"text\": \"é বাংলা\" }\n".utf8)), ("/export-bytes-invalid", Data([0xc3, 0x28]))] {
+                let response = try await api(region).requestResponse(access: access, service: "patient", path: path)
+                XCTAssertEqual(response.body, expected)
+                XCTAssertEqual(try ExportIntegrity.verifiedBytes(response), expected)
+            }
+        }
+    }
+
+    func testExportChecksumRejectsTamperedURLSessionBody() async throws {
+        let response = try await api().requestResponse(access: access, service: "patient", path: "/export-bytes-tampered")
+        XCTAssertThrowsError(try ExportIntegrity.verifiedBytes(response))
+    }
+
     override func setUp() { super.setUp(); _ = MethodRecordingProtocol.drain() }
     private var access: SessionAccess {
         SessionAccess(identity: Identity(subject: "test-patient", role: .patient,
