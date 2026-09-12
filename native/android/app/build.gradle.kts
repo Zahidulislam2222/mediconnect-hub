@@ -81,6 +81,7 @@ dependencies {
     implementation(libs.amplify.auth)
     implementation(libs.coroutines.android)
     implementation(libs.okhttp)
+    implementation(libs.gson)
     debugImplementation(libs.compose.ui.tooling)
     debugImplementation(libs.compose.test.manifest)
     testImplementation(libs.junit)

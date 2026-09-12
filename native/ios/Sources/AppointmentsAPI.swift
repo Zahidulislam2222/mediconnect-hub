@@ -7,7 +7,14 @@ struct Appointment: Identifiable {
     let status: String?
 }
 struct AppointmentPage { let items: [Appointment]; let next: String? }
-struct HTTPFailure: Error { let status: Int? }
+struct HTTPFailure: Error {
+    let status: Int?
+    let outcome: NativeFailureOutcome?
+    init(status: Int?, outcome: NativeFailureOutcome? = nil) {
+        self.status = status
+        self.outcome = outcome
+    }
+}
 
 enum AppointmentDecoder {
     static func decode(_ data: Data, identity: Identity, contract: MobileContract) throws -> AppointmentPage {

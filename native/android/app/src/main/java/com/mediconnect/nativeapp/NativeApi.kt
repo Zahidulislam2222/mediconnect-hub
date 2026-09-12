@@ -7,7 +7,14 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.Response
 import org.json.JSONObject
+import com.google.gson.Strictness
+import com.google.gson.stream.JsonReader
+import com.google.gson.stream.JsonToken
 import java.io.IOException
+import java.io.StringReader
+import java.nio.ByteBuffer
+import java.nio.charset.CodingErrorAction
+import java.nio.charset.StandardCharsets
 import java.time.Instant
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
@@ -16,6 +23,40 @@ import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.RequestBody.Companion.toRequestBody
 
 enum class NativeHttpMethod { GET, POST, PUT, DELETE }
+
+// Fixed backend wire outcomes; arbitrary server text is never retained in failures.
+enum class NativeFailureOutcome {
+    ERASURE_IN_PROGRESS, ERASURE_REQUEST_CHANGED, ERASURE_RETRY_REQUIRED, EXPORT_INCOMPLETE;
+
+    companion object {
+        fun decode(status: Int, body: String): NativeFailureOutcome? = try {
+            // Use the same strict reader on the JVM and Android. JSONObject accepts
+            // non-JSON syntax and silently ignores trailing input on some runtimes.
+            val value = mutableMapOf<String, String?>()
+            JsonReader(StringReader(body)).use { reader ->
+                reader.strictness = Strictness.STRICT
+                reader.beginObject()
+                while (reader.hasNext()) {
+                    val name = reader.nextName()
+                    require(!value.containsKey(name))
+                    value[name] = if (reader.peek() == JsonToken.STRING) reader.nextString()
+                    else { reader.skipValue(); null }
+                }
+                reader.endObject()
+                require(reader.peek() == JsonToken.END_DOCUMENT)
+            }
+            val state = value["status"]
+            val code = value["code"]
+            when {
+                status == 409 && !value.containsKey("code") && state == "IN_PROGRESS" -> ERASURE_IN_PROGRESS
+                status == 409 && !value.containsKey("code") && state == "REQUEST_CHANGED" -> ERASURE_REQUEST_CHANGED
+                status == 503 && state == "RETRY_REQUIRED" && code == "ERASURE_INCOMPLETE" -> ERASURE_RETRY_REQUIRED
+                status == 503 && !value.containsKey("status") && code == "DATA_EXPORT_INCOMPLETE" -> EXPORT_INCOMPLETE
+                else -> null
+            }
+        } catch (_: Exception) { null }
+    }
+}
 
 class NativeResponse(val body: String, val status: Int, val exportIntegrity: String?)
 
@@ -52,16 +93,20 @@ class NativeApi(private val config: MobileConfiguration, private val sessions: S
             override fun onResponse(call: Call, response: Response) {
                 response.use {
                     try {
-                        if (!it.isSuccessful) throw ApiFailure(it.code)
                         val body = it.body
                         if (body.contentLength() > config.maxResponseBytes) throw ApiFailure()
                         val source = body.source()
                         source.request(config.maxResponseBytes + 1)
                         if (source.buffer.size > config.maxResponseBytes) throw ApiFailure()
-                        val text = source.readUtf8()
+                        val text = if (it.isSuccessful) source.readUtf8() else StandardCharsets.UTF_8.newDecoder()
+                            .onMalformedInput(CodingErrorAction.REPORT)
+                            .onUnmappableCharacter(CodingErrorAction.REPORT)
+                            .decode(ByteBuffer.wrap(source.readByteArray())).toString()
+                        if (!it.isSuccessful) throw ApiFailure(it.code, NativeFailureOutcome.decode(it.code, text))
                         if (continuation.isActive) continuation.resume(NativeResponse(text, it.code, it.header("X-Export-Integrity")))
-                    } catch (_: Exception) {
-                        if (continuation.isActive) continuation.resumeWithException(ApiFailure(it.code))
+                    } catch (failure: Exception) {
+                        if (continuation.isActive) continuation.resumeWithException(
+                            if (failure is ApiFailure) ApiFailure(it.code, failure.outcome) else ApiFailure(it.code))
                     }
                 }
             }

@@ -28,8 +28,19 @@ private final class MethodRecordingProtocol: URLProtocol {
             capturedRequest.httpBody = data
         }
         Self.lock.lock(); Self.captured.append(capturedRequest); Self.lock.unlock()
-        guard let url = request.url,
-              let response = HTTPURLResponse(url: url, statusCode: url.path == "/metadata" ? 202 : (url.path == "/rejected" ? 409 : 200), httpVersion: nil,
+        guard let url = request.url else { return }
+        if url.path.hasPrefix("/failure/") {
+            let pieces = url.path.split(separator: "/")
+            let status = Int(pieces[1]) ?? 503
+            let payload = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems?.first(where: { $0.name == "body" })?.value ?? ""
+            let headers = pieces.count > 2 ? ["Content-Length": String(payload.utf8.count)] : [:]
+            let response = HTTPURLResponse(url: url, statusCode: status, httpVersion: nil, headerFields: headers)!
+            client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+            client?.urlProtocol(self, didLoad: Data(payload.utf8))
+            client?.urlProtocolDidFinishLoading(self)
+            return
+        }
+        guard let response = HTTPURLResponse(url: url, statusCode: url.path == "/metadata" ? 202 : (url.path == "/rejected" ? 409 : 200), httpVersion: nil,
                                              headerFields: url.path == "/metadata" ? ["x-export-integrity": "test-unverified-integrity"] : [:]) else {
             client?.urlProtocol(self, didFailWithError: URLError(.badURL)); return
         }
@@ -46,9 +57,9 @@ final class NativeMethodsTransportTests: XCTestCase {
         SessionAccess(identity: Identity(subject: "test-patient", role: .patient,
                                         expiresAt: Date().addingTimeInterval(300)), token: "test-token")
     }
-    private func api(_ residency: String = "US") throws -> NativeAPI {
+    private func api(_ residency: String = "US", maxBytes: Int = 1048576) throws -> NativeAPI {
         let awsRegion = residency == "US" ? "us-east-1" : "eu-central-1"
-        let source: [String: Any] = ["requestTimeoutSeconds": 10, "maxResponseBytes": 1048576,
+        let source: [String: Any] = ["requestTimeoutSeconds": 10, "maxResponseBytes": maxBytes,
             "regions": [residency: ["awsRegion": awsRegion, "userPoolId": awsRegion + "_testpool",
                 "clientId": "testclient", "issuer": "https://example.test/testpool",
                 "services": ["patient": "https://example.test"]]]]
@@ -111,5 +122,57 @@ final class NativeMethodsTransportTests: XCTestCase {
             _ = try await api().requestResponse(access: access, service: "patient", path: "/rejected")
             XCTFail("Non-success response accepted")
         } catch let failure as HTTPFailure { XCTAssertEqual(failure.status, 409) }
+    }
+
+    func testPrivacyFailuresExposeOnlyKnownStatusAndCodePairs() async throws {
+        let cases: [(Int, String, NativeFailureOutcome?)] = [
+            (409, #"{"status":"IN_PROGRESS"}"#, .erasureInProgress),
+            (409, #"{"status":"REQUEST_CHANGED"}"#, .erasureRequestChanged),
+            (503, #"{"status":"RETRY_REQUIRED","code":"ERASURE_INCOMPLETE"}"#, .erasureRetryRequired),
+            (503, #"{"code":"DATA_EXPORT_INCOMPLETE"}"#, .exportIncomplete),
+            (401, #"{"status":"IN_PROGRESS"}"#, nil),
+            (409, #"{"status":true}"#, nil),
+            (409, #"{"status":"UNKNOWN"}"#, nil),
+            (409, #"{"status":"IN_PROGRESS","code":"DATA_EXPORT_INCOMPLETE"}"#, nil),
+            (503, #"{"code":"ERASURE_INCOMPLETE"}"#, nil),
+            (503, #"{"status":null,"code":"DATA_EXPORT_INCOMPLETE"}"#, nil),
+            (503, "not-json", nil),
+            (409, #"{"status":"IN_PROGRESS"} trailing"#, nil),
+            (409, #"{status:'IN_PROGRESS'}"#, nil),
+            (409, #"{"status":"IN_PROGRESS",}"#, nil),
+            (409, #"{"status":"REQUEST_CHANGED","status":"IN_PROGRESS"}"#, nil),
+            (409, #"{"status":"IN_PROGRESS","ignored":[1,]}"#, nil)
+        ]
+        for region in ["US", "EU"] {
+            for (status, body, outcome) in cases {
+                do {
+                    _ = try await api(region).request(access: access, service: "patient", path: "/failure/" + String(status), query: ["body": body])
+                    XCTFail("Non-success accepted")
+                } catch let failure as HTTPFailure {
+                    XCTAssertEqual(failure.status, status)
+                    XCTAssertEqual(failure.outcome, outcome)
+                }
+            }
+        }
+    }
+    func testOversizedErrorBodiesPreserveStatusWithoutOutcome() async throws {
+        for region in ["US", "EU"] {
+            for suffix in ["", "/length"] {
+                do {
+                    _ = try await api(region, maxBytes: 4).request(access: access, service: "patient", path: "/failure/409" + suffix, query: ["body": #"{"status":"IN_PROGRESS"}"#])
+                    XCTFail("Oversized error accepted")
+                } catch let failure as HTTPFailure {
+                    XCTAssertEqual(failure.status, 409)
+                    XCTAssertNil(failure.outcome)
+                }
+            }
+        }
+    }
+
+    func testInvalidUTF8DoesNotExposeOutcome() {
+        var body = Data(#"{"status":"IN_PROGRESS","ignored":""#.utf8)
+        body.append(0xff)
+        body.append(contentsOf: #""}"#.utf8)
+        XCTAssertNil(NativeFailureOutcome.decode(status: 409, data: body))
     }
 }

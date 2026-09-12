@@ -16,7 +16,7 @@ import kotlin.coroutines.resumeWithException
 
 data class Appointment(val id: String, val time: Instant?, val person: String?, val status: String?)
 data class AppointmentPage(val items: List<Appointment>, val next: String?)
-class ApiFailure(val status: Int? = null) : IOException("REQUEST_UNAVAILABLE")
+class ApiFailure(val status: Int? = null, val outcome: NativeFailureOutcome? = null) : IOException("REQUEST_UNAVAILABLE")
 
 object AppointmentDecoder {
     fun decode(body: String, identity: Identity, contract: MobileContract): AppointmentPage {
