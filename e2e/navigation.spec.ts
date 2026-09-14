@@ -3,8 +3,7 @@ import { test, expect } from '@playwright/test';
 test.describe('Route Protection', () => {
   test('unauthenticated user visiting /patient-dashboard redirects to /auth', async ({ page }) => {
     // Clear any stored auth state
-    await page.goto('/');
-    await page.evaluate(() => {
+    await page.addInitScript(() => {
       localStorage.removeItem('_mc_auth');
       localStorage.removeItem('_mc_user');
       localStorage.removeItem('access_token');

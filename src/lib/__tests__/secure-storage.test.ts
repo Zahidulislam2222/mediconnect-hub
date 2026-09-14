@@ -7,7 +7,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 
 // Mock import.meta.env before importing the module
-vi.stubEnv('VITE_STORAGE_CIPHER_KEY', 'test-cipher-key-for-unit-tests-32ch');
+vi.stubEnv('VITE_STORAGE_CIPHER_KEY', 'test-key');
 
 // Dynamic import so the module reads the stubbed env var
 const {
@@ -22,14 +22,15 @@ const {
 
 describe('Auth Session Flag', () => {
   beforeEach(() => {
+    clearAllSensitive();
     localStorage.clear();
   });
 
-  it('markAuthenticated stores only a boolean flag, not a token', () => {
+  it('markAuthenticated keeps its presentation hint in memory, without persistent auth data', () => {
     markAuthenticated();
     // The stored value should be the string 'true', not a JWT or token
     const raw = localStorage.getItem('_mc_auth');
-    expect(raw).toBe('true');
+    expect(raw).toBeNull();
     // Verify no access_token key is set
     expect(localStorage.getItem('access_token')).toBeNull();
   });
@@ -61,16 +62,16 @@ describe('Auth Session Flag', () => {
 
 describe('Encrypted User Storage', () => {
   beforeEach(() => {
+    clearAllSensitive();
     localStorage.clear();
   });
 
-  it('setUser stores encrypted data (not plaintext JSON)', () => {
+  it('setUser keeps profile data out of browser persistence', () => {
     const userData = { name: 'John', email: 'john@example.com', role: 'patient' };
     setUser(userData);
     const raw = localStorage.getItem('_mc_user');
-    expect(raw).not.toBeNull();
-    // The stored value should be encrypted (enc: or aes: prefix), not plain JSON
-    expect(raw!.startsWith('enc:') || raw!.startsWith('aes:')).toBe(true);
+    expect(raw).toBeNull();
+    expect(sessionStorage.getItem('_mc_user')).toBeNull();
   });
 
   it('getUser retrieves stored user data', () => {
@@ -105,21 +106,27 @@ describe('Encrypted User Storage', () => {
     expect(localStorage.getItem('user')).toBeNull();
   });
 
-  it('getUser migrates legacy plaintext user data', () => {
-    // Simulate legacy storage (plain JSON in old key)
-    localStorage.setItem('user', JSON.stringify({ name: 'Legacy', role: 'patient' }));
-    const result = getUser();
-    expect(result).not.toBeNull();
-    expect(result.name).toBe('Legacy');
-    // After migration, legacy key should be removed
+  it('discards legacy local profile data instead of trusting it', () => {
+    localStorage.setItem('user', JSON.stringify({ name: 'Legacy', role: 'admin' }));
+    expect(getUser()).toBeNull();
     expect(localStorage.getItem('user')).toBeNull();
-    // And new key should be set
-    expect(localStorage.getItem('_mc_user')).not.toBeNull();
+    expect(localStorage.getItem('_mc_user')).toBeNull();
   });
+  it('does not authenticate from a forged persisted flag', () => {
+    localStorage.setItem('_mc_auth', 'true');
+    expect(isAuthenticated()).toBe(false);
+  });
+  it('returns a copy so external mutation cannot overwrite cached identity', () => {
+    setUser({ id: 'test-patient', role: 'patient' });
+    getUser().role = 'admin';
+    expect(getUser().role).toBe('patient');
+  });
+
 });
 
 describe('clearAllSensitive', () => {
   beforeEach(() => {
+    clearAllSensitive();
     localStorage.clear();
   });
 

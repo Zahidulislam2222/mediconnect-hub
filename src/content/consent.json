@@ -1,0 +1,8 @@
+{
+  "policyVersion": "demo-2026-09-09",
+  "missingTitle": "Terms acceptance required",
+  "missingDescription": "Review and accept the current demonstration terms on the registration form. Missing acceptance is not inferred from login or cookie preferences.",
+  "signupDescription": "I have read the demonstration terms and privacy notice. I will use fictional data only.",
+  "termsPath": "/terms-of-service",
+  "privacyPath": "/privacy-policy"
+}

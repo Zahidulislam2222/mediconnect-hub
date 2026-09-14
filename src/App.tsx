@@ -1,17 +1,22 @@
+import privacyNotices from '@/content/privacy-notices.json';
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, HashRouter, Routes, Route, Outlet, Navigate, useNavigate } from "react-router-dom";
+import { BrowserRouter, HashRouter, Routes, Route, Outlet, Navigate, useNavigate, useLocation } from "react-router-dom";
 import { Capacitor } from "@capacitor/core";
-import { useEffect, useState } from "react";
-import { PushNotifications } from '@capacitor/push-notifications';
-import { api } from "./lib/api";
+import { lazy, Suspense, useEffect, useState } from "react";
+import shellContent from "./content/application-shell.json";
+import { getGdprConsent, type GdprConsent } from "./lib/consent";
+import { PushInitializer } from './components/app/PushInitializer';
 import { signOut } from 'aws-amplify/auth';
-import { isAuthenticated, clearAllSensitive, getUser } from "./lib/secure-storage";
+import { clearAllSensitive } from "./lib/secure-storage";
 
 // Page Imports
-import Index from "./pages/Index";
+import { isJourneyApplicationPath } from './config/journey-routing';
+import { journey } from './content/journey';
+const JourneyApp = lazy(() => import('./components/journey/JourneyApp'));
+import './styles/journey.css';
 import Auth from "./pages/Auth";
 import PatientDashboard from "./pages/PatientDashboard";
 import DoctorDashboard from "./pages/DoctorDashboard";
@@ -56,6 +61,7 @@ import StaffDirectory from "./pages/staff/StaffDirectory";
 // Context Provider
 import { CheckoutProvider } from "./context/CheckoutContext";
 import { SubscriptionProvider } from "./context/SubscriptionContext";
+import { VerifiedSession, VerifiedRole as RoleGuard } from "./context/VerifiedSession";
 import { ChatWidget } from "./components/chat/ChatWidget";
 
 const Router = Capacitor.isNativePlatform() ? HashRouter : BrowserRouter;
@@ -64,27 +70,11 @@ const queryClient = new QueryClient();
 // =========================================================================
 // GDPR GUARD: Granular Cookie & Consent Banner (GDPR Art. 7)
 // =========================================================================
-interface GdprConsent {
-  essential: boolean;
-  functional: boolean;
-  analytics: boolean;
-  timestamp: string;
-}
-
-const getGdprConsent = (): GdprConsent | null => {
-  try {
-    const raw = localStorage.getItem('gdpr_consent');
-    if (!raw) return null;
-    if (raw === 'true') return { essential: true, functional: true, analytics: true, timestamp: new Date().toISOString() };
-    return JSON.parse(raw);
-  } catch { return null; }
-};
-
 const GdprBanner = () => {
   const [consent, setConsent] = useState<GdprConsent | null>(getGdprConsent());
   const [showCustomize, setShowCustomize] = useState(false);
-  const [functional, setFunctional] = useState(true);
-  const [analytics, setAnalytics] = useState(true);
+  const [functional, setFunctional] = useState(false);
+  const [analytics, setAnalytics] = useState(false);
 
   if (consent) return null;
 
@@ -100,7 +90,7 @@ const GdprBanner = () => {
       <div className="mx-4 mb-4 sm:mx-6 sm:mb-6 max-w-2xl sm:ml-auto">
         <div className="rounded-2xl bg-foreground/95 backdrop-blur-xl text-background p-5 shadow-elevated border border-white/10">
           <p className="text-sm mb-4 text-background/80 leading-relaxed">
-            We use cookies and process data strictly in your region to comply with GDPR & HIPAA.
+            {privacyNotices.cookieStorage}
             See our <a href="/privacy-policy" className="underline text-primary-foreground/90 hover:text-primary-foreground">Privacy Policy</a>.
           </p>
           {showCustomize ? (
@@ -115,7 +105,7 @@ const GdprBanner = () => {
               </label>
               <label className="flex items-center gap-2.5 text-sm cursor-pointer">
                 <input type="checkbox" checked={analytics} onChange={(e) => setAnalytics(e.target.checked)} className="rounded accent-primary" />
-                <span className="text-background/70">Analytics (anonymized usage data)</span>
+                <span className="text-background/70">{privacyNotices.analyticsLabel}</span>
               </label>
             </div>
           ) : null}
@@ -138,49 +128,6 @@ const GdprBanner = () => {
       </div>
     </div>
   );
-};
-
-// =========================================================================
-// 📱 PUSH INITIALIZER (Fixed Role Routing Bug & Added GDPR Block)
-// =========================================================================
-const PushInitializer = () => {
-  useEffect(() => {
-    // GDPR Check: Do not initialize push without functional consent
-    try {
-      const consent = getGdprConsent();
-      if (!consent?.functional) return;
-    } catch { return; }
-    if (!Capacitor.isNativePlatform()) return;
-
-    const setupPush = async () => {
-      let perm = await PushNotifications.checkPermissions();
-      if (perm.receive === 'prompt') {
-        perm = await PushNotifications.requestPermissions();
-      }
-      if (perm.receive !== 'granted') return;
-
-      await PushNotifications.register();
-
-      await PushNotifications.addListener('registration', async (token) => {
-        // FCM token registered — not logged for HIPAA compliance
-        const savedUser = getUser();
-        if (savedUser) {
-          const { id, role } = savedUser;
-          // 🟢 BUG FIX: Prevent Doctor Tokens from being sent to Patient Table
-          const endpoint = role === 'doctor' ? `/doctors/${id}` : `/patients/${id}`;
-          await api.put(endpoint, { fcmToken: token.value }).catch(console.error);
-        }
-      });
-
-      await PushNotifications.addListener('pushNotificationActionPerformed', (notification) => {
-        // Notification tapped — navigate handled below
-      });
-    };
-
-    setupPush();
-  }, []);
-
-  return null;
 };
 
 // =========================================================================
@@ -210,7 +157,7 @@ const HipaaGuard = ({ children }: { children: React.ReactNode }) => {
         try {
           // 🟢 CRITICAL FIX: Tell AWS to end the session
           await signOut(); 
-          console.log("HIPAA Auto-Logout Triggered");
+          console.log("Session inactivity timeout");
         } catch (error) {
           console.error("Error signing out:", error);
         }
@@ -220,7 +167,7 @@ const HipaaGuard = ({ children }: { children: React.ReactNode }) => {
         localStorage.removeItem('userRegion');
         
         // Redirect
-        navigate('/auth', { replace: true, state: { message: 'Session expired due to inactivity (HIPAA).' } });
+        navigate('/auth', { replace: true, state: { message: 'Session expired due to inactivity.' } });
       }, INACTIVITY_LIMIT);
     };
 
@@ -248,46 +195,28 @@ const HipaaGuard = ({ children }: { children: React.ReactNode }) => {
 // =========================================================================
 // 🔒 ROLE GUARD: Prevents cross-role access (e.g., patient accessing admin)
 // =========================================================================
-const RoleGuard = ({ allowedRoles, children }: { allowedRoles: string[]; children: React.ReactNode }) => {
-  const user = getUser();
-  const role = user?.role?.toLowerCase() || '';
-  if (!allowedRoles.includes(role)) {
-    const fallback = role === 'doctor' ? '/doctor-dashboard'
-                   : role === 'admin' ? '/admin/dashboard'
-                   : role === 'staff' ? '/staff/dashboard'
-                   : '/patient-dashboard';
-    return <Navigate to={fallback} replace />;
-  }
-  return <>{children}</>;
-};
-
 // =========================================================================
 // 🔒 ROUTE PROTECTOR: Blocks unauthenticated URL guessing + HIPAA session
 // =========================================================================
-const ProtectedRoute = () => {
-  if (!isAuthenticated()) {
-    return <Navigate to="/auth" replace />;
-  }
-
-  return (
+const ProtectedRoute = () => (
+  <VerifiedSession>
+    <PushInitializer enabled={getGdprConsent()?.functional === true} />
     <CheckoutProvider>
       <SubscriptionProvider>
-        <HipaaGuard>
-          <Outlet />
-        </HipaaGuard>
+        <HipaaGuard><Outlet /></HipaaGuard>
       </SubscriptionProvider>
     </CheckoutProvider>
-  );
-};
+  </VerifiedSession>
+);
 
 // =========================================================================
 // 🚦 MAIN ROUTER CONTENT
 // =========================================================================
 const AppContent = () => {
+  const location = useLocation();
   return (
     <Routes>
       {/* PUBLIC ZONE — no HIPAA guard needed */}
-      <Route path="/" element={<Index />} />
       <Route path="/auth" element={<Auth />} />
       <Route path="/admin-auth" element={<AdminStaffAuth />} />
       <Route path="/knowledge" element={<KnowledgeBase role="patient" />} />
@@ -340,21 +269,28 @@ const AppContent = () => {
       </Route>
 
       {/* Catch-all */}
-      <Route path="*" element={<NotFound />} />
+      <Route path="*" element={isJourneyApplicationPath(location.pathname)
+        ? <Suspense fallback={<div className="jy-app"><main className="jy-inner jy-section"><p role="status">{journey.labels.loading}</p></main></div>}><JourneyApp mode="application" /></Suspense> : <NotFound />} />
     </Routes>
   );
+};
+
+// The public journey does not offer live chat or request consent for inactive services.
+// Keep the original application helpers on retained real application routes.
+const ApplicationExtras = () => {
+  const { pathname } = useLocation();
+  if (isJourneyApplicationPath(pathname)) return null;
+  return <><GdprBanner />{!shellContent.routesWithoutFloatingChat.includes(pathname) && <ChatWidget />}</>;
 };
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
-      <GdprBanner />
-      <PushInitializer />
       <Toaster />
       <Sonner />
       <Router>
         <AppContent />
-        <ChatWidget />
+        <ApplicationExtras />
       </Router>
     </TooltipProvider>
   </QueryClientProvider>

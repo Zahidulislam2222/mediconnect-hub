@@ -1,3 +1,4 @@
+import { clinicalNumber } from '@/lib/clinical-inputs';
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { signOut, getCurrentUser, fetchAuthSession } from 'aws-amplify/auth';
@@ -242,19 +243,19 @@ if (avatarUrl && !avatarUrl.startsWith('http')) {
             >
               <VitalCard
                 title="Heart Rate"
-                value={realVitals?.heartRate ? String(realVitals.heartRate) : "--"}
+                value={clinicalNumber(realVitals?.heartRate) ?? "--"}
                 unit="bpm"
-                status={realVitals?.heartRate > 100 ? "critical" : "normal"}
-                change={realVitals ? "Live" : "No Signal"}
-                trend={[70, 72, 71, 73, 72, 70, realVitals?.heartRate || 70]}
+                status="unassessed"
+                change=""
+                trend={[]}
                 icon={<Heart className="h-5 w-5" />}
                 color="red"
               />
             </div>
 
-            <VitalCard title="Blood Pressure" value="120/80" unit="mmHg" status="normal" change="Stable" trend={[118, 120, 119, 121, 120, 120, 120]} icon={<Activity className="h-5 w-5" />} color="blue" />
-            <VitalCard title="Blood Glucose" value="95" unit="mg/dL" status="normal" change="+2%" trend={[92, 94, 95, 96, 95, 94, 95]} icon={<Droplets className="h-5 w-5" />} color="purple" />
-            <VitalCard title="SpO2" value="98" unit="%" status="excellent" change="Stable" trend={[97, 98, 98, 99, 98, 98, 98]} icon={<Wind className="h-5 w-5" />} color="teal" />
+            <VitalCard title="Blood Pressure" value="--" unit="mmHg" status="unassessed" change="" trend={[]} icon={<Activity className="h-5 w-5" />} color="blue" />
+            <VitalCard title="Blood Glucose" value="--" unit="mg/dL" status="unassessed" change="" trend={[]} icon={<Droplets className="h-5 w-5" />} color="purple" />
+            <VitalCard title="SpO2" value="--" unit="%" status="unassessed" change="" trend={[]} icon={<Wind className="h-5 w-5" />} color="teal" />
           </div>
 
           {/* Billing Widget */}

@@ -1,0 +1,253 @@
+{
+  "brand": "MediConnect",
+  "notice": "Interactive portfolio demo. Fictional people and records. No real appointments or medical services.",
+  "noScript": "Enable JavaScript to explore the local patient, clinician and staff demonstrations. This preview does not provide medical care.",
+  "navigation": {
+    "journey": "The care journey",
+    "workspace": "Explore the platform",
+    "login": "Log in",
+    "home": "Back to MediConnect",
+    "skip": "Skip to content"
+  },
+  "hero": {
+    "eyebrow": "TELEHEALTH, WITH A HUMAN SIDE",
+    "title": "Care is a conversation.",
+    "emphasis": "Keep it connected.",
+    "description": "From finding a time to knowing what comes next. A shared space for patients, clinicians and the people who bring care together.",
+    "primary": "Explore patient demo",
+    "secondary": "View clinician workspace",
+    "footnote": "No account needed · All sample data",
+    "caption": "A familiar face. A clearer next step.",
+    "mediaLabel": "AI-generated clinician portrait · illustrative",
+    "scroll": "Follow one appointment",
+    "appointmentLabel": "YOUR NEXT CONVERSATION"
+  },
+  "sample": {
+    "patient": "Alex Morgan",
+    "patientInitials": "AM",
+    "clinician": "Dr Maya Chen",
+    "clinicianInitials": "MC",
+    "specialty": "Primary care",
+    "appointmentId": "MC-1042",
+    "date": "Tuesday, 15 September 2026",
+    "shortDate": "Tue, 15 Sep",
+    "timezone": "UTC · sample timezone",
+    "duration": "20 minutes",
+    "slots": ["09:30", "10:30", "14:00"],
+    "initialSlot": "10:30",
+    "needsConfirmation": "Needs confirmation",
+    "ready": "Ready for visit",
+    "initialStatus": "needs-confirmation",
+    "visitType": "Video consultation",
+    "reason": "General wellbeing check-in",
+    "patientNote": "I’d like to talk about my daily routine and prepare a few questions.",
+    "recordTitle": "Your conversation, carried forward.",
+    "recordNote": "Illustrative follow-up — not a clinical record or medical advice.",
+    "recordItems": [
+      "Questions discussed together",
+      "Next steps kept in one place",
+      "A follow-up time to agree"
+    ],
+    "queue": [
+      {
+        "initials": "JL",
+        "name": "Jamie Lee",
+        "time": "09:00",
+        "status": "Sample visit ended"
+      },
+      {
+        "initials": "RS",
+        "name": "Riley Shah",
+        "time": "11:30",
+        "status": "Sample appointment"
+      }
+    ]
+  },
+  "journey": {
+    "eyebrow": "ONE APPOINTMENT. EVERY PERSPECTIVE.",
+    "title": "Care moves forward.",
+    "emphasis": "The context stays.",
+    "description": "Follow Alex’s appointment as the same details move from a patient’s day into a clinician’s workspace — and back again.",
+    "sampleLabel": "FICTIONAL CARE JOURNEY",
+    "anchorLabel": "ONE SHARED APPOINTMENT",
+    "readMore": "Try this in the demo",
+    "motionOn": "Turn motion off",
+    "motionOff": "Turn motion on",
+    "stages": [
+      {
+        "id": "choose",
+        "number": "01",
+        "label": "Find your time",
+        "title": "A little space\nfor your health.",
+        "body": "Start with a familiar name and a time that fits. The appointment details stay together from here.",
+        "panelTitle": "Choose a time",
+        "panelLabel": "PATIENT VIEW"
+      },
+      {
+        "id": "prepare",
+        "number": "02",
+        "label": "Arrive understood",
+        "title": "The story arrives\nbefore you do.",
+        "body": "The same appointment lands in the clinician’s day, alongside the reason for the visit. No starting from a blank page.",
+        "panelTitle": "Today’s conversations",
+        "panelLabel": "CLINICIAN VIEW"
+      },
+      {
+        "id": "connect",
+        "number": "03",
+        "label": "Have a conversation",
+        "title": "Less in the way.\nMore face to face.",
+        "body": "A calm consultation space keeps the person in focus and the appointment context within reach.",
+        "panelTitle": "The consultation space",
+        "panelLabel": "ILLUSTRATIVE CONSULTATION"
+      },
+      {
+        "id": "follow",
+        "number": "04",
+        "label": "Know what’s next",
+        "title": "A conversation ends.\nThe care continues.",
+        "body": "A place for the conversation’s next steps. This sample follow-up shows the structure, not a real clinician’s advice.",
+        "panelTitle": "After the conversation",
+        "panelLabel": "PATIENT FOLLOW-UP"
+      }
+    ]
+  },
+  "workspace": {
+    "eyebrow": "A DIFFERENT VIEW. THE SAME CARE.",
+    "title": "Step into the other side.",
+    "description": "Change a time as a patient. See it update for the clinician. Coordinate the same visit as staff. Try it — the sample is yours to explore.",
+    "roles": [
+      {
+        "id": "patient",
+        "name": "Patient",
+        "title": "Your health. Your day.",
+        "body": "Choose a sample appointment time and explore what comes next.",
+        "action": "Open patient demo",
+        "greeting": "Good morning, Alex.",
+        "subtitle": "A little clarity for the day ahead."
+      },
+      {
+        "id": "clinician",
+        "name": "Clinician",
+        "title": "Start with the whole picture.",
+        "body": "Review a sample queue, visit context and consultation space.",
+        "action": "Open clinician demo",
+        "greeting": "Your day, Dr Chen.",
+        "subtitle": "The people behind today’s appointments."
+      },
+      {
+        "id": "staff",
+        "name": "Staff",
+        "title": "Keep care moving.",
+        "body": "Coordinate the same appointment and see its status update everywhere.",
+        "action": "Open staff demo",
+        "greeting": "Bring the day together.",
+        "subtitle": "One shared appointment. Clear coordination."
+      }
+    ],
+    "demoLabel": "LOCAL DEMO",
+    "reset": "Reset sample",
+    "resetFeedback": "Sample restored to 10:30, needs confirmation.",
+    "appointment": "Your next appointment",
+    "chooseTime": "Choose a sample time",
+    "slotFeedback": "Sample time updated. No real booking made.",
+    "contextTitle": "Before we meet",
+    "contextLabel": "Alex’s sample note",
+    "openVisit": "Explore consultation",
+    "closeVisit": "Back to appointment",
+    "visitLabel": "Consultation preview",
+    "visitNotice": "Illustration only. No live call, camera or microphone connection.",
+    "previewBadge": "PREVIEW · NOT A LIVE CALL",
+    "mic": "Microphone illustration",
+    "camera": "Camera illustration",
+    "micOff": "Microphone shown off",
+    "cameraOff": "Camera shown off",
+    "notes": "Conversation outline",
+    "notesDescription": "A simple structure for listening, understanding and agreeing what comes next.",
+    "queueTitle": "Today’s appointments",
+    "selected": "Selected appointment",
+    "coordination": "Appointment coordination",
+    "markReady": "Mark sample ready",
+    "markPending": "Return to needs confirmation",
+    "staffFeedback": "Shared sample status updated. No notification sent.",
+    "followup": "View sample follow-up",
+    "hideFollowup": "Close sample follow-up",
+    "timezoneLabel": "All times in the sample timezone",
+    "noteLabel": "Fictional patient note",
+    "connected": "Shared with all three demo views",
+    "empty": "No other appointments in this sample.",
+    "noNotification": "Local state only. No notification sent.",
+    "staffInitials": "CT",
+    "staffContextTitle": "Visit logistics",
+    "staffContextLabel": "COORDINATION VIEW",
+    "staffContextHeading": "The right people. The same plan.",
+    "staffContextBody": "Confirm the sample appointment details, then mark it ready. The patient and clinician views receive the updated status.",
+    "staffBoundary": "Clinical notes are not included in this coordination view.",
+    "staffHandoffTitle": "A shared readiness signal.",
+    "staffHandoffBody": "Use the role switcher to see the same time and readiness in the patient and clinician workspaces.",
+    "patientInCall": "Patient · fictional sample"
+  },
+  "auth": {
+    "eyebrow": "YOUR SPACE FOR CARE",
+    "title": "Welcome back.",
+    "description": "A calmer place to pick up the conversation.",
+    "notice": "Local design preview. Sign-in is not connected. Use sample details only; nothing is sent or saved.",
+    "email": "Email address",
+    "password": "Password",
+    "name": "Full name",
+    "submit": "Preview sign in",
+    "show": "Show password",
+    "hide": "Hide password",
+    "forgot": "Forgot password?",
+    "create": "Create a patient account",
+    "back": "Back to sign in",
+    "reset": "Preview password reset",
+    "signup": "Preview create account",
+    "resetTitle": "Find your way back.",
+    "signupTitle": "Make room for your health.",
+    "feedback": "Preview only — authentication is offline. Your details were cleared and nothing was sent.",
+    "resetFeedback": "Preview only — no reset email was sent. Your details were cleared.",
+    "demo": "Explore without signing in",
+    "staffNote": "Staff access is invitation-only. No public staff registration.",
+    "clinicianNote": "Clinician access is provisioned by the care team.",
+    "quote": "The next conversation\nstarts with you.",
+    "quoteCaption": "Patient, clinician, care team. Connected by the same story."
+  },
+  "footer": {
+    "title": "A more connected\nway to care.",
+    "body": "Explore the complete sample journey, at your own pace.",
+    "credit": "MediConnect · Telehealth platform concept",
+    "disclosure": "Generated portraits depict fictional people. This local preview is not a healthcare provider.",
+    "notFound": "This page isn’t part of the sample.",
+    "return": "Return to the care journey"
+  },
+  "authValidation": {
+    "nameMax": 120,
+    "emailMax": 254,
+    "passwordMin": 8,
+    "passwordMax": 128
+  },
+  "media": {
+    "clinicianPoster": "/media/continuity/clinician-v1.webp",
+    "clinicianVideo": "/media/continuity/clinician-v1.mp4",
+    "patientPoster": "/media/continuity/patient-v2.webp",
+    "patientVideo": "/media/continuity/patient-v2.mp4",
+    "patientLabel": "AI-generated fictional patient portrait",
+    "fallback": "MC",
+    "play": "Play portrait film",
+    "pause": "Pause portrait film",
+    "failed": "Portrait unavailable — the demo still works."
+  },
+  "motion": {
+    "stageStops": [0, 0.32, 0.64, 1],
+    "transitionWindow": 0.11,
+    "foldDegrees": 18,
+    "travelPixels": 365,
+    "duration": 0.5,
+    "mobileQuery": "(max-width: 760px)",
+    "compactQuery": "(max-height: 720px)",
+    "mediaThreshold": 0.15,
+    "seekEpsilonSeconds": 0.042,
+    "seekFailureMs": 1500
+  }
+}

@@ -33,15 +33,12 @@ import { useToast } from "@/hooks/use-toast";
 import { getCurrentUser, signOut, fetchAuthSession } from 'aws-amplify/auth'; // 🟢 Added fetchAuthSession
 import { api } from "@/lib/api";
 import { getUser, clearAllSensitive } from "@/lib/secure-storage";
-import { io } from "socket.io-client";
+import { io, type Socket } from "socket.io-client";
+import { monitoringConnection } from "@/lib/monitoring-socket";
+import { parseMonitoringReading, monitoringFreshness, monitoringSettings, type MonitoringReading } from "@/lib/monitoring-data";
 
 // --- TYPES ---
-interface VitalReading {
-    timestamp: string;
-    heartRate: number;
-    temperature?: number;
-    status: 'NORMAL' | 'WARNING' | 'CRITICAL';
-}
+type VitalReading = MonitoringReading;
 
 interface PatientProfile {
     name: string;
@@ -75,6 +72,8 @@ export default function LiveMonitoring() {
     // 🟢 FIX: Define patientId HERE (At the very top)
     const queryParams = new URLSearchParams(location.search);
     const patientId = queryParams.get("patientId");
+    const selectedPatientRef = useRef(patientId);
+    selectedPatientRef.current = patientId;
 
     // Refs
     const pollingRef = useRef<NodeJS.Timeout | null>(null);
@@ -182,7 +181,7 @@ export default function LiveMonitoring() {
     const [patient, setPatient] = useState<PatientProfile | null>(null);
     const [vitals, setVitals] = useState<VitalReading[]>([]);
     const [loading, setLoading] = useState(true);
-    const [connectionStatus, setConnectionStatus] = useState<'CONNECTED' | 'STALE' | 'DISCONNECTED' | 'POLLING'>('CONNECTED');
+    const [connectionStatus, setConnectionStatus] = useState<'CONNECTED' | 'STALE' | 'DISCONNECTED' | 'POLLING'>('DISCONNECTED');
     const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
     const [emergencyLoading, setEmergencyLoading] = useState(false);
 
@@ -203,23 +202,49 @@ export default function LiveMonitoring() {
     useEffect(() => {
         if (!patientId) return;
 
-        // Connect to your Patient Service Port
-        const socket = io(import.meta.env.VITE_PATIENT_SERVICE_URL || "http://localhost:8081");
-
-        socket.emit('join_monitoring', patientId);
-
-        socket.on('vital_update', (newReading) => {
-            setVitals(prev => {
-                const updated = [...prev, newReading];
-                return updated.slice(-30); // Keep only last 30 points for smooth scrolling
+        setVitals([]);
+        setPatient(null);
+        setConnectionStatus('DISCONNECTED');
+        let cancelled = false;
+        let socket: Socket | undefined;
+        void monitoringConnection().then(connection => {
+            if (cancelled) return;
+            socket = io(connection.url, {
+                autoConnect: false,
+                auth: callback => {
+                    void monitoringConnection().then(current => {
+                        if (cancelled) return;
+                        if (current.url !== connection.url) { setConnectionStatus('DISCONNECTED'); socket?.disconnect(); return; }
+                        callback(current.auth);
+                    }).catch(() => {
+                        if (!cancelled) setConnectionStatus('DISCONNECTED');
+                        socket?.disconnect();
+                    });
+                },
             });
-            setConnectionStatus('CONNECTED');
-            setLastUpdated(new Date());
-        });
+            socket.on('connect', () => {
+                socket?.emit('join_monitoring', patientId, (result: { ok: boolean }) => {
+                    if (cancelled) return;
+                    if (!result?.ok) { setConnectionStatus('DISCONNECTED'); socket?.disconnect(); }
+                });
+            });
+            socket.on('connect_error', () => { if (!cancelled) setConnectionStatus('DISCONNECTED'); });
+            socket.on('disconnect', reason => {
+                if (cancelled) return;
+                setConnectionStatus('DISCONNECTED');
+                if (reason === 'io server disconnect') socket?.connect();
+            });
+            socket.on('vital_update', (payload: unknown) => {
+                const newReading = parseMonitoringReading(payload);
+                if (cancelled || !newReading) return;
+                setVitals(prev => [...prev, newReading].slice(-monitoringSettings.historyPoints));
+                setConnectionStatus(monitoringFreshness([newReading]));
+                setLastUpdated(new Date());
+            });
+            socket.connect();
+        }).catch(() => { if (!cancelled) setConnectionStatus('DISCONNECTED'); });
 
-        return () => {
-            socket.disconnect();
-        };
+        return () => { cancelled = true; socket?.disconnect(); };
     }, [patientId]);
 
     // 🟢 PROFESSIONAL TRIGGER: Wakes up the data fetcher on page load or patient change
@@ -249,6 +274,7 @@ useEffect(() => {
                 api.get(`/vitals?patientId=${patientId}&limit=20`)
             ]);
 
+            if (selectedPatientRef.current !== patientId) return;
             // Profile logic
             if (profileRes.status === 'fulfilled') {
                 const pData: any = profileRes.value;
@@ -275,7 +301,7 @@ useEffect(() => {
         } catch (error) {
             console.error("Init Error:", error);
         } finally {
-            setLoading(false);
+            if (selectedPatientRef.current === patientId) setLoading(false);
         }
     };
 
@@ -286,43 +312,26 @@ useEffect(() => {
             setConnectionStatus('POLLING');
             const response: any = await api.get(`/vitals?patientId=${patientId}&limit=5`);
 
+            if (selectedPatientRef.current !== patientId) return;
             if (response && response.history) {
                 processVitalsData(response.history);
-                setConnectionStatus('CONNECTED');
             } else {
                 setConnectionStatus('DISCONNECTED');
             }
             setLastUpdated(new Date());
         } catch (err) {
-            setConnectionStatus('DISCONNECTED');
+            if (selectedPatientRef.current === patientId) setConnectionStatus('DISCONNECTED');
         }
     }, [patientId]); // 🟢 Added missing dependency array
 
     // --- 4. PROCESSING LOGIC ---
-    const processVitalsData = (data: any[]) => {
-        const historyArray = Array.isArray(data) ? data : [];
-        if (historyArray.length === 0) return;
-
-        const formatted: VitalReading[] = historyArray.map((item: any) => {
-            const hr = Number(item.heartRate);
-            return {
-                timestamp: item.timestamp,
-                heartRate: hr,
-                temperature: item.temperature ? Number(item.temperature) : undefined,
-                status: (hr > 100 ? 'CRITICAL' : hr > 90 ? 'WARNING' : 'NORMAL') as 'NORMAL' | 'WARNING' | 'CRITICAL'
-            };
-        }).sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
-
+    const processVitalsData = (data: unknown[]) => {
+        const formatted = (Array.isArray(data) ? data : []).map(parseMonitoringReading)
+            .filter((reading): reading is MonitoringReading => reading !== null)
+            .sort((a, b) => Date.parse(a.timestamp) - Date.parse(b.timestamp))
+            .slice(-monitoringSettings.historyPoints);
         setVitals(formatted);
-
-        const latestTime = new Date(formatted[formatted.length - 1].timestamp).getTime();
-        const now = new Date().getTime();
-        if (now - latestTime > 60000) {
-            setConnectionStatus('STALE');
-        } else {
-            setConnectionStatus('CONNECTED');
-        }
-
+        setConnectionStatus(monitoringFreshness(formatted));
         setLastUpdated(new Date());
     };
 
@@ -508,8 +517,7 @@ useEffect(() => {
                                 connectionStatus === 'STALE' ? <Clock className="h-3 w-3" /> :
                                     <WifiOff className="h-3 w-3" />}
 
-                            {connectionStatus === 'CONNECTED' ? "LIVE SIGNAL" :
-                                connectionStatus === 'STALE' ? "STALE DATA" : "OFFLINE"}
+                            {monitoringSettings.connectionStatus[connectionStatus]}
                         </div>
                     </div>
                 </div>
@@ -603,12 +611,11 @@ useEffect(() => {
                             </CardHeader>
                             <CardContent>
                                 <div className="text-4xl font-bold flex items-end gap-2">
-                                    {latestVital?.heartRate || "--"}
+                                    {latestVital?.heartRate ?? "--"}
                                     <span className="text-sm font-normal text-muted-foreground mb-1">bpm</span>
                                 </div>
                                 <p className="text-xs text-muted-foreground mt-1">
-                                    {latestVital?.status === 'CRITICAL' ? "⚠️ High Risk" :
-                                        latestVital?.status === 'WARNING' ? "⚠️ Elevated" : "✅ Normal Range"}
+                                    {monitoringSettings.deviceStatus[latestVital?.status ?? 'UNKNOWN']}
                                 </p>
                             </CardContent>
                         </Card>
@@ -623,11 +630,11 @@ useEffect(() => {
                             </CardHeader>
                             <CardContent>
                                 <div className="text-4xl font-bold flex items-end gap-2">
-                                    {latestVital?.temperature ? latestVital.temperature : "--"}
+                                    {latestVital?.temperature ?? "--"}
                                     <span className="text-sm font-normal text-muted-foreground mb-1">°F</span>
                                 </div>
                                 <p className="text-xs text-muted-foreground mt-1">
-                                    {latestVital?.temperature ? "Sensor Active" : "No Sensor Data"}
+                                    {latestVital?.temperature != null ? "Sensor Active" : "No Sensor Data"}
                                 </p>
                             </CardContent>
                         </Card>

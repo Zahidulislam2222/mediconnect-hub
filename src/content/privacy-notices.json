@@ -1,0 +1,29 @@
+{
+  "cookieStorage": "Essential storage supports sign-in and security. Optional features require your choice. Regional processing and clinical compliance remain subject to deployment verification.",
+  "analyticsLabel": "Analytics (optional usage measurement)",
+  "securityTitle": "HIPAA and GDPR readiness",
+  "securityDescription": "Security and privacy controls are under review; clinical deployment requires additional verification.",
+  "recordsDescription": "FHIR record formats are under development; clinical interoperability requires verification.",
+  "retainedRecords": "Some records remain subject to the reviewed retention policy.",
+  "accountErasure": "Account erasure requires review. Medical, financial and audit records may remain where applicable retention requirements permit or require it.",
+  "doctorErasureConfirmation": "Continue with the approved closure request? Identity removal is permanent once completed. Records may remain under applicable retention requirements.",
+  "securityStatus": "Security controls under review",
+  "sessionConnected": "Consultation connection established",
+  "reviewStatus": "Under review",
+  "privacyStatus": "Privacy controls under review",
+  "securityLabel": "Security",
+  "privacyLabel": "Privacy",
+  "interoperabilityLabel": "Interoperability",
+  "encryptionLabel": "Encryption",
+  "encryptionDescription": "Encryption coverage requires deployment verification.",
+  "vaultTitle": "Document vault",
+  "vaultDescription": "Document storage is under review. Use fictional records only.",
+  "trustPoints": [
+    "Security controls under review",
+    "Regional processing requires verification",
+    "Encryption coverage requires verification",
+    "FHIR interoperability requires verification",
+    "Audit logging requires verification",
+    "Multi-region deployment requires verification"
+  ]
+}

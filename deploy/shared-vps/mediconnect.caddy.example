@@ -1,0 +1,6 @@
+# Replace the hostname only after the owner explicitly chooses it.
+<approved-mediconnect-hostname> {
+    header Cache-Control "no-store"
+    reverse_proxy 127.0.0.1:18082
+}
+

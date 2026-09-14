@@ -1,3 +1,7 @@
+import privacyNotices from '@/content/privacy-notices.json';
+import imagingSafety from '@/content/imaging-safety';
+import { parseImagingResponse } from '@/lib/imaging-response';
+import { Hub } from 'aws-amplify/utils';
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { getCurrentUser } from 'aws-amplify/auth';
@@ -32,14 +36,8 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { api } from "@/lib/api";
-import { getUser, setUser as setStoredUser, clearAllSensitive } from "@/lib/secure-storage";
+import { getUser, setUser as setStoredUser, clearAllSensitive, SESSION_CLEARED_EVENT } from "@/lib/secure-storage";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-
-// --- DEMO FALLBACK FOR AI QUOTA LIMITS ---
-const DEMO_RADIOLOGY_REPORT = {
-  diagnosis: "[DEMO MODE] Clear lung fields. No detected fractures or anomalies. Cardiac silhouette is within normal limits.",
-  visionTags: ["X-Ray", "Chest", "Normal", "Medical Imaging"]
-};
 
 export default function HealthRecords() {
   const navigate = useNavigate();
@@ -69,7 +67,35 @@ export default function HealthRecords() {
 
   // AI Analysis State
   const [uploadedImagePreview, setUploadedImagePreview] = useState<string | null>(null);
-  const [aiResult, setAiResult] = useState<any>(null);
+  const [aiResult, setAiResult] = useState<{ diagnosis: string; pdfData?: string } | null>(null);
+  const [imagingError, setImagingError] = useState(false);
+  const imagingGeneration = useRef(0);
+  const imagingActive = useRef(true);
+  const imagingReader = useRef<FileReader | null>(null);
+
+  useEffect(() => {
+    imagingActive.current = true;
+    const invalidate = () => {
+      imagingActive.current = false;
+      imagingGeneration.current++;
+      imagingReader.current?.abort();
+      setAiResult(null);
+      setUploadedImagePreview(null);
+      setAiProcessing(false);
+      setImagingError(false);
+    };
+    const unsubscribe = Hub.listen('auth', ({ payload }) => {
+      if (['signedOut', 'signedIn', 'tokenRefresh_failure'].includes(payload.event)) invalidate();
+    });
+    window.addEventListener(SESSION_CLEARED_EVENT, invalidate);
+    return () => {
+      imagingActive.current = false;
+      imagingGeneration.current++;
+      imagingReader.current?.abort();
+      unsubscribe();
+      window.removeEventListener(SESSION_CLEARED_EVENT, invalidate);
+    };
+  }, []);
 
   const [selectedNote, setSelectedNote] = useState<any>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -136,49 +162,50 @@ export default function HealthRecords() {
 
   // --- 2. AI IMAGE ANALYSIS LOGIC (Reused from Symptom Checker) ---
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
+    if (imagingActive.current && e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
+      const generation = ++imagingGeneration.current;
+      imagingReader.current?.abort();
+      setAiResult(null);
+      setUploadedImagePreview(null);
+      setImagingError(false);
+      setAiProcessing(true);
       const reader = new FileReader();
+      imagingReader.current = reader;
+      reader.onerror = () => {
+        if (!imagingActive.current || imagingGeneration.current !== generation) return;
+        setAiProcessing(false);
+        setImagingError(true);
+      };
       reader.onload = (ev) => {
+        if (!imagingActive.current || imagingGeneration.current !== generation) return;
         const result = ev.target?.result as string;
         setUploadedImagePreview(result);
-        processImageUpload(result);
+        void processImageUpload(result, generation);
       };
       reader.readAsDataURL(file);
+      e.target.value = '';
     }
   };
 
-  const processImageUpload = async (base64Full: string) => {
-    setAiProcessing(true);
-    setAiResult(null);
-    const base64Clean = base64Full.split(",")[1];
-
+  const processImageUpload = async (base64Full: string, generation: number) => {
+    const current = () => imagingActive.current && imagingGeneration.current === generation;
     try {
+      const base64Clean = typeof base64Full === 'string' ? base64Full.split(',')[1] : null;
+      if (!base64Clean || !user.id) throw new Error('INVALID_IMAGING_INPUT');
       const data: any = await api.post('/ai/imaging', {
         imageBase64: base64Clean,
         patientId: user.id,
-        prompt: "Perform a detailed clinical analysis of this imaging scan."
+        prompt: imagingSafety.prompt
       });
-
-      if (data.analysis) {
-        setAiResult({
-          diagnosis: data.analysis,
-          pdfData: data.pdfBase64, // 🟢 STORE THE PDF STRING
-          visionTags: ["Radiology", data.provider]
-        });
-      } else {
-        throw new Error("AI Failed");
-      }
+      if (!current()) return;
+      setAiResult(parseImagingResponse(data));
     } catch (error) {
-      console.warn("AI Limit Reached, showing Demo Report");
-      toast({
-        title: "Simulation Mode",
-        description: "AWS Daily Limit reached. Showing demo radiology report.",
-      });
-      // Fallback to Demo Data so the UI doesn't look broken
-      setTimeout(() => setAiResult(DEMO_RADIOLOGY_REPORT), 1500);
+      if (!current()) return;
+      setAiResult(null);
+      setImagingError(true);
     } finally {
-      setAiProcessing(false);
+      if (current()) setAiProcessing(false);
     }
   };
 
@@ -283,7 +310,7 @@ export default function HealthRecords() {
     }
 
     setIsUploading(true);
-    toast({ title: "Uploading Scan", description: "Transmitting to HIPAA-compliant clinical engine..." });
+    toast({ title: "Uploading Scan", description: "Uploading the scan for processing..." });
 
     try {
       const formData = new FormData();
@@ -371,16 +398,16 @@ export default function HealthRecords() {
                   <div className="space-y-1">
                     <CardTitle className="text-lg flex items-center gap-2 text-blue-800">
                       <Server className="h-5 w-5" />
-                      Encrypted Document Vault
+                      {privacyNotices.vaultTitle}
                     </CardTitle>
                     <CardDescription>
-                      Secure storage for your medical history.
+                      {privacyNotices.vaultDescription}
                     </CardDescription>
                   </div>
 
                   <div className="flex items-center gap-2">
                     <Badge variant="outline" className="bg-blue-100 text-blue-700 border-blue-200 hidden sm:flex">
-                      AES-256
+                      {privacyNotices.reviewStatus}
                     </Badge>
 
                     {/* 🟢 NEW UPLOAD BUTTON */}
@@ -394,7 +421,7 @@ export default function HealthRecords() {
                     </Button>
                     <div className="flex items-center gap-2">
                     <Badge variant="outline" className="bg-blue-100 text-blue-700 border-blue-200 hidden sm:flex">
-                      AES-256
+                      {privacyNotices.reviewStatus}
                     </Badge>
 
                     {/* EXISTING BUTTON */}
@@ -499,7 +526,7 @@ export default function HealthRecords() {
                   <div>
                     <h3 className="text-lg font-semibold">Upload X-Ray or MRI</h3>
                     <p className="text-sm text-muted-foreground max-w-xs mx-auto mt-1">
-                      Powered by Google Vision & AWS Bedrock.
+                      {imagingSafety.uploadDescription}
                     </p>
                   </div>
 
@@ -528,9 +555,13 @@ export default function HealthRecords() {
 
               {/* Result Area */}
               <div className="space-y-4">
-                {!aiResult && !aiProcessing && (
+                {imagingError && <div role="alert" className="border rounded-xl p-4 text-destructive">
+                  <p className="font-semibold">{imagingSafety.unavailableTitle}</p>
+                  <p>{imagingSafety.unavailableDescription}</p>
+                </div>}
+                {!aiResult && !aiProcessing && !imagingError && (
                   <div className="h-64 bg-muted/20 border rounded-xl flex items-center justify-center text-muted-foreground text-sm p-10 text-center">
-                    Upload an image to see the hybrid cloud analysis result.
+                    {imagingSafety.emptyDescription}
                   </div>
                 )}
 
@@ -539,12 +570,11 @@ export default function HealthRecords() {
                     <CardHeader>
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
-                          <Badge variant="outline" className="text-green-600 border-green-200 bg-green-50">Analysis Complete</Badge>
-                          <Badge variant="secondary" className="bg-blue-50 text-blue-700">Google Vision</Badge>
+                          <Badge variant="outline">{imagingSafety.draftBadge}</Badge>
                         </div>
                       </div>
-                      <CardTitle className="mt-2">Radiology Report</CardTitle>
-                      <CardDescription>Generated by Claude 3 (Bedrock)</CardDescription>
+                      <CardTitle className="mt-2">{imagingSafety.draftTitle}</CardTitle>
+                      <CardDescription>{imagingSafety.draftDescription}</CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-4">
                       {/* Diagnosis */}
@@ -554,33 +584,24 @@ export default function HealthRecords() {
                         </p>
                       </div>
 
-                      {/* Vision Tags */}
-                      <div className="space-y-2">
-                        <span className="text-xs text-muted-foreground">Detected Entities (Vision API)</span>
-                        <div className="flex flex-wrap gap-2">
-                          {aiResult.visionTags?.map((tag: string) => (
-                            <Badge key={tag} variant="secondary">{tag}</Badge>
-                          ))}
-                        </div>
-                      </div>
-
                       <div className="flex justify-end pt-2">
                         <Button
                           variant="outline"
                           size="sm"
                           className="gap-2"
+                          disabled={!aiResult.pdfData}
                           onClick={() => {
                             if (!aiResult.pdfData) return;
                             const link = document.createElement('a');
                             link.href = `data:application/pdf;base64,${aiResult.pdfData}`;
-                            link.download = `Radiology_Report_${new Date().getTime()}.pdf`;
+                            link.download = `${imagingSafety.downloadFilenamePrefix}_${new Date().getTime()}.pdf`;
                             link.click();
 
-                            toast({ title: "Report Downloaded", description: "The clinical PDF is saved to your device." });
+                            toast({ title: imagingSafety.downloadTitle, description: imagingSafety.downloadDescription });
                           }}
                         >
                           <Download className="h-4 w-4" />
-                          Save Report
+                          {imagingSafety.downloadLabel}
                         </Button>
                       </div>
                     </CardContent>

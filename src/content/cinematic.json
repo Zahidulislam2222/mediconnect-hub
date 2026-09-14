@@ -1,0 +1,36 @@
+{
+  "brand": "MediConnect",
+  "navigation": [{ "label": "The experience", "href": "/#journey" }, { "label": "Your workspace", "href": "/#workspace" }, { "label": "Behind the care", "href": "/#engineering" }],
+  "hero": {
+    "eyebrow": "Connected care. Human by design.",
+    "lines": ["Care, without", "the distance."],
+    "description": "From the first conversation to what comes next. A considered space for patients, clinicians and the people connecting them.",
+    "primary": "Explore the experience", "secondary": "Enter your workspace", "scroll": "Scroll to discover", "caption": "An imagined care environment. A real interface to explore.",
+    "footnote": "Interactive portfolio · Clinical services offline"
+  },
+  "journey": {
+    "eyebrow": "One continuous journey", "title": "Different moments.\nA connected experience.",
+    "description": "Move through the care pavilion. Each space represents a step in the patient journey—not a real clinic or a live service.",
+    "stages": [
+      { "id": "arrival", "number": "01", "label": "Before", "title": "A calmer beginning.", "body": "A place for your appointment, your questions and the context you want to share. Start with a clear next step.", "detail": "Appointment planning", "icon": "calendar" },
+      { "id": "consultation", "number": "02", "label": "Together", "title": "Space for the conversation.", "body": "The consultation brings the person and their care context together. Less searching through disconnected screens.", "detail": "Consultation workspace", "icon": "video" },
+      { "id": "continuity", "number": "03", "label": "Beyond", "title": "Care doesn't end at goodbye.", "body": "A shared view of notes and follow-up keeps the next step in sight. Explore the illustrative record below.", "detail": "Records & follow-up", "icon": "record" }
+    ],
+    "controls": "Choose a care moment", "loading": "Preparing the care pavilion…", "fallback": "Still view · interactive 3D unavailable", "modelLabel": "Illustrative 3D care pavilion", "motionOn": "Motion on", "motionOff": "Motion off", "rotate": "Rotate the pavilion", "rotation": "View angle", "technique": "Original Blender scene · illustrative care pavilion"
+  },
+  "workspace": {
+    "eyebrow": "Made for the people in care", "title": "Your day.\nA little more connected.", "description": "Three perspectives, one care journey. Switch roles to inspect a fictional workspace—no real patient data or account required.",
+    "roles": ["Patient", "Clinician", "Care team"], "hello": "Good morning, Alex.", "badge": "Illustrative workspace", "date": "Your care overview", "appointment": "Your next conversation", "doctor": "Dr. Morgan · General practice", "time": "Tomorrow, 10:30 AM", "record": "Latest care note", "recordValue": "Follow-up plan", "action": "Open sample record", "close": "Close sample record", "recordTitle": "A clear next step", "recordBody": "This fictional record demonstrates the layout of a follow-up plan. It is not medical advice, a diagnosis or a real prescription.", "recordItems": ["Discussion summary", "Questions for the next visit", "Appointment follow-up"], "clinicianTitle": "A clearer view of your day.", "teamTitle": "Keep the day moving.", "clinicianTask": "Upcoming consultations", "teamTask": "Care coordination", "clinicianValue": "Review the sample appointment", "teamValue": "Explore the sample handoff", "signIn": "View sign-in"
+  },
+  "engineering": {
+    "eyebrow": "Behind the experience", "title": "Thoughtful on the surface.\nSubstantial underneath.", "body": "This portfolio preserves the engineering behind the interface. Infrastructure source is retained for inspection; retired cloud resources are not running.",
+    "items": [{ "title": "Role-aware application", "body": "Patient, clinician, administrator and staff workflows remain in the application source." }, { "title": "Infrastructure as code", "body": "Kubernetes, Terraform and CI/CD definitions are preserved as implementation evidence—not claims of live resources." }, { "title": "A transparent preview", "body": "Sign-in and records here are local interface demonstrations. No clinical service, payment or cloud resource is activated." }]
+  },
+  "closing": { "eyebrow": "Take a closer look", "title": "A more human\nkind of connection.", "action": "Explore your workspace", "note": "A local design preview. Not a medical service." },
+  "auth": {
+    "eyebrow": "Your care, connected", "title": "Welcome back.", "description": "A considered space for your next step.", "roles": ["Patient", "Clinician"], "staffRoles": ["Administrator", "Staff"], "email": "Email address", "emailPlaceholder": "you@example.com", "password": "Password", "show": "Show password", "hide": "Hide password", "submit": "Sign in", "forgot": "Forgot password?", "signup": "Create an account", "signupTitle": "Start your journey.", "name": "Full name", "resetTitle": "Find your way back.", "resetSubmit": "Send reset instructions", "backToLogin": "Back to sign in", "back": "Back to MediConnect", "staff": "Team access", "patient": "Patient & clinician access", "localBadge": "LOCAL INTERFACE PREVIEW", "notice": "Clinical services are offline. This form validates locally; credentials are never sent or saved.", "unavailable": "The form is valid. Live sign-in is unavailable in this portfolio preview. Your details were not sent or saved.", "resetFeedback": "Email format checked locally. No reset email was sent because the service is offline.", "signupFeedback": "Details checked locally. No account was created and no details were sent or saved.", "artTitle": "Every connection\nstarts with a person.", "artBody": "One space for the moments before, during and after care.", "sample": "Explore without an account"
+  },
+  "ui": { "skip": "Skip to content", "signIn": "Sign in", "menu": "Open menu", "closeMenu": "Close menu", "nav": "Main navigation", "backTop": "Back to top", "notFound": "This page isn't in the preview.", "home": "Return to the experience" },
+  "media": { "hero": "/media/cinematic/care-atmosphere-v1.webp", "heroAlt": "An illustrative contemporary care pavilion with warm interiors and soft architectural lighting", "poster": "/media/cinematic/care-world-v1.webp", "model": "/media/cinematic/care-world-v1.glb", "video": null },
+  "motion": { "maxPixelRatio": 1.5, "desktopBreakpoint": 900, "cameraFov": 38, "cameraNear": 0.1, "cameraFar": 120, "rotationLimit": 0.5, "loadTimeoutMs": 15000, "stages": [{ "camera": [10, 9, 17], "target": [-2.4, 1, 0] }, { "camera": [6, 7, 14], "target": [0, 1, 0] }, { "camera": [8, 6, 13], "target": [3, 1, 0] }], "lights": { "hemisphere": 1.4, "key": 3.2, "fill": 1.5, "skyColor": "#e1f0ff", "groundColor": "#403a32", "keyColor": "#ffe3c3", "fillColor": "#afd8ff" } }
+}

@@ -1,0 +1,14 @@
+{
+  "unavailableTitle": "Image analysis unavailable",
+  "unavailableDescription": "The image could not be analyzed. No findings were produced. Try again or ask your care team to review the original image.",
+  "draftTitle": "AI imaging draft",
+  "draftDescription": "AI-generated content requires review by a qualified clinician. It is not a confirmed radiology report.",
+  "draftBadge": "Unreviewed AI draft",
+  "uploadDescription": "Submit an image for an AI-generated draft for clinician review.",
+  "emptyDescription": "Select an image to request an AI draft. No clinical findings are available before a successful response.",
+  "prompt": "Describe the provided imaging scan as an unreviewed AI draft for a qualified clinician. Clearly state uncertainty and limitations.",
+  "downloadLabel": "Download AI draft",
+  "downloadTitle": "Draft download requested",
+  "downloadDescription": "Your browser handles the download. Review the draft with a clinician before using it.",
+  "downloadFilenamePrefix": "AI_Imaging_Draft"
+}

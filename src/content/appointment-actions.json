@@ -1,0 +1,8 @@
+{
+  "cancelConfirmation": "Cancel this appointment? Any refund is subject to the payment provider's confirmed status.",
+  "cancelledTitle": "Appointment cancelled",
+  "cancelledDescription": "Cancellation was confirmed. This acknowledgement does not verify that a refund has completed.",
+  "errorTitle": "Appointment action failed",
+  "cancelFailed": "Cancellation could not be confirmed. Check your appointment and refund status before trying again.",
+  "checkInFailed": "Check-in could not be completed. Please try again before entering the consultation."
+}

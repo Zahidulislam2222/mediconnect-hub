@@ -1,0 +1,8 @@
+{
+  "profile": "/register-patient",
+  "prescriptions": "/prescription",
+  "billing": "/billing",
+  "pay": "/billing/pay",
+  "pickup": "/pharmacy/generate-qr",
+  "refill": "/pharmacy/request-refill"
+}

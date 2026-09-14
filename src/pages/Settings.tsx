@@ -1,3 +1,4 @@
+import privacyNotices from '@/content/privacy-notices.json';
 import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { signOut, getCurrentUser, fetchAuthSession, fetchUserAttributes } from 'aws-amplify/auth';
@@ -335,15 +336,19 @@ export default function Settings() {
             const confirm = window.confirm("Are you absolutely sure? This cannot be undone.");
             if (!confirm) return;
             try {
-                await api.delete('/me');
-                toast({ title: "Account Deleted", description: "Your identity has been erased." });
-                handleLogout();
+                const result = await api.delete('/me');
+                if (result?.status === 'ERASED_WITH_RETENTION') {
+                    toast({ title: "Erasure stages completed", description: privacyNotices.retainedRecords });
+                    handleLogout();
+                } else {
+                    toast({ title: "Erasure request recorded", description: "Your request is pending review or processing. Erasure has not been confirmed." });
+                }
             } catch (e) {
                 toast({ variant: "destructive", title: "Error", description: "Could not complete deletion." });
             }
         } else if (closureStatus === "APPROVED_FOR_DELETION") {
             const confirm = window.confirm(
-                "FINAL WARNING: This will permanently erase your identity, anonymize all records, and delete your Cognito account. This cannot be undone."
+                privacyNotices.doctorErasureConfirmation
             );
             if (!confirm) return;
             try {
@@ -474,7 +479,7 @@ export default function Settings() {
                         <p className="text-sm text-gray-600 mb-4">
                             {userRole === 'doctor' && closureStatus === "APPROVED_FOR_DELETION"
                                 ? "Your closure has been approved. Click below to permanently erase your identity."
-                                : "Once you delete your account, your identity will be erased. Medical records will be anonymized per HIPAA/GDPR legal compliance."
+                                : privacyNotices.accountErasure
                             }
                         </p>
                         <Button

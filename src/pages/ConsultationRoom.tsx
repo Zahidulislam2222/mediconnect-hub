@@ -1,6 +1,8 @@
+import privacyNotices from '@/content/privacy-notices.json';
+import { authorizedSocketUrl } from '@/lib/socket-ticket';
 import { useState, useEffect, useRef } from "react";
 import { useNavigate, useLocation, useSearchParams } from "react-router-dom";
-import { getCurrentUser, fetchAuthSession } from 'aws-amplify/auth'; // Updated import
+import { getCurrentUser } from 'aws-amplify/auth'; // Updated import
 import {
   ConsoleLogger,
   DefaultDeviceController,
@@ -31,6 +33,7 @@ import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { api } from "@/lib/api";
 import { getUser, clearAllSensitive } from "@/lib/secure-storage";
+import { publicEnv } from "@/config/env";
 
 export default function ConsultationRoom() {
   const navigate = useNavigate();
@@ -69,19 +72,12 @@ export default function ConsultationRoom() {
     if (!hasJoined || !appointmentId) return;
 
     let ws: WebSocket | null = null;
+    let cancelled = false;
 
     const connectSocket = async () => {
       try {
-        const session = await fetchAuthSession();
-        const token = session.tokens?.idToken?.toString();
-        if (!token) throw new Error("Authentication token missing");
-
-        const userRegion = localStorage.getItem('userRegion') || 'US';
-        const wsBaseUrl = userRegion === 'EU' 
-            ? import.meta.env.VITE_COMMUNICATION_WS_URL_EU 
-            : import.meta.env.VITE_COMMUNICATION_WS_URL_US; 
-
-        const wsUrl = `${wsBaseUrl}?token=${token}&appointmentId=${appointmentId}`;
+        const wsUrl = await authorizedSocketUrl();
+        if (cancelled) return;
         ws = new WebSocket(wsUrl);
         socketRef.current = ws;
 
@@ -106,6 +102,7 @@ export default function ConsultationRoom() {
     connectSocket();
 
     return () => {
+      cancelled = true;
       if (ws) ws.close();
     };
   }, [hasJoined, appointmentId]);
@@ -302,7 +299,7 @@ export default function ConsultationRoom() {
       meetingSession.audioVideo.start();
       meetingSession.audioVideo.startLocalVideoTile();
       setHasJoined(true);
-      toast({ title: "Secure Connection Established", description: "HIPAA Compliant Session Active" });
+      toast({ title: "Secure Connection Established", description: privacyNotices.sessionConnected });
 
       // 🟢 ADD THIS: Listen for Live Transcription
       // 🟢 UPDATED WITH TYPE CAST TO FIX TS2339
@@ -411,7 +408,7 @@ export default function ConsultationRoom() {
             <h1 className="font-semibold text-sm md:text-base">Consultation Room</h1>
             <div className="flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-              <p className="text-xs text-emerald-400/80">AES-256 Encrypted</p>
+              <p className="text-xs text-emerald-400/80">{privacyNotices.securityStatus}</p>
             </div>
           </div>
         </div>

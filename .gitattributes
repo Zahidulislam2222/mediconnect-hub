@@ -1,0 +1,2 @@
+# Preserve upstream font/license bytes and their provenance-manifest hashes.
+public/fonts/* -text

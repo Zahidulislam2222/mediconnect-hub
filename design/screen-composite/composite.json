@@ -1,0 +1,37 @@
+{
+  "source": "../../public/media/journey/connected-care-v1.mp4",
+  "sourceSha256": "6b206f90aa34d1a858c96508147b281d4298a7a5e5834e7ce583f5d9056c6f11",
+  "content": "../../src/content/journey.json",
+  "output": "../../../memory/blender-screen-assets",
+  "publicOutput": "../../public/media/journey",
+  "name": "connected-care-blender-v1",
+  "width": 1280,
+  "height": 720,
+  "fps": 24,
+  "frames": 536,
+  "renderEngine": "BLENDER_EEVEE",
+  "interface": {"width": 1280, "height": 720, "headerHeight": 40, "brandFontPx": 32, "footerHeight": 88, "softnessPx": 1.2, "opacity": 1, "ambientLeftPercent": 23, "ambientRightPercent": 13, "textPaperPercent": 76},
+  "reviewFrames": [360, 384, 408, 432, 456, 480, 512, 535],
+  "tracking": {
+    "order": ["topLeft", "topRight", "bottomRight", "bottomLeft"],
+    "virtualWidth": 850,
+    "firstFrame": 408,
+    "keyframes": [
+      {"frame":408,"right":-68,"top":61,"bottom":476,"topSlope":0.23,"bottomSlope":-0.2},
+      {"frame":414,"right":30,"top":65,"bottom":477,"topSlope":0.23,"bottomSlope":-0.19},
+      {"frame":420,"right":125,"top":84,"bottom":467,"topSlope":0.22,"bottomSlope":-0.18},
+      {"frame":426,"right":214,"top":98,"bottom":463,"topSlope":0.215,"bottomSlope":-0.16},
+      {"frame":432,"right":292,"top":104,"bottom":462,"topSlope":0.2,"bottomSlope":-0.143},
+      {"frame":444,"right":424,"top":110,"bottom":460,"topSlope":0.175,"bottomSlope":-0.12},
+      {"frame":456,"right":498,"top":116,"bottom":460,"topSlope":0.15,"bottomSlope":-0.108},
+      {"frame":468,"right":541,"top":116,"bottom":459,"topSlope":0.14,"bottomSlope":-0.102},
+      {"frame":480,"right":551,"top":116,"bottom":458,"topSlope":0.14,"bottomSlope":-0.1},
+      {"frame":496,"right":555,"top":117,"bottom":458,"topSlope":0.14,"bottomSlope":-0.1},
+      {"frame":512,"right":555,"top":117,"bottom":458,"topSlope":0.14,"bottomSlope":-0.1},
+      {"frame":535,"right":555,"top":117,"bottom":458,"topSlope":0.14,"bottomSlope":-0.1}
+    ],
+    "method": "manual planar corner pin, qualified against screen edges; not a camera solve"
+  },
+  "copy": {"status": "Video consultation", "disclaimer": "Illustrative call · not live", "before": "Original film", "after": "Blender screen composite", "title": "A more connected screen", "description": "The same film, with a MediConnect interface composited into the wall display in Blender. The doctor image remains visible; the laptop and room are preserved.", "note": "Video graphics are illustrative, not clickable call controls. The original homepage remains unchanged."},
+  "encode": {"crf": 21, "gop": 6, "pixelFormat": "yuv420p"}
+}

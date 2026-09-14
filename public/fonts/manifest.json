@@ -1,0 +1,38 @@
+{
+  "repository": "google/fonts",
+  "revision": "77669fa9a8a89271bce79dfc05fd2529efb1a187",
+  "assets": [
+    {
+      "path": "ofl/inter/Inter[opsz,wght].ttf",
+      "file": "inter-variable.ttf",
+      "kind": "font",
+      "gitBlob": "047c92f6e2212473dc436020afed689527076d44",
+      "bytes": 876576,
+      "sha256": "29160a80ff49ddcab2c97711247e08b1fab27a484a329ce8b813d820dc559031"
+    },
+    {
+      "path": "ofl/inter/OFL.txt",
+      "file": "Inter-OFL.txt",
+      "kind": "license",
+      "gitBlob": "21f6aff961064c2e429f570995e446bcdd555422",
+      "bytes": 4377,
+      "sha256": "5b9321a4298cfeb6b34354164a1c3afc3db114569984c502b9b35d988fd58c57"
+    },
+    {
+      "path": "ofl/sora/Sora[wght].ttf",
+      "file": "sora-variable.ttf",
+      "kind": "font",
+      "gitBlob": "3b93d661fa07f5948799ba29979009b409cd4740",
+      "bytes": 111400,
+      "sha256": "84ff7096ae3ec6c8be47d906d1a0ba4de7f2ce78c615275c77301964a316e16c"
+    },
+    {
+      "path": "ofl/sora/OFL.txt",
+      "file": "Sora-OFL.txt",
+      "kind": "license",
+      "gitBlob": "f1d9d6af7ba46af6c2da765fa123d93239c913f5",
+      "bytes": 4385,
+      "sha256": "ba0b9729c9428ba79a0459ab8ec575791b51509dbec213e383d0316d37fec299"
+    }
+  ]
+}

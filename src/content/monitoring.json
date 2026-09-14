@@ -1,0 +1,16 @@
+{
+  "historyPoints": 30,
+  "freshnessMaxAgeMs": 60000,
+  "connectionStatus": {
+    "CONNECTED": "Recent data",
+    "STALE": "Stale data",
+    "DISCONNECTED": "Offline",
+    "POLLING": "Refreshing"
+  },
+  "deviceStatus": {
+    "NORMAL": "Device reports normal",
+    "WARNING": "Device warning",
+    "CRITICAL": "Device alert",
+    "UNKNOWN": "No device assessment"
+  }
+}

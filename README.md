@@ -1,5 +1,12 @@
 # MediConnect Hub — Patient & Provider Portal
 
+> **Release review in progress.** Historical features and achievements below are preserved,
+> but do not establish current cloud availability or certification. The accepted cinematic
+> journey is an isolated fictional demonstration; the retained original application has separate
+> integration/security gates. Flutter migration is requested, not completed.
+> The sibling infrastructure repository's `REVIEWER-GUIDE.md` distinguishes implemented/tested,
+> historically operated, inactive and planned capabilities (separate Git repositories).
+
 <div align="center">
 
 ![React](https://img.shields.io/badge/React-18.3-61DAFB?logo=react&logoColor=white)

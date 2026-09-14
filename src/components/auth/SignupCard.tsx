@@ -1,3 +1,4 @@
+import { recordTermsAcceptance, consentContent } from "@/lib/consent";
 import React, { useState } from "react";
 import { User, Building2, Globe, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -50,11 +51,7 @@ export const SignupCard: React.FC<SignupCardProps> = ({
       return;
     }
     setConsentError(false);
-    localStorage.setItem('pending_consent', JSON.stringify({
-      agreedToTerms: true,
-      policyVersion: "v1.0",
-      timestamp: new Date().toISOString()
-    }));
+    recordTermsAcceptance();
     handleSignUp(e);
   };
 
@@ -121,10 +118,10 @@ export const SignupCard: React.FC<SignupCardProps> = ({
               />
               <div className="space-y-1 leading-none">
                 <Label htmlFor="terms" className="text-sm font-medium leading-none cursor-pointer">
-                  Accept Terms & Privacy Policy
+                  Accept Terms &amp; Privacy Policy
                 </Label>
                 <p className="text-xs text-muted-foreground">
-                  I agree to the processing of my medical data in accordance with HIPAA/GDPR policies.
+                  {consentContent.signupDescription}
                 </p>
                 {consentError && <p className="text-xs text-destructive font-semibold mt-1">You must accept the terms to register.</p>}
               </div>

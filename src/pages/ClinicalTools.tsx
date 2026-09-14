@@ -36,6 +36,7 @@ export default function ClinicalTools() {
             subtitle="Drug interactions, terminology, provider validation"
             userRole="doctor"
             userName="Doctor"
+            userAvatar=""
             onLogout={async () => { await signOut(); clearAllSensitive(); navigate("/auth"); }}
         >
             <div className="space-y-6 animate-fade-in pb-10">

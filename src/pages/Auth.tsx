@@ -1,3 +1,8 @@
+import privacyNotices from '@/content/privacy-notices.json';
+import { getPendingAcceptance, recordTermsAcceptance, consentContent } from "@/lib/consent";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 // AWS Imports
@@ -9,7 +14,9 @@ import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 import { HeartPulse, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { PublicHeader } from "@/components/PublicHeader";
-import { api } from "@/lib/api";
+import { api, HttpResponseError } from "@/lib/api";
+import { isProfileMissing, verifyOwnProfile } from "@/lib/profile-bootstrap";
+import { publicEnv, isProductionBuild } from "@/config/env";
 import { setUser, getUser, markAuthenticated, clearAllSensitive } from "@/lib/secure-storage";
 import { getRegionalResources } from "../aws-config";
 
@@ -54,6 +61,8 @@ export default function Auth() {
 
   const [userType, setUserType] = useState<"patient" | "provider">("patient");
   const [authStep, setAuthStep] = useState<AuthStep>("login");
+  const [needsAcceptance, setNeedsAcceptance] = useState(false);
+  const [acceptedCurrentTerms, setAcceptedCurrentTerms] = useState(false);
   const [loading, setLoading] = useState(false);
   
   const [selectedRegion, setSelectedRegion] = useState<Region>(
@@ -83,11 +92,11 @@ export default function Auth() {
     Amplify.configure({
       Auth: {
         Cognito: {
-          userPoolId: isEU ? import.meta.env.VITE_COGNITO_USER_POOL_ID_EU : import.meta.env.VITE_COGNITO_USER_POOL_ID_US,
+          userPoolId: isEU ? publicEnv("VITE_COGNITO_USER_POOL_ID_EU") : publicEnv("VITE_COGNITO_USER_POOL_ID_US"),
           userPoolClientId: isEU 
-            ? (userType === 'provider' ? import.meta.env.VITE_COGNITO_CLIENT_DOCTOR_EU : import.meta.env.VITE_COGNITO_CLIENT_PATIENT_EU)
-            : (userType === 'provider' ? import.meta.env.VITE_COGNITO_CLIENT_DOCTOR_US : import.meta.env.VITE_COGNITO_CLIENT_PATIENT_US),
-          identityPoolId: isEU ? import.meta.env.VITE_COGNITO_IDENTITY_POOL_ID_EU : import.meta.env.VITE_COGNITO_IDENTITY_POOL_ID_US,
+            ? (userType === 'provider' ? publicEnv("VITE_COGNITO_CLIENT_DOCTOR_EU") : publicEnv("VITE_COGNITO_CLIENT_PATIENT_EU"))
+            : (userType === 'provider' ? publicEnv("VITE_COGNITO_CLIENT_DOCTOR_US") : publicEnv("VITE_COGNITO_CLIENT_PATIENT_US")),
+          identityPoolId: isEU ? publicEnv("VITE_COGNITO_IDENTITY_POOL_ID_EU") : publicEnv("VITE_COGNITO_IDENTITY_POOL_ID_US"),
         }
       }
     });
@@ -137,61 +146,38 @@ export default function Auth() {
       const groups = (payload?.['cognito:groups'] as string[]) || [];
       const isDoctor = groups.includes('doctor') || groups.includes('doctors');
 
-      if (!isDoctor) {
-        let data = await api.get(`/patients/${userId}`).catch(() => null);
-        
-        if (!data || data.error || Object.keys(data).length === 0) {
-            if (!isFreshLogin) {
-                console.error("Security Alert: User deleted from database.");
-                return false; 
-            }
-
-            let consentDetails = JSON.parse(localStorage.getItem('pending_consent') || 'null');
-            if (!consentDetails) {
-                consentDetails = { agreedToTerms: true, policyVersion: "v1.0", crossDeviceVerification: true, timestamp: new Date().toISOString() };
-            }
-            
-            const response = await api.post('/register-patient', { 
-                name: userName, email: userEmail, role: 'patient', consentDetails 
-            });
-            localStorage.removeItem('pending_consent');
-            data = response.profile; 
+      const role = isDoctor ? 'doctor' : 'patient';
+      const profilePath = isDoctor ? `/doctors/${userId}` : `/patients/${userId}`;
+      let data;
+      try {
+        data = await api.get(profilePath);
+      } catch (error) {
+        // Only an explicit missing-profile response permits registration.
+        if (!isProfileMissing(error) || !isFreshLogin) throw error;
+        const consentDetails = getPendingAcceptance();
+        if (!consentDetails) {
+          toast({ variant: "destructive", title: consentContent.missingTitle, description: consentContent.missingDescription });
+          setNeedsAcceptance(true);
+          return false;
         }
-        profile = data;
-        roleKey = "patient";
-      } else {
-        let data = await api.get(`/doctors/${userId}`).catch(() => null);
-        
-        if (!data || data.error || (data.doctors && data.doctors.length === 0) || Object.keys(data).length === 0) {
-           if (!isFreshLogin) {
-               console.error("Security Alert: Doctor deleted from database.");
-               return false; 
-           }
-
-           try {
-               let consentDetails = JSON.parse(localStorage.getItem('pending_consent') || 'null');
-               if (!consentDetails) {
-                   consentDetails = { agreedToTerms: true, policyVersion: "v1.0", crossDeviceVerification: true, timestamp: new Date().toISOString() };
-               }
-               
-               const response = await api.post('/register-doctor', { 
-                 name: userName, email: userEmail, role: 'doctor', specialization: 'General Practice', licenseNumber: 'PENDING-VERIFICATION', consentDetails
-               });
-               localStorage.removeItem('pending_consent');
-               data = response.profile ? response.profile : response; 
-               
-           } catch (err: any) {
-               if (err.message && err.message.includes('409')) {
-                   // Doctor profile already exists — proceed with login
-               } else {
-                   toast({ variant: "destructive", title: "Registration Error", description: "Failed to create profile." });
-                   return false; 
-               }
-           }
+        try {
+          const response = await api.post(isDoctor ? '/register-doctor' : '/register-patient', {
+            name: userName, email: userEmail, role, consentDetails,
+          });
+          data = response.profile;
+        } catch (registrationError) {
+          // A concurrent registration is successful only after an actual own-profile read.
+          if (!(registrationError instanceof HttpResponseError) || registrationError.status !== 409) {
+            throw registrationError;
+          }
+          data = await api.get(profilePath);
         }
-        profile = data.doctors ? data.doctors.find((d: any) => d.doctorId === userId) : data;
-        if (profile) roleKey = "doctor";
+        verifyOwnProfile(data, userId, role);
+        localStorage.removeItem('pending_consent');
       }
+      verifyOwnProfile(data, userId, role);
+      profile = data;
+      roleKey = role;
 
       if (!profile) return false;
 
@@ -202,11 +188,10 @@ export default function Auth() {
       setUser({
         name: profile.name || userEmail.split('@')[0],
         email: profile.email || userEmail,
-        role: roleKey,
-        ...profile
+        ...profile,
+        role: roleKey
       });
       markAuthenticated();
-      localStorage.setItem('gdpr_consent', 'true');
 
       // NOW we check if they need Identity Verification
       if (roleKey === 'doctor') {
@@ -310,9 +295,9 @@ export default function Auth() {
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (localStorage.getItem('gdpr_consent') !== 'true') {
-      toast({ variant: "destructive", title: "Consent Required", description: "You must click 'I Accept' on the cookie banner at the bottom of the screen to register." });
-      return; 
+    if (!getPendingAcceptance()) {
+      toast({ variant: "destructive", title: consentContent.missingTitle, description: consentContent.missingDescription });
+      return;
     }
     setLoading(true);
     try {
@@ -491,7 +476,7 @@ export default function Auth() {
 
   const handleSkip = () => {
     // 🟢 SECURITY FIX: Completely disable this button in Production!
-    if (import.meta.env.MODE === 'production' || import.meta.env.PROD) {
+    if (isProductionBuild) {
       toast({ variant: "destructive", title: "Action Blocked", description: "Demo mode is disabled in production." });
       return;
     }
@@ -527,6 +512,26 @@ export default function Auth() {
 
   return (
     <div className="min-h-screen flex overflow-hidden">
+      <Dialog open={needsAcceptance} onOpenChange={setNeedsAcceptance}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>{consentContent.missingTitle}</DialogTitle>
+            <DialogDescription>{consentContent.missingDescription}</DialogDescription></DialogHeader>
+          <label className="flex gap-3 items-start">
+            <Checkbox checked={acceptedCurrentTerms} onCheckedChange={value => setAcceptedCurrentTerms(value === true)} />
+            <span>{consentContent.signupDescription}</span>
+          </label>
+          <div className="flex gap-4 text-primary underline">
+            <a href={consentContent.termsPath} target="_blank" rel="noreferrer">Terms</a>
+            <a href={consentContent.privacyPath} target="_blank" rel="noreferrer">Privacy notice</a>
+          </div>
+          <Button disabled={!acceptedCurrentTerms || loading} onClick={async () => {
+            recordTermsAcceptance();
+            setNeedsAcceptance(false);
+            setAcceptedCurrentTerms(false);
+            await checkSession(true);
+          }}>Continue</Button>
+        </DialogContent>
+      </Dialog>
       {!['identity', 'diploma-upload'].includes(authStep) && <PublicHeader />}
 
       {/* Left Panel — Brand Visual */}
@@ -555,16 +560,16 @@ export default function Auth() {
               <br />Your Fingertips
             </h1>
             <p className="text-lg text-white/70 max-w-md leading-relaxed">
-              Connect with world-class healthcare providers from anywhere. Secure, private, and fully HIPAA-compliant.
+              Explore connected-care workflows using fictional information. Clinical activation and compliance review remain pending.
             </p>
           </div>
 
           <div className="flex items-center gap-6 text-sm text-white/40">
-            <span>HIPAA Compliant</span>
+            <span>{privacyNotices.securityStatus}</span>
             <span className="h-1 w-1 rounded-full bg-white/30" />
-            <span>GDPR Ready</span>
+            <span>{privacyNotices.privacyStatus}</span>
             <span className="h-1 w-1 rounded-full bg-white/30" />
-            <span>AES-256</span>
+            <span>{privacyNotices.reviewStatus}</span>
           </div>
         </div>
       </div>
