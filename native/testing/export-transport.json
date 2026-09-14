@@ -1,0 +1,6 @@
+{
+  "awsRegions": {
+    "US": "us-east-1",
+    "EU": "eu-central-1"
+  }
+}

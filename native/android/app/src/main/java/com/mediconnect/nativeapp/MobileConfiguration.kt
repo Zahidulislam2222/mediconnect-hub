@@ -19,8 +19,22 @@ data class ProfileContract(val service: String, val readPath: String, val append
 data class CancellationContract(val path: String, val cancellableStatuses: Set<String>, val cancelledStatuses: Set<String>, val maxLookupPages: Int)
 
 data class PatientSettingsContract(val updatePath: String, val maxNameLength: Int)
+data class PatientExportContract(val path: String, val collections: Set<String>, val ownerCollection: String, val maxJsonDepth: Int)
 
 class MobileContract(source: JSONObject, policy: JSONObject) {
+    val patientExport = source.getJSONObject("patientExport").let { row ->
+        val path = row.get("path"); val depth = row.get("maxJsonDepth"); val owner = row.get("ownerCollection")
+        require(path is String && path.matches(Regex("/[A-Za-z0-9/_-]+")) && !path.contains("//") && !path.endsWith('/'))
+        require(depth is Int && depth > 0 && owner is String)
+        val values = row.getJSONArray("collections")
+        val names = (0 until values.length()).map { index ->
+            val name = values.get(index)
+            require(name is String && name.matches(Regex("[A-Za-z][A-Za-z0-9]*")))
+            name
+        }
+        require(names.isNotEmpty() && names.toSet().size == names.size && owner in names)
+        PatientExportContract(path, names.toSet(), owner, depth)
+    }
     val patientSettings = source.getJSONObject("patientSettings").let { row ->
         val path = row.get("updatePath"); val limit = row.get("maxNameLength")
         require(path is String && path.matches(Regex("/[A-Za-z0-9/_-]+")) && !path.contains("//") && !path.endsWith('/'))

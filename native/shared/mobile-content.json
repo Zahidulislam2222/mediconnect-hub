@@ -106,6 +106,24 @@
     "sms": "SMS notifications",
     "promotional": "Promotional notifications"
   },
+  "export": {
+    "title": "Export your data",
+    "privacy": "This file contains private health information. Choose a destination you trust. Files you save remain there after you sign out.",
+    "download": "Prepare my export",
+    "save": "Choose where to save",
+    "filenamePrefix": "mediconnect-export"
+  },
+  "exportStatus": {
+    "CLOSED": "Export is closed.",
+    "IDLE": "Prepare a copy of your available data.",
+    "DOWNLOADING": "Downloading and checking your export…",
+    "READY": "Your export is ready to save.",
+    "SELECTING": "Choose a destination or cancel.",
+    "SAVING": "Saving your export…",
+    "SAVED": "Your export was saved.",
+    "CANCELLED": "Export cancelled. Prepare a new copy to try again.",
+    "FAILED": "The export could not be completed. If you selected a destination, check it for an incomplete file before trying again."
+  },
   "settingsStatus": {
     "CLOSED": "Settings are closed.",
     "LOADING": "Loading your saved settings…",

@@ -51,6 +51,22 @@ struct MobileConfiguration {
 
 struct PatientSettingsContract: Decodable { let updatePath: String; let maxNameLength: Int }
 
+struct PatientExportContract: Decodable {
+    let path: String
+    let collections: [String]
+    let ownerCollection: String
+    let maxJsonDepth: Int
+
+    func validate() throws {
+        guard path.range(of: "^/[A-Za-z0-9/_-]+$", options: .regularExpression) != nil,
+              !path.contains("//"), !path.hasSuffix("/"), maxJsonDepth > 0,
+              !collections.isEmpty, Set(collections).count == collections.count,
+              collections.contains(ownerCollection),
+              collections.allSatisfy({ $0.range(of: "^[A-Za-z][A-Za-z0-9]*$", options: .regularExpression) != nil })
+        else { throw MobileFailure.configuration }
+    }
+}
+
 struct ProfileContract: Decodable {
     let service: String
     let readPath: String
@@ -78,14 +94,17 @@ struct MobileContract {
     let appointments: AppointmentContract
     let profiles: [String: ProfileContract]
     let patientSettings: PatientSettingsContract
+    let patientExport: PatientExportContract
     let cancellation: CancellationContract
 
     init(data: Data, policy: Data) throws {
-        struct Document: Decodable { let appointments: AppointmentContract; let profiles: [String: ProfileContract]; let cancellation: CancellationContract; let patientSettings: PatientSettingsContract }
+        struct Document: Decodable { let appointments: AppointmentContract; let profiles: [String: ProfileContract]; let cancellation: CancellationContract; let patientSettings: PatientSettingsContract; let patientExport: PatientExportContract }
         struct Policy: Decodable { let groups: [String: Role]; let defaultRole: Role }
         let document = try JSONDecoder().decode(Document.self, from: data)
         appointments = document.appointments
         patientSettings = document.patientSettings
+        patientExport = document.patientExport
+        try patientExport.validate()
         guard patientSettings.maxNameLength > 0,
               patientSettings.updatePath.range(of: "^/[A-Za-z0-9/_-]+$", options: .regularExpression) != nil,
               !patientSettings.updatePath.contains("//"), !patientSettings.updatePath.hasSuffix("/") else { throw MobileFailure.configuration }

@@ -43,6 +43,7 @@ class WorkspaceModel @JvmOverloads constructor(
     val cancellation = AppointmentCancellation(runtime?.appointments, runtime?.contract?.cancellation, scope)
     val recovery = PasswordRecovery(runtime?.sessions, scope)
     val settings = runtime?.patientSettings?.let { PatientSettingsEditor(it, runtime.contract.patientSettings.maxNameLength, scope) }
+    val export = runtime?.patientExport?.let { PatientExportController(it, runtime.sessions, scope) }
     val profile = ProfileEnrollment(runtime?.profiles, policies.policyVersion, scope)
     val registration = AccountRegistration(runtime?.sessions, scope)
     private val mutable = MutableStateFlow(WorkspaceState())
@@ -64,6 +65,7 @@ class WorkspaceModel @JvmOverloads constructor(
         cancellation.close(clearSession = true)
         profile.close()
         settings?.close()
+        export?.close()
         generation++
         operation?.cancel()
         expiry?.cancel()
@@ -94,6 +96,10 @@ class WorkspaceModel @JvmOverloads constructor(
     }
 
     fun resume() {
+        val retained = mutable.value.identity
+        if (export?.state?.value?.step == ExportStep.SELECTING && retained != null && retained.expiresAt > Instant.now()) {
+            mutable.value = mutable.value.copy(visible = true); return
+        }
         if (recovery.state.value.step != RecoveryStep.CLOSED || registration.state.value.step != RegistrationStep.CLOSED) return
         if (mutable.value.visible && (mutable.value.identity != null || mutable.value.busy)) return
         mutable.value = mutable.value.copy(visible = true)
@@ -145,6 +151,7 @@ class WorkspaceModel @JvmOverloads constructor(
 
     private suspend fun accept(identity: Identity) {
         settings?.close()
+        export?.close()
         currentCoroutineContext().ensureActive()
         val runtime = runtime ?: return
         mutable.value = WorkspaceState(identity = identity, busy = true)
@@ -176,7 +183,27 @@ class WorkspaceModel @JvmOverloads constructor(
     fun openSettings() {
         val current = mutable.value
         val identity = current.identity ?: return
-        if (current.visible && !current.busy && identity.role == Role.PATIENT && profile.state.value.step == ProfileStep.READY) settings?.open(identity)
+        if (current.visible && !current.busy && identity.role == Role.PATIENT && profile.state.value.step == ProfileStep.READY) {
+            settings?.open(identity); export?.open(identity)
+        }
+    }
+
+    fun closeSettings() { settings?.close(); export?.close() }
+
+    fun pauseForExportPicker(ticket: java.util.UUID): Boolean {
+        val identity = mutable.value.identity ?: return false
+        if (export?.state?.value != ExportState(ExportStep.SELECTING, ticket) || identity.expiresAt <= Instant.now()) return false
+        mutable.value = mutable.value.copy(visible = false)
+        return true
+    }
+
+    fun returnFromExportPicker(ticket: java.util.UUID): Boolean {
+        val identity = mutable.value.identity ?: return false
+        if (export?.state?.value != ExportState(ExportStep.SELECTING, ticket) || identity.expiresAt <= Instant.now()) {
+            export?.cancel(ticket); return false
+        }
+        mutable.value = mutable.value.copy(visible = true)
+        return true
     }
 
     fun openCancellation(appointment: Appointment) {

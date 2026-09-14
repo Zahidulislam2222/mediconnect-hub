@@ -19,6 +19,7 @@ class MobileRuntime(private val context: Context) : WorkspaceServices {
     override val contract = MobileContract(read("mobile-contract.json"), read("session-policy.json"))
     override val sessions = CognitoSession(context, config, contract)
     override val patientSettings = PatientSettingsApi(NativeApi(config, sessions, NativeHttp.client(config)), contract)
+    override val patientExport = PatientExportApi(NativeApi(config, sessions, NativeHttp.client(config)), contract, config.maxResponseBytes, sessions)
     override val profiles = ProfileApi(NativeApi(config, sessions, NativeHttp.client(config)), contract)
     override val appointments = AppointmentsApi(config, contract, sessions, NativeHttp.client(config))
     // This preference is a non-sensitive logout safety latch, never a credential or a profile cache.

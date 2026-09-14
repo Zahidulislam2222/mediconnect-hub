@@ -1,6 +1,7 @@
 package com.mediconnect.nativeapp
 
 import android.os.Bundle
+import androidx.activity.result.contract.ActivityResultContracts
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
@@ -49,8 +50,25 @@ import com.amplifyframework.auth.cognito.challengeResponse
 
 class MainActivity : ComponentActivity() {
     private val model: WorkspaceModel by viewModels()
+    private val exportRequest = ExportPickerRequest()
+    private val exportDestination = registerForActivityResult(ActivityResultContracts.CreateDocument(PatientExportDocument.mimeType)) { uri ->
+        val ticket = exportRequest.finish()
+        if (ticket != null) {
+            if (uri == null) model.export?.cancel(ticket)
+            else if (model.returnFromExportPicker(ticket)) {
+                model.export?.save(ticket) { bytes, valid -> PatientExportDocument.write(contentResolver, uri, bytes, valid) }
+            }
+        }
+    }
+    private fun selectExportDestination() {
+        val ticket = exportRequest.begin { model.export?.selectDestination() } ?: return
+        try { exportDestination.launch(model.content.label("export", "filenamePrefix") + PatientExportDocument.extension) }
+        catch (_: Exception) { exportRequest.finish(); model.export?.cancel(ticket) }
+    }
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        exportRequest.restorePending(savedInstanceState?.getBoolean(ExportPickerRequest.savedStateKey) == true)
+        if (savedInstanceState != null) model.export?.state?.value?.ticket?.let { model.export?.cancel(it) }
         window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
         enableEdgeToEdge()
         setContent {
@@ -62,6 +80,7 @@ class MainActivity : ComponentActivity() {
             val profile by model.profile.state.collectAsStateWithLifecycle()
             val registration by model.registration.state.collectAsStateWithLifecycle()
             val settings = model.settings?.state?.collectAsStateWithLifecycle()?.value ?: SettingsState()
+            val export = model.export?.state?.collectAsStateWithLifecycle()?.value ?: ExportState()
             MobileTheme(model.content) {
                 val canReturnHome = state.identity == null && !state.busy && !state.challenge &&
                     recovery.step == RecoveryStep.CLOSED && registration.step == RegistrationStep.CLOSED
@@ -79,14 +98,23 @@ class MainActivity : ComponentActivity() {
                     settings = settings, openSettings = model::openSettings,
                     editSettings = { model.settings?.edit(it) }, saveSettings = { model.settings?.save() },
                     discardSettings = { model.settings?.discard() }, reloadSettings = { model.settings?.reload() },
-                    closeSettings = { model.settings?.close() }, settingsAvailable = model.settings != null,
+                    closeSettings = model::closeSettings, settingsAvailable = model.settings != null,
+                    export = export, prepareExport = { model.export?.download() }, saveExport = ::selectExportDestination,
                     homeLabel = journey.home, returnHome = if (canReturnHome) ({ welcome = true }) else null)
                 }
             }
         }
     }
     override fun onStart() { super.onStart(); model.resume() }
-    override fun onStop() { model.hide(); super.onStop() }
+    override fun onSaveInstanceState(outState: Bundle) {
+        outState.putBoolean(ExportPickerRequest.savedStateKey, exportRequest.pending)
+        super.onSaveInstanceState(outState)
+    }
+    override fun onStop() {
+        val ticket = exportRequest.ticket
+        if (ticket == null || !model.pauseForExportPicker(ticket)) model.hide()
+        super.onStop()
+    }
 }
 
 @Composable
@@ -115,6 +143,7 @@ fun WorkspaceScreen(state: WorkspaceState, content: MobileContent, configured: B
                     settings: SettingsState = SettingsState(), settingsAvailable: Boolean = false,
                     openSettings: () -> Unit = {}, editSettings: (PatientSettingsDraft) -> Unit = {},
                     saveSettings: () -> Unit = {}, discardSettings: () -> Unit = {}, reloadSettings: () -> Unit = {}, closeSettings: () -> Unit = {},
+                    export: ExportState = ExportState(), prepareExport: () -> Unit = {}, saveExport: () -> Unit = {},
                     homeLabel: String = "", returnHome: (() -> Unit)? = null) {
     CancellationDialog(cancellation, content, confirmCancellation, checkCancellation, closeCancellation)
     Scaffold { padding ->
@@ -159,6 +188,7 @@ fun WorkspaceScreen(state: WorkspaceState, content: MobileContent, configured: B
                     if (state.identity.role == Role.PATIENT && settingsAvailable && profile.step == ProfileStep.READY) {
                         if (settings.step != SettingsStep.CLOSED) {
                             item { PatientSettingsForm(settings, content, editSettings, saveSettings, discardSettings, reloadSettings, closeSettings) }
+                            item { PatientExportActions(export, content, prepareExport, saveExport) }
                             return@LazyColumn
                         }
                         item { TextButton(onClick = openSettings, enabled = !state.busy) { Text(content.label("settings", "open")) } }

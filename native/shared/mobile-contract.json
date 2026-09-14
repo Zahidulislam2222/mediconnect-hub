@@ -41,5 +41,41 @@
   "patientSettings": {
     "updatePath": "/patients",
     "maxNameLength": 200
+  },
+  "patientExport": {
+    "path": "/me/export",
+    "collections": [
+      "patient",
+      "appointments",
+      "vitals",
+      "allergies",
+      "immunizations",
+      "carePlans",
+      "prescriptions",
+      "labOrders",
+      "referrals",
+      "consentLedger",
+      "transactions",
+      "reconciliations",
+      "chatHistory",
+      "sdohAssessments",
+      "healthRecords",
+      "eligibilityChecks",
+      "priorAuths",
+      "emergencyAccessLogs",
+      "graphData",
+      "videoSessions",
+      "bluebuttonConnections",
+      "reminders",
+      "hl7Messages",
+      "mpiLinks",
+      "ecrReports",
+      "elrReports",
+      "dicomStudies",
+      "symptomLogs",
+      "bigqueryVitals"
+    ],
+    "ownerCollection": "patient",
+    "maxJsonDepth": 64
   }
 }

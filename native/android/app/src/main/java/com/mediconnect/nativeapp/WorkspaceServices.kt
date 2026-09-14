@@ -16,6 +16,7 @@ interface WorkspaceAppointments : CancellationService {
 interface WorkspaceServices {
     val sessions: SignInSession
     val patientSettings: PatientSettingsService? get() = null
+    val patientExport: PatientExportService? get() = null
     val profiles: ProfileService
     val appointments: WorkspaceAppointments
     val contract: MobileContract

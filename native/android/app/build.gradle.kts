@@ -54,6 +54,8 @@ android {
     buildFeatures { compose = true; buildConfig = true }
     sourceSets["main"].assets.srcDir(generatedAssets)
     sourceSets["test"].resources.srcDir(prepareMobileAssets)
+    sourceSets["test"].resources.srcDir("../../testing")
+    sourceSets["androidTest"].assets.srcDir("../../testing")
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
