@@ -1,6 +1,7 @@
+import { authorizedSocketUrl } from '@/lib/socket-ticket';
 import { useState, useEffect, useRef } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { getCurrentUser, fetchAuthSession } from 'aws-amplify/auth';
+import { getCurrentUser } from 'aws-amplify/auth';
 import {
     Send, Search, Video,
     Loader2, User, Paperclip, CheckCheck, ChevronLeft, Lock
@@ -15,6 +16,7 @@ import { cn } from "@/lib/utils";
 import { api } from "@/lib/api";
 import { getUser, setUser, clearAllSensitive } from "@/lib/secure-storage";
 import { useToast } from "@/hooks/use-toast";
+import { publicEnv } from "@/config/env";
 
 // Interface for our Clean Contact List
 interface Contact {
@@ -34,16 +36,6 @@ interface Message {
     resource?: any; // FHIR structure
     isOptimistic?: boolean; 
 }
-
-// Helper to get JWT securely via Amplify (not localStorage)
-const getAuthTokenAsync = async (): Promise<string | null> => {
-    try {
-        const session = await fetchAuthSession();
-        return session.tokens?.idToken?.toString() || null;
-    } catch {
-        return null;
-    }
-};
 
 export default function Messages() {
     const navigate = useNavigate();
@@ -167,19 +159,9 @@ export default function Messages() {
         let cancelled = false;
 
         const connectWebSocket = async () => {
-            // 🟢 FIX: REGIONAL LOGIC (Matches ConsultationRoom.tsx)
-            const userRegion = localStorage.getItem('userRegion') || 'US';
-            const wsBaseUrl = userRegion === 'EU'
-                ? import.meta.env.VITE_COMMUNICATION_WS_URL_EU
-                : import.meta.env.VITE_COMMUNICATION_WS_URL_US;
-
-            // 🟢 SECURITY FIX: Get token via Amplify, not localStorage scan
-            const token = await getAuthTokenAsync();
-
-            if (!token || cancelled) return;
-            if (!wsBaseUrl) return;
-
-            socket = new WebSocket(`${wsBaseUrl}?token=${token}`);
+            const url = await authorizedSocketUrl();
+            if (cancelled) return;
+            socket = new WebSocket(url);
 
             socket.onmessage = (event) => {
                 try {
@@ -200,7 +182,7 @@ export default function Messages() {
             };
         };
 
-        connectWebSocket();
+        connectWebSocket().catch(() => console.error("Secure chat connection unavailable"));
 
         return () => {
             cancelled = true;

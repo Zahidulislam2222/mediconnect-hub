@@ -1,0 +1,5 @@
+{
+  "extends": "./tsconfig.app.json",
+  "compilerOptions": { "strict": true, "noUnusedLocals": true, "noUnusedParameters": true },
+  "include": ["src/cinematic-main.tsx", "src/vite-env.d.ts", "src/content/__tests__/cinematic.test.ts"]
+}

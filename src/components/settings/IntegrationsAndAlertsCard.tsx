@@ -1,3 +1,4 @@
+import privacyNotices from '@/content/privacy-notices.json';
 import React from "react";
 import { 
     Mail, 
@@ -143,7 +144,7 @@ export const IntegrationsAndAlertsCard: React.FC<IntegrationsAndAlertsCardProps>
                         </div>
                         
                         <p className="mt-4 text-[10px] text-center text-muted-foreground uppercase font-semibold tracking-tighter opacity-70">
-                            MediConnect uses AES-256 encryption for all third-party authorization tokens.
+                            {privacyNotices.encryptionDescription}
                         </p>
                     </CardContent>
                 </Card>

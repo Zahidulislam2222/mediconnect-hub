@@ -1,0 +1,43 @@
+{
+  "status": "local-review-only",
+  "factualStatus": "Illustrative portfolio environment; not a real clinic or medical service",
+  "assets": [
+    {
+      "file": "/media/cinematic/care-atmosphere-v1.webp",
+      "purpose": "Hero and sign-in atmosphere",
+      "creator": "Built-in image-generation tool, conditioned on original project Blender render",
+      "source": "care-atmosphere-v1.png, retained in project-private asset storage",
+      "prompt": "hero-prompt.md",
+      "width": 1672,
+      "height": 941,
+      "bytes": 116076,
+      "focalArea": "Pavilion on the right; dark negative space on the left",
+      "mobileTreatment": "Contained architectural scene below the headline with subject-safe horizontal positioning",
+      "rights": "Generated for this project; reference artwork authored in this project; no third-party model or photo imported",
+      "limitations": "AI treatment changes material detail and geometry; not identical to real-time GLB"
+    },
+    {
+      "file": "/media/cinematic/care-world-v1.glb",
+      "purpose": "Scroll-controlled and manually rotated 3D pavilion",
+      "creator": "Original project-owned Blender script",
+      "source": "build_scene.py and scene.json; editable blend retained privately",
+      "bytes": 1634332,
+      "poster": "/media/cinematic/care-world-v1.webp",
+      "mobileTreatment": "Do not load model; show poster and direct stage controls",
+      "rights": "Original authored geometry and materials; no external assets",
+      "limitations": "Illustrative geometry; browser lighting differs from Cycles"
+    },
+    {
+      "file": "/media/cinematic/care-world-v1.webp",
+      "purpose": "Mobile, reduced-motion and failed-render fallback",
+      "creator": "Local Blender Cycles render",
+      "source": "care-world-v1.png, retained privately",
+      "width": 1600,
+      "height": 1000,
+      "bytes": 40588,
+      "rights": "Original project artwork",
+      "focalArea": "All three care stations visible; contain without cropping"
+    }
+  ],
+  "video": { "generated": false, "openrouterJobsSubmitted": 0, "status": "Awaiting corrected cost confirmation and input-delivery qualification" }
+}

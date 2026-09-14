@@ -1,3 +1,4 @@
+import privacyNotices from '@/content/privacy-notices.json';
 import { useNavigate } from "react-router-dom";
 import { useRef, useEffect, useState } from "react";
 import {
@@ -22,6 +23,7 @@ import { Button } from "@/components/ui/button";
 import { PublicHeader } from "@/components/PublicHeader";
 import {
   motion,
+  type Variants,
   useScroll,
   useTransform,
   useInView,
@@ -107,7 +109,7 @@ function PlatformMockup() {
   const ref = useRef<HTMLDivElement>(null);
   const isInView = useInView(ref, { once: true, margin: "-50px" });
 
-  const cardVariants = {
+  const cardVariants: Variants = {
     hidden: { opacity: 0, y: 40, scale: 0.95 },
     visible: (i: number) => ({
       opacity: 1,
@@ -258,9 +260,9 @@ function HorizontalFeatures() {
   const features = [
     { icon: Video, title: "HD Video Consultations", description: "Crystal-clear calls powered by AWS Chime SDK with end-to-end encryption", color: "bg-blue-500/10 text-blue-600" },
     { icon: Brain, title: "AI Symptom Checker", description: "Instant health insights using Bedrock & Vertex AI multi-model diagnostics", color: "bg-violet-500/10 text-violet-600" },
-    { icon: Shield, title: "HIPAA & GDPR Compliant", description: "AES-256 encryption, immutable audit logs, and regional data sovereignty", color: "bg-emerald-500/10 text-emerald-600" },
+    { icon: Shield, title: privacyNotices.securityTitle, description: privacyNotices.securityDescription, color: "bg-emerald-500/10 text-emerald-600" },
     { icon: Calendar, title: "Smart Scheduling", description: "Real-time availability, instant booking, and automated reminders", color: "bg-amber-500/10 text-amber-600" },
-    { icon: FileText, title: "Digital Health Records", description: "FHIR R4 compliant records accessible anytime with PHI encryption", color: "bg-sky-500/10 text-sky-600" },
+    { icon: FileText, title: "Digital Health Records", description: privacyNotices.recordsDescription, color: "bg-sky-500/10 text-sky-600" },
     { icon: Clock, title: "24/7 Care Access", description: "Round-the-clock medical advice from certified healthcare providers", color: "bg-rose-500/10 text-rose-600" },
   ];
 
@@ -391,14 +393,7 @@ export default function Index() {
     { num: "03", title: "Start Consultation", description: "Encrypted HD video with personalized care plans", icon: Video },
   ];
 
-  const trustPoints = [
-    "HIPAA compliant infrastructure",
-    "GDPR data sovereignty",
-    "AES-256 encryption at rest",
-    "FHIR R4 interoperability",
-    "SOC 2 audit trail",
-    "Multi-region deployment",
-  ];
+  const trustPoints = privacyNotices.trustPoints;
 
   return (
     <div className="min-h-screen bg-background overflow-hidden">
@@ -423,7 +418,7 @@ export default function Index() {
               className="inline-flex items-center gap-2 rounded-full border border-border bg-card px-4 py-1.5 text-sm font-medium text-muted-foreground mb-8 shadow-soft"
             >
               <span className="flex h-2 w-2 rounded-full bg-success animate-pulse" />
-              Trusted by 50,000+ patients across US & EU
+              Trusted by 50,000+ patients across US &amp; EU
             </motion.div>
 
             <motion.h1
@@ -479,10 +474,10 @@ export default function Index() {
               transition={{ duration: 0.8, delay: 0.9 }}
               className="flex items-center justify-center gap-6 mt-10 text-xs text-muted-foreground/50"
             >
-              <div className="flex items-center gap-1.5"><Shield className="h-3.5 w-3.5" /> HIPAA</div>
-              <div className="flex items-center gap-1.5"><Globe className="h-3.5 w-3.5" /> GDPR</div>
-              <div className="flex items-center gap-1.5"><Lock className="h-3.5 w-3.5" /> AES-256</div>
-              <div className="flex items-center gap-1.5"><Activity className="h-3.5 w-3.5" /> FHIR R4</div>
+              <div className="flex items-center gap-1.5"><Shield className="h-3.5 w-3.5" /> {privacyNotices.securityStatus}</div>
+              <div className="flex items-center gap-1.5"><Globe className="h-3.5 w-3.5" /> {privacyNotices.privacyStatus}</div>
+              <div className="flex items-center gap-1.5"><Lock className="h-3.5 w-3.5" /> {privacyNotices.encryptionLabel}: {privacyNotices.reviewStatus}</div>
+              <div className="flex items-center gap-1.5"><Activity className="h-3.5 w-3.5" /> {privacyNotices.interoperabilityLabel}: {privacyNotices.reviewStatus}</div>
             </motion.div>
           </div>
         </motion.div>
@@ -548,7 +543,7 @@ export default function Index() {
         <div className="container mx-auto max-w-5xl">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
             <div>
-              <p className="text-sm font-medium text-accent uppercase tracking-wider mb-3">Security & Compliance</p>
+              <p className="text-sm font-medium text-accent uppercase tracking-wider mb-3">Security &amp; Compliance</p>
               <h2 className="font-display text-3xl md:text-4xl font-bold text-foreground mb-6">
                 Built for healthcare-grade security
               </h2>
@@ -568,10 +563,10 @@ export default function Index() {
 
             <div className="grid grid-cols-2 gap-4">
               {[
-                { icon: Shield, label: "HIPAA", sub: "Compliant" },
-                { icon: Globe, label: "GDPR", sub: "Data Sovereignty" },
-                { icon: Lock, label: "AES-256", sub: "Encryption" },
-                { icon: Activity, label: "FHIR R4", sub: "Interoperable" },
+                { icon: Shield, label: privacyNotices.securityLabel, sub: privacyNotices.reviewStatus },
+                { icon: Globe, label: privacyNotices.privacyLabel, sub: privacyNotices.reviewStatus },
+                { icon: Lock, label: privacyNotices.encryptionLabel, sub: privacyNotices.reviewStatus },
+                { icon: Activity, label: privacyNotices.interoperabilityLabel, sub: privacyNotices.reviewStatus },
               ].map((item, idx) => (
                 <TrustCard key={idx} icon={item.icon} label={item.label} sub={item.sub} idx={idx} />
               ))}
@@ -618,7 +613,7 @@ export default function Index() {
                   onClick={() => navigate("/admin-auth")}
                   className="text-background/60 hover:text-background hover:bg-background/10 text-base px-8 h-13 rounded-xl transition-all duration-200"
                 >
-                  Staff & Admin Portal
+                  Staff &amp; Admin Portal
                 </Button>
               </div>
             </div>
@@ -645,7 +640,7 @@ export default function Index() {
             </div>
           </div>
           <div className="mt-10 pt-8 border-t border-border text-center text-sm text-muted-foreground/60">
-            &copy; 2026 MediConnect. All rights reserved. Multi-region deployment on AWS, Azure & GCP.
+            &copy; 2026 MediConnect. All rights reserved. Multi-region deployment on AWS, Azure &amp; GCP.
           </div>
         </div>
       </footer>

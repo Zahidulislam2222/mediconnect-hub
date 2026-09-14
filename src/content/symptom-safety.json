@@ -1,0 +1,17 @@
+{
+  "welcome": "This AI tool provides general information, not a diagnosis or emergency triage. A qualified clinician must review clinical decisions. If you think you may have a medical emergency, contact local emergency services now; do not wait for this tool.",
+  "unavailableTitle": "Assessment unavailable",
+  "unavailable": "No assessment was produced. Your risk level is unknown. Contact a qualified healthcare professional for advice. If you think you may have a medical emergency, contact local emergency services now; do not wait for this tool.",
+  "serviceLabel": "AI information support — not a diagnosis",
+  "inputLabel": "Describe your symptoms",
+  "sendLabel": "Send symptoms",
+  "unverifiedStatus": "Not monitored",
+  "reportLabel": "AI-generated draft — not an official clinical report. Requires clinician review.",
+  "logoutFailed": "Sign-out could not be confirmed. Close this session and sign out again before sharing the device.",
+  "defaultUserName": "Patient",
+  "pageTitle": "AI Health Assistant",
+  "title": "Symptom Checker",
+  "downloadLabel": "Download AI draft PDF",
+  "loadingLabel": "Requesting AI information...",
+  "placeholder": "Describe your symptoms in your own words..."
+}

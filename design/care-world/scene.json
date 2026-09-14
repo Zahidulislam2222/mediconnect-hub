@@ -1,0 +1,18 @@
+{
+  "output": "../../../memory/cinematic-assets",
+  "publicOutput": "../../public/media/cinematic",
+  "name": "care-world-v1",
+  "render": { "engine": "CYCLES", "samples": 48, "width": 1600, "height": 1000, "fps": 24, "frames": 144 },
+  "camera": { "start": [12, -17, 13], "end": [9, -13, 9], "target": [0, 0, 1.2], "lens": 48 },
+  "materials": {
+    "porcelain": { "color": [0.76, 0.82, 0.80, 1], "roughness": 0.28 },
+    "stone": { "color": [0.33, 0.39, 0.39, 1], "roughness": 0.64 },
+    "ink": { "color": [0.025, 0.06, 0.085, 1], "roughness": 0.3 },
+    "blue": { "color": [0.045, 0.34, 0.52, 1], "roughness": 0.26 },
+    "linen": { "color": [0.66, 0.51, 0.35, 1], "roughness": 0.8 },
+    "leaf": { "color": [0.08, 0.23, 0.13, 1], "roughness": 0.55 },
+    "metal": { "color": [0.43, 0.51, 0.55, 1], "roughness": 0.22, "metallic": 0.85 },
+    "light": { "color": [0.24, 0.8, 1, 1], "roughness": 0.25, "emission": 3 }
+  },
+  "pods": [{ "name": "Arrival", "x": -4.1, "y": 0.4 }, { "name": "Consultation", "x": 0, "y": 0 }, { "name": "Continuity", "x": 4.1, "y": 0.4 }]
+}

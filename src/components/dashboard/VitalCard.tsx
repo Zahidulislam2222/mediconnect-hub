@@ -7,7 +7,7 @@ interface VitalCardProps {
   title: string;
   value: string | number;
   unit: string;
-  status: "normal" | "warning" | "critical" | "excellent";
+  status: "normal" | "warning" | "critical" | "excellent" | "unassessed";
   change: string;
   trend: number[];
   icon: ReactNode;
@@ -48,6 +48,7 @@ const colorMap = {
 };
 
 const statusMap = {
+  unassessed: { label: "Not assessed", class: "text-muted-foreground bg-muted" },
   normal: { label: "Normal", class: "metric-badge-success" },
   excellent: { label: "Excellent", class: "metric-badge-success" },
   warning: { label: "Warning", class: "metric-badge-warning" },
@@ -98,7 +99,7 @@ export function VitalCard({
         </div>
 
         {/* Trend */}
-        <div className="flex items-center justify-between">
+        {change && <div className="flex items-center justify-between">
           <div className="flex items-center gap-1.5">
             {isNeutral ? (
               <Minus className="h-4 w-4 text-muted-foreground" />
@@ -123,8 +124,10 @@ export function VitalCard({
           </div>
         </div>
 
+        }
+
         {/* Sparkline */}
-        <div className="h-12 mt-3 -mx-2">
+        {trend.length > 0 && <div className="h-12 mt-3 -mx-2">
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart data={chartData}>
               <defs>
@@ -142,7 +145,7 @@ export function VitalCard({
               />
             </AreaChart>
           </ResponsiveContainer>
-        </div>
+        </div>}
       </div>
     </div>
   );

@@ -1,0 +1,45 @@
+{
+  "appointments": {
+    "service": "booking",
+    "path": "/appointments",
+    "query": {
+      "patient": "patientId",
+      "doctor": "doctorId"
+    },
+    "listKeys": [
+      "appointments",
+      "existingBookings",
+      "data"
+    ]
+  },
+  "profiles": {
+    "patient": {
+      "service": "patient",
+      "readPath": "/me",
+      "appendSubject": false,
+      "createPath": "/register-patient",
+      "subjectField": "patientId"
+    },
+    "doctor": {
+      "service": "doctor",
+      "readPath": "/doctors",
+      "appendSubject": true,
+      "createPath": "/register-doctor",
+      "subjectField": "doctorId"
+    }
+  },
+  "cancellation": {
+    "path": "/appointments/cancel",
+    "cancellableStatuses": [
+      "CONFIRMED"
+    ],
+    "cancelledStatuses": [
+      "CANCELLED"
+    ],
+    "maxLookupPages": 20
+  },
+  "patientSettings": {
+    "updatePath": "/patients",
+    "maxNameLength": 200
+  }
+}

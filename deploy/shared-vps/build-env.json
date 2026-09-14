@@ -1,0 +1,4 @@
+{
+  "VITE_STORAGE_CIPHER_KEY": "test-key",
+  "VITE_STRIPE_PUBLISHABLE_KEY": "pk_test_showcase"
+}

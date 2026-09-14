@@ -2,14 +2,17 @@
  * Subscription Types & API Helpers
  *
  * All prices are display-only — actual charges happen server-side.
- * Discount percentages come from server, never hardcoded client-side.
+ * Display catalog lives in validated content; actual discounts/entitlements come from the server.
  */
 
 import { api } from './api';
 
 // ─── Types ──────────────────────────────────────────────────────────────
 
-export type PlanId = 'free' | 'plus' | 'premium';
+import type { PlanId } from './subscription-protocol';
+export type { PlanId } from './subscription-protocol';
+export type { PlanDisplay } from '@/content/subscription-plans';
+export { subscriptionPlans as PLAN_DISPLAY } from '@/content/subscription-plans';
 export type SubscriptionStatus = 'active' | 'past_due' | 'cancelled' | 'incomplete' | 'none';
 
 export interface SubscriptionInfo {
@@ -22,61 +25,6 @@ export interface SubscriptionInfo {
     cycleEnd: string;
     cancelAtPeriodEnd: boolean;
 }
-
-export interface PlanDisplay {
-    id: PlanId;
-    name: string;
-    price: number;
-    discountPercent: number;
-    features: string[];
-    highlighted?: boolean;
-}
-
-export const PLAN_DISPLAY: PlanDisplay[] = [
-    {
-        id: 'free',
-        name: 'Free',
-        price: 0,
-        discountPercent: 0,
-        features: [
-            'Pay-per-visit at full rate',
-            'Access to all doctors',
-            'Secure video consultations',
-            'FHIR health records',
-        ],
-    },
-    {
-        id: 'plus',
-        name: 'MediConnect Plus',
-        price: 19,
-        discountPercent: 20,
-        highlighted: true,
-        features: [
-            '20% discount on all visits',
-            'Priority booking (24h early access)',
-            'Chat follow-ups with doctors',
-            'Access to all doctors',
-            'Secure video consultations',
-            'FHIR health records',
-        ],
-    },
-    {
-        id: 'premium',
-        name: 'MediConnect Premium',
-        price: 39,
-        discountPercent: 30,
-        features: [
-            '30% discount on all visits',
-            '1 free GP visit per month',
-            'Family sharing (up to 4 members)',
-            'Priority booking (24h early access)',
-            'Chat follow-ups with doctors',
-            'Access to all specialists',
-            'Secure video consultations',
-            'FHIR health records',
-        ],
-    },
-];
 
 // ─── API Calls ──────────────────────────────────────────────────────────
 

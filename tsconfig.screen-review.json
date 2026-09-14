@@ -1,0 +1,11 @@
+{
+  "extends": "./tsconfig.app.json",
+  "compilerOptions": { "strict": true, "noEmit": true },
+  "include": [
+    "src/screen-review-main.tsx",
+    "src/components/screen-review/**/*.tsx",
+    "src/content/screen-review.ts",
+    "src/content/journey.ts",
+    "src/vite-env.d.ts"
+  ]
+}

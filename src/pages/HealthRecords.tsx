@@ -1,3 +1,4 @@
+import privacyNotices from '@/content/privacy-notices.json';
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { getCurrentUser } from 'aws-amplify/auth';
@@ -283,7 +284,7 @@ export default function HealthRecords() {
     }
 
     setIsUploading(true);
-    toast({ title: "Uploading Scan", description: "Transmitting to HIPAA-compliant clinical engine..." });
+    toast({ title: "Uploading Scan", description: "Uploading the scan for processing..." });
 
     try {
       const formData = new FormData();
@@ -371,16 +372,16 @@ export default function HealthRecords() {
                   <div className="space-y-1">
                     <CardTitle className="text-lg flex items-center gap-2 text-blue-800">
                       <Server className="h-5 w-5" />
-                      Encrypted Document Vault
+                      {privacyNotices.vaultTitle}
                     </CardTitle>
                     <CardDescription>
-                      Secure storage for your medical history.
+                      {privacyNotices.vaultDescription}
                     </CardDescription>
                   </div>
 
                   <div className="flex items-center gap-2">
                     <Badge variant="outline" className="bg-blue-100 text-blue-700 border-blue-200 hidden sm:flex">
-                      AES-256
+                      {privacyNotices.reviewStatus}
                     </Badge>
 
                     {/* 🟢 NEW UPLOAD BUTTON */}
@@ -394,7 +395,7 @@ export default function HealthRecords() {
                     </Button>
                     <div className="flex items-center gap-2">
                     <Badge variant="outline" className="bg-blue-100 text-blue-700 border-blue-200 hidden sm:flex">
-                      AES-256
+                      {privacyNotices.reviewStatus}
                     </Badge>
 
                     {/* EXISTING BUTTON */}
@@ -499,7 +500,7 @@ export default function HealthRecords() {
                   <div>
                     <h3 className="text-lg font-semibold">Upload X-Ray or MRI</h3>
                     <p className="text-sm text-muted-foreground max-w-xs mx-auto mt-1">
-                      Powered by Google Vision & AWS Bedrock.
+                      Powered by Google Vision &amp; AWS Bedrock.
                     </p>
                   </div>
 

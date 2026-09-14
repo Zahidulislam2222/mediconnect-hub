@@ -17,6 +17,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { api } from "@/lib/api";
 import { setUser, getUser, markAuthenticated, clearAllSensitive } from "@/lib/secure-storage";
+import { publicEnv } from "@/config/env";
 
 type Region = "US" | "EU";
 type PortalType = "admin" | "staff";
@@ -47,20 +48,20 @@ export default function AdminStaffAuth() {
     const getClientId = () => {
       if (portalType === 'admin') {
         return isEU
-          ? import.meta.env.VITE_COGNITO_CLIENT_ADMIN_EU
-          : import.meta.env.VITE_COGNITO_CLIENT_ADMIN_US;
+          ? publicEnv("VITE_COGNITO_CLIENT_ADMIN_EU")
+          : publicEnv("VITE_COGNITO_CLIENT_ADMIN_US");
       }
       return isEU
-        ? import.meta.env.VITE_COGNITO_CLIENT_STAFF_EU
-        : import.meta.env.VITE_COGNITO_CLIENT_STAFF_US;
+        ? publicEnv("VITE_COGNITO_CLIENT_STAFF_EU")
+        : publicEnv("VITE_COGNITO_CLIENT_STAFF_US");
     };
 
     Amplify.configure({
       Auth: {
         Cognito: {
-          userPoolId: isEU ? import.meta.env.VITE_COGNITO_USER_POOL_ID_EU : import.meta.env.VITE_COGNITO_USER_POOL_ID_US,
+          userPoolId: isEU ? publicEnv("VITE_COGNITO_USER_POOL_ID_EU") : publicEnv("VITE_COGNITO_USER_POOL_ID_US"),
           userPoolClientId: getClientId(),
-          identityPoolId: isEU ? import.meta.env.VITE_COGNITO_IDENTITY_POOL_ID_EU : import.meta.env.VITE_COGNITO_IDENTITY_POOL_ID_US,
+          identityPoolId: isEU ? publicEnv("VITE_COGNITO_IDENTITY_POOL_ID_EU") : publicEnv("VITE_COGNITO_IDENTITY_POOL_ID_US"),
         }
       }
     });

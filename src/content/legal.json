@@ -1,0 +1,42 @@
+{
+  "updated": "2026-09-09",
+  "brand": "MediConnect",
+  "backLabel": "Back to Home",
+  "notice": "Demonstration only. Use fictional information. This release is not approved to handle real patient records, deliver clinical care, or accept real payments.",
+  "pages": {
+    "privacy": {
+      "title": "Privacy notice — demonstration",
+      "sections": [
+        { "title": "Information in this preview", "body": "Use synthetic names, records and payment details when exploring the demonstrations. Do not upload personal medical documents or enter another person's information. Demonstrated features do not establish that their production integrations are active." },
+        { "title": "Before personal data can be processed", "body": "An operating organization must publish its identity and verified privacy contact, purposes and lawful bases, applicable health-data conditions, recipients and processors, transfer arrangements, retention schedule and rights procedures. Those operating details have not been verified for this release." },
+        { "title": "Rights and retention", "body": "Where GDPR applies, rights can include access, correction, erasure, restriction, objection and portability, subject to applicable conditions. Article 12 generally requires a response within one month; permitted extensions require timely explanation. Medical-record retention depends on applicable law and record type. HIPAA does not set a universal medical-record retention period." }
+      ],
+      "sources": [
+        { "label": "GDPR — official regulation", "url": "https://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX%3A32016R0679" },
+        { "label": "HHS — medical-record retention", "url": "https://www.hhs.gov/hipaa/for-professionals/faq/580/does-hipaa-require-covered-entities-to-keep-medical-records-for-any-period/index.html" }
+      ]
+    },
+    "security": {
+      "title": "Security and compliance readiness",
+      "sections": [
+        { "title": "Current status", "body": "Security, privacy and interoperability controls are under verification. This preview does not claim HIPAA or GDPR compliance, a SOC 2 examination, or FHIR conformance certification." },
+        { "title": "Healthcare activation requirements", "body": "Real-patient use requires a documented risk assessment, verified safeguards and access controls, applicable vendor agreements, staff responsibilities, incident response, backup recovery, retention operations and clinical review. Signed business associate agreements and designated privacy officers have not been verified." },
+        { "title": "Standards and evidence", "body": "FHIR defines healthcare information exchange; it does not replace authentication, authorization or secure transport. SOC 2 concerns examination of organizational controls. Source code and passing local tests alone do not establish either operational assurance or legal compliance." }
+      ],
+      "sources": [
+        { "label": "HHS — HIPAA risk analysis", "url": "https://www.hhs.gov/hipaa/for-professionals/security/guidance/guidance-risk-analysis/index.html" },
+        { "label": "HL7 — FHIR R4 security", "url": "https://hl7.org/fhir/R4/security.html" },
+        { "label": "AICPA — SOC 2", "url": "https://www.aicpa-cima.com/topic/audit-assurance/audit-and-assurance-greater-than-soc-2/" }
+      ]
+    },
+    "terms": {
+      "title": "Demonstration terms",
+      "sections": [
+        { "title": "Purpose", "body": "MediConnect demonstrates planned patient, clinician, staff and administrator workflows. A demo appointment, subscription, consultation or health record is not a real service commitment." },
+        { "title": "Medical use", "body": "The demonstration and its AI output are not medical advice, diagnosis or treatment. For a medical emergency, contact your local emergency service. Do not rely on this preview for urgent care." },
+        { "title": "Payments and future service terms", "body": "Use payment-provider test mode and synthetic data only. Before real billing or care is enabled, the operating organization must provide reviewed terms covering service availability, eligibility, pricing, renewal, cancellation, refunds, privacy and applicable consumer rights. This demonstration notice does not replace those terms." }
+      ],
+      "sources": []
+    }
+  }
+}

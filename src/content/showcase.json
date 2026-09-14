@@ -1,0 +1,79 @@
+{
+  "brand": "MediConnect",
+  "edition": "An interactive telehealth showcase",
+  "navigation": [
+    { "label": "The experience", "href": "#experience" },
+    { "label": "Care workspace", "href": "#workspace" },
+    { "label": "Behind the build", "href": "#engineering" }
+  ],
+  "hero": {
+    "eyebrow": "Care, with a continuous thread",
+    "title": "Good care. One connected journey.",
+    "lines": ["Good care.", "One connected", "journey."],
+    "description": "From the first appointment to the next conversation. Explore a calmer way for patients and care teams to stay on the same page.",
+    "primary": "Explore the workspace",
+    "secondary": "See how it connects",
+    "disclaimer": "Interactive portfolio · No real patient data"
+  },
+  "preview": {
+    "label": "The care journey",
+    "badge": "Illustrative preview",
+    "person": "Alex Morgan",
+    "initials": "AM",
+    "personDetail": "Fictional patient · Example record",
+    "clinician": "Dr. Sam Taylor",
+    "clinicianInitials": "ST",
+    "specialty": "Primary care · Fictional clinician",
+    "appointment": "Tuesday, 15 September",
+    "time": "10:30 AM",
+    "format": "Video consultation",
+    "footnote": "Try the steps. This preview stays in your browser.",
+    "stages": [
+      { "id": "appointment", "number": "01", "label": "Appointment", "title": "A little clarity before your visit.", "description": "A familiar face, a clear time, and the details in one place.", "status": "Example appointment", "detailLabel": "Before the visit", "detail": "Your questions, ready to discuss", "items": ["Appointment details", "Visit preparation", "Care team information"] },
+      { "id": "consultation", "number": "02", "label": "Consultation", "title": "A conversation, with context.", "description": "The visit and the patient story, brought into the same workspace.", "status": "Consultation preview", "detailLabel": "Alongside the conversation", "detail": "A shared view of the visit", "items": ["Visit context", "Conversation workspace", "Notes for follow-up"] },
+      { "id": "followup", "number": "03", "label": "Follow-up", "title": "The next step stays in sight.", "description": "Keep the visit summary and the next conversation connected.", "status": "Follow-up preview", "detailLabel": "After the visit", "detail": "A summary you can return to", "items": ["Visit summary", "Follow-up schedule", "Questions for your care team"] }
+    ]
+  },
+  "principles": [
+    { "number": "01", "title": "A place to begin", "description": "Appointments with the context you need." },
+    { "number": "02", "title": "A clearer conversation", "description": "The person and their record, side by side." },
+    { "number": "03", "title": "A thread to follow", "description": "The next step, kept within reach." }
+  ],
+  "workspace": {
+    "eyebrow": "Different roles. Shared understanding.",
+    "title": "One workspace.\nMore than one perspective.",
+    "description": "Switch seats to explore how a connected care experience can look. These are interactive illustrations, not live clinical screens.",
+    "badge": "Fictional data only",
+    "action": "Preview follow-up",
+    "feedback": "Follow-up preview selected. No appointment was created or changed.",
+    "roles": [
+      { "id": "patient", "label": "Patient", "eyebrow": "Your care, in view", "title": "Less searching. More understanding.", "description": "See the next visit, revisit a summary, and know where to find your care team.", "screenTitle": "Your care overview", "screenSubtitle": "A little more organized. A little less to remember.", "rows": [{ "label": "Upcoming visit", "value": "Primary care consultation", "meta": "15 Sep · 10:30 AM" }, { "label": "Visit summary", "value": "Your last conversation", "meta": "Example document" }, { "label": "Next step", "value": "Prepare your questions", "meta": "For your next visit" }], "note": "A single place for the before, during and after." },
+      { "id": "clinician", "label": "Clinician", "eyebrow": "Context before the call", "title": "A clearer picture before the conversation.", "description": "Bring the schedule, patient context and visit notes into a focused clinical workspace.", "screenTitle": "Your consultation workspace", "screenSubtitle": "Today’s schedule, with the context beside it.", "rows": [{ "label": "Next consultation", "value": "Alex Morgan", "meta": "10:30 AM · Fictional patient" }, { "label": "Visit context", "value": "Patient questions & history", "meta": "Illustrative record" }, { "label": "Follow-up", "value": "Review the visit summary", "meta": "Draft example" }], "note": "Designed around the conversation, not the paperwork." },
+      { "id": "team", "label": "Care team", "eyebrow": "A coordinated day", "title": "Keep the day moving, together.", "description": "A shared view of appointments, handoffs and follow-up tasks helps illustrate the operational side of care.", "screenTitle": "Your team workspace", "screenSubtitle": "Make the next handoff easier to follow.", "rows": [{ "label": "Appointment queue", "value": "Primary care visits", "meta": "Example schedule" }, { "label": "Team handoff", "value": "Visit preparation", "meta": "Ready for review" }, { "label": "Follow-up task", "value": "Coordinate the next visit", "meta": "Illustrative task" }], "note": "The details that connect one person’s work to another’s." }
+    ]
+  },
+  "engineering": {
+    "eyebrow": "Behind the experience",
+    "title": "The interface is the beginning.\nThe engineering goes deeper.",
+    "description": "MediConnect’s source brings together role-based applications, backend services and infrastructure as code. The public site is a lightweight showcase; the larger architecture is retained for technical review.",
+    "items": [
+      { "number": "01", "title": "Role-aware applications", "body": "Patient, clinician, staff and administrator interfaces, with protected routes in the application source.", "status": "Source retained" },
+      { "number": "02", "title": "Connected service design", "body": "Appointment, record, communication and AI integrations are preserved. They are not activated by this demo.", "status": "Services inactive" },
+      { "number": "03", "title": "Infrastructure as evidence", "body": "Kubernetes, Terraform and CI/CD definitions remain available in the project, alongside retired Aurora/RDS and Secrets Manager integrations.", "status": "Cloud resources retired" }
+    ],
+    "note": "Architecture and security controls are implementation work, not a claim of regulatory certification."
+  },
+  "faq": {
+    "eyebrow": "A clear picture",
+    "title": "What you’re exploring.",
+    "items": [
+      { "question": "Can I book a real appointment?", "answer": "No. This deployment is an interactive portfolio, not an operating healthcare service. Booking, authentication, payments, video calls and AI services are not available here." },
+      { "question": "Is the patient information real?", "answer": "No. Names, dates and records in these previews are fictional examples. Please do not enter personal, medical or payment information into this showcase." },
+      { "question": "What happened to the cloud infrastructure?", "answer": "Costly cloud resources were intentionally retired. Their code is preserved as engineering evidence, including Kubernetes, CI/CD, Aurora/RDS and Secrets Manager integrations." },
+      { "question": "Does the preview send anything to a backend?", "answer": "The care-stage and role previews use local interface state only. They do not create appointments, store patient records, call AI services or charge payments." }
+    ]
+  },
+  "closing": { "eyebrow": "From first hello to what’s next", "title": "See the whole care journey.", "description": "Three perspectives. One connected idea. Take a closer look at the workspace.", "action": "Take another look" },
+  "footer": { "description": "A connected care concept, built to be explored.", "status": "Portfolio showcase · Backend services inactive", "note": "Not a healthcare service or medical advice.", "back": "Back to top" },
+  "ui": { "skip": "Skip to content", "openMenu": "Open navigation", "closeMenu": "Close navigation", "navLabel": "Main navigation", "stepsLabel": "Choose a care stage", "rolesLabel": "Workspace perspective", "previewLabel": "Preview", "noteLabel": "The idea", "detailsLabel": "Visit details", "careLabel": "Your care, connected", "reset": "Reset preview" }
+}

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { getCurrentUser } from 'aws-amplify/auth';
+import { getCurrentUser, signOut } from 'aws-amplify/auth';
 import {
   Send,
   Brain,
@@ -20,13 +20,12 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { api } from "@/lib/api";
-import { getUser, setUser as setStoredUser } from "@/lib/secure-storage";
+import { getUser, setUser as setStoredUser, clearAllSensitive } from "@/lib/secure-storage";
+import { parseSymptomResponse } from "@/lib/symptom-response";
+import { symptomContent as safety } from "@/lib/symptom-content";
+import { symptomRouting } from "@/config/env";
 
-// --- DEMO FALLBACK DATA (For when AWS Limit is Reached) ---
-const DEMO_TEXT_RESPONSE = {
-  risk: "Low",
-  reason: "[DEMO MODE] The AI service is currently busy (Daily Quota Reached). Based on standard protocols, mild symptoms usually require rest and hydration. Please consult a doctor if symptoms persist."
-};
+// Only the explicit available response contract may produce an assessment.
 
 
 
@@ -34,6 +33,11 @@ export default function SymptomChecker() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const scrollRef = useRef<HTMLDivElement>(null);
+  const sessionClosed = useRef(false);
+  const mounted = useRef(false);
+  const pendingAssessment = useRef<AbortController | null>(null);
+  const pendingProfile = useRef<AbortController | null>(null);
+  const logoutPending = useRef(false);
 
   // --- STATE ---
   const [user, setUser] = useState<any>(() => {
@@ -41,28 +45,35 @@ export default function SymptomChecker() {
     // ORIGINAL: const saved = localStorage.getItem('user'); return saved ? JSON.parse(saved) : ...
     try {
       const saved = getUser();
-      return saved || { name: "Patient", id: "guest", avatar: null };
-    } catch (e) { return { name: "Patient", id: "guest", avatar: null }; }
+      return saved || { name: safety.defaultUserName, id: "guest", avatar: null };
+    } catch (e) { return { name: safety.defaultUserName, id: "guest", avatar: null }; }
   });
   const [messages, setMessages] = useState<any[]>([
     {
       id: "welcome",
       role: "assistant",
-      content: "Hello. I am your AI Health Assistant. Describe your symptoms briefly, and I will assess the risk level."
+      content: safety.welcome
     }
   ]);
   const [inputValue, setInputValue] = useState("");
-  const [isLoading, setIsLoading] = useState(false); // For Text
+  const [isLoading, setIsLoading] = useState(false);
+  const [isSessionClosed, setIsSessionClosed] = useState(false);
 
   // --- 1. AUTH & PROFILE LOAD ---
   useEffect(() => {
+    mounted.current = true;
+    const profileController = new AbortController();
+    pendingProfile.current = profileController;
     async function fetchProfile() {
       try {
         const authUser = await getCurrentUser();
-        const profile: any = await api.get(`/register-patient?id=${authUser.userId}`);
+        if (profileController.signal.aborted || sessionClosed.current) return;
+        const query = new URLSearchParams({ id: authUser.userId });
+        const profile: any = await api.get(`${symptomRouting.profile}?${query}`, { signal: profileController.signal });
+        if (profileController.signal.aborted || sessionClosed.current) return;
 
         const userData = {
-          name: profile.name || "Patient",
+          name: profile.name || safety.defaultUserName,
           id: authUser.userId,
           avatar: profile.avatar
         };
@@ -74,10 +85,15 @@ export default function SymptomChecker() {
         const currentLocal = getUser() || {};
         setStoredUser({ ...currentLocal, ...userData });
       } catch (err) {
-        console.warn("Auth load failed, using guest mode");
+        // A missing profile never establishes a verified identity or assessment.
       }
     }
     fetchProfile();
+    return () => {
+      mounted.current = false;
+      profileController.abort();
+      pendingAssessment.current?.abort();
+    };
   }, []);
 
   // Auto-scroll to bottom of chat
@@ -101,12 +117,15 @@ export default function SymptomChecker() {
     const r = risk?.toLowerCase() || "";
     if (r.includes("high") || r.includes("critical")) return "text-red-600 bg-red-50 border-red-200";
     if (r.includes("medium")) return "text-orange-600 bg-orange-50 border-orange-200";
-    return "text-green-600 bg-green-50 border-green-200";
+    if (r === "low") return "text-green-600 bg-green-50 border-green-200";
+    return "text-muted-foreground bg-muted border-border";
   };
 
   // --- 2. TEXT SYMPTOM CHECKER LOGIC ---
   const handleSend = async () => {
-    if (!inputValue.trim()) return;
+    if (!inputValue.trim() || pendingAssessment.current || sessionClosed.current || !mounted.current) return;
+    const controller = new AbortController();
+    pendingAssessment.current = controller;
 
     const userText = inputValue;
     setInputValue("");
@@ -118,26 +137,14 @@ export default function SymptomChecker() {
 
     try {
       // API CALL
-      const data: any = await api.post('/ai/symptoms', {
+      const raw = await api.post(symptomRouting.assessment, {
         text: userText
-      });
-
-      let aiContent = "";
-      let riskLevel = "Unknown";
-
-      // 1. FIX: Check for 'risk_analysis' (from Lambda) OR 'assessment' (old way)
-      const result = data.analysis;
-
-      if (result && result.risk !== "Error") {
-        riskLevel = result.risk;
-
-        // 2. VIDEO FEATURE: Show which Cloud provided the answer
-        const providerName = data.provider || "AWS Bedrock";
-        aiContent = `[System: ${providerName}]\n\nRisk: ${riskLevel}\n${result.reason}`;
-
-      } else {
-        throw new Error("AI Service Limit");
-      }
+      }, { signal: controller.signal });
+      if (controller.signal.aborted || sessionClosed.current) return;
+      const data = parseSymptomResponse(raw);
+      const riskLevel = data.analysis.risk;
+      const providerLabel = data.provider ? `[System: ${data.provider}]\n\n` : '';
+      const aiContent = `${providerLabel}Risk: ${riskLevel}\n${data.analysis.reason}`;
 
       // Add AI Response
       setMessages((prev) => [
@@ -151,46 +158,64 @@ export default function SymptomChecker() {
           {
             id: (Date.now() + 2).toString(),
             role: "assistant",
-            content: "Your official clinical report is ready.",
+            content: safety.reportLabel,
             pdfData: data.pdfBase64 // Store it in the message
           }
         ]);
       }
 
-    } catch (error) {
-      console.warn("AI Error, switching to Demo Mode:", error);
+    } catch {
+      if (controller.signal.aborted || sessionClosed.current) return;
       toast({
-        title: "System Busy",
-        description: "AWS Daily Limit reached. Showing simulated response.",
-        variant: "default",
+        title: safety.unavailableTitle,
+        description: safety.unavailable,
+        variant: "destructive",
       });
 
-      // DEMO MODE FALLBACK
+      // An outage is not evidence of low clinical risk.
       setMessages((prev) => [
         ...prev,
         {
           id: (Date.now() + 1).toString(),
           role: "assistant",
-          content: `Risk Assessment: ${DEMO_TEXT_RESPONSE.risk}\n\n${DEMO_TEXT_RESPONSE.reason}`,
-          risk: DEMO_TEXT_RESPONSE.risk
+          content: safety.unavailable
         }
       ]);
     } finally {
-      setIsLoading(false);
+      if (pendingAssessment.current === controller) pendingAssessment.current = null;
+      if (!controller.signal.aborted && !sessionClosed.current) setIsLoading(false);
     }
   };
 
 
 
   const handleLogout = async () => {
-    navigate("/");
+    if (logoutPending.current || !mounted.current) return;
+    logoutPending.current = true;
+    sessionClosed.current = true;
+    pendingAssessment.current?.abort();
+    pendingProfile.current?.abort();
+    setIsSessionClosed(true);
+    setIsLoading(false);
+    setMessages([]);
+    setInputValue("");
+    setUser({ name: safety.defaultUserName, id: "guest", avatar: null });
+    clearAllSensitive();
+    try {
+      await signOut();
+      if (mounted.current) navigate(symptomRouting.auth, { replace: true });
+    } catch {
+      if (mounted.current) toast({ title: safety.logoutFailed, variant: "destructive" });
+    } finally {
+      logoutPending.current = false;
+    }
   };
 
   // --- RENDER ---
   return (
     <DashboardLayout
-      title="AI Health Assistant"
-      subtitle="Symptom Checker"
+      title={safety.pageTitle}
+      subtitle={safety.title}
       userRole="patient"
       userName={user.name}
       userAvatar={user.avatar}
@@ -206,13 +231,12 @@ export default function SymptomChecker() {
                 <Brain className="h-5 w-5 text-white" />
               </div>
               <div>
-                <CardTitle className="text-lg">Symptom Checker</CardTitle>
-                <p className="text-xs text-muted-foreground">Powered by Claude 3 (Bedrock)</p>
+                <CardTitle className="text-lg">{safety.title}</CardTitle>
+                <p className="text-sm text-muted-foreground">{safety.serviceLabel}</p>
               </div>
             </div>
-            <Badge variant="outline" className="text-green-600 bg-green-50 border-green-200">
-              <span className="h-2 w-2 rounded-full bg-green-500 mr-1.5 animate-pulse" />
-              Active
+            <Badge variant="outline">
+              {safety.unverifiedStatus}
             </Badge>
           </CardHeader>
 
@@ -260,7 +284,7 @@ export default function SymptomChecker() {
                           link.click();
                         }}
                       >
-                        Download Clinical PDF
+                        {safety.downloadLabel}
                       </Button>
                     )}
                   </div>
@@ -273,7 +297,7 @@ export default function SymptomChecker() {
                   <Avatar className="h-8 w-8"><AvatarFallback><Sparkles className="h-4 w-4 text-primary" /></AvatarFallback></Avatar>
                   <div className="bg-white border px-4 py-3 rounded-2xl rounded-tl-none shadow-sm flex items-center gap-2">
                     <Loader2 className="h-4 w-4 animate-spin text-primary" />
-                    <span className="text-xs text-muted-foreground">Analyzing symptoms...</span>
+                    <span className="text-xs text-muted-foreground">{safety.loadingLabel}</span>
                   </div>
                 </div>
               )}
@@ -285,14 +309,15 @@ export default function SymptomChecker() {
           <div className="p-4 bg-white border-t">
             <div className="flex gap-3">
               <Input
-                placeholder="Ex: I have a severe headache and sensitivity to light..."
+                placeholder={safety.placeholder}
+                aria-label={safety.inputLabel}
                 value={inputValue}
                 onChange={(e) => setInputValue(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && !isLoading && handleSend()}
                 className="flex-1"
-                disabled={isLoading}
+                disabled={isLoading || isSessionClosed}
               />
-              <Button onClick={handleSend} disabled={isLoading || !inputValue.trim()} className="bg-primary hover:bg-primary/90">
+              <Button aria-label={safety.sendLabel} onClick={handleSend} disabled={isLoading || isSessionClosed || !inputValue.trim()} className="bg-primary hover:bg-primary/90">
                 {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
               </Button>
             </div>

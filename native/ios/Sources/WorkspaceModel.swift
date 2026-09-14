@@ -1,0 +1,246 @@
+import Amplify
+import Combine
+import Foundation
+import SwiftUI
+
+@MainActor
+final class WorkspaceModel: ObservableObject {
+    @Published private(set) var identity: Identity?
+    @Published private(set) var appointments: [Appointment] = []
+    @Published private(set) var next: String?
+    @Published private(set) var busy = false
+    @Published private(set) var message: String?
+    @Published private(set) var challenge = false
+    @Published private(set) var challengeInput: ChallengeInput = .code
+    @Published private(set) var challengeChoices: [MFAType] = []
+    @Published private(set) var authenticatorSetup: AuthenticatorSetup?
+    @Published private(set) var visible = true
+    let residency: String
+    let content: MobileContent?
+    let policies: MobilePolicies?
+    let registration: AccountRegistration
+    let cancellation: AppointmentCancellation
+    let recovery: PasswordRecovery
+    let profile: ProfileEnrollment
+    let settings: PatientSettingsEditor?
+    private var profileObservation: AnyCancellable?
+    private let auth: WorkspaceSession?
+    private let api: WorkspaceAppointments?
+    private let signInLatch: ExplicitSignInLatch
+    private(set) var operation: Task<Void, Never>?
+    private var expiry: Task<Void, Never>?
+    private var generation = 0
+    var configured: Bool { auth != nil && api != nil }
+
+    // A non-sensitive logout latch. Credentials remain managed by Amplify/Keychain.
+    private var requiresExplicitSignIn: Bool {
+        get { signInLatch.required }
+        set { signInLatch.required = newValue }
+    }
+
+    convenience init() {
+        let residency = Bundle.main.object(forInfoDictionaryKey: "MediConnectResidency") as? String ?? ""
+        let content = try? MobileContent(data: BundledAssets.data("mobile-content"))
+        let policies = try? MobilePolicies(legal: BundledAssets.data("legal"), consent: BundledAssets.data("consent"))
+        var auth: WorkspaceSession?
+        var api: WorkspaceAppointments?
+        var profileService: ProfileAPI?
+        var settingsEditor: PatientSettingsEditor?
+        var cancellationService: AppointmentCancellationAPI?
+        var cancellationPolicy: CancellationContract?
+        do {
+            let config = try MobileConfiguration(data: BundledAssets.data("mobile-config"), residency: residency)
+            let contract = try MobileContract(data: BundledAssets.data("mobile-contract"), policy: BundledAssets.data("session-policy"))
+            let session = try CognitoSession(config: config, contract: contract)
+            auth = session
+            profileService = ProfileAPI(transport: NativeAPI(config: config), contract: contract, fetch: { try await session.fetch() })
+            settingsEditor = PatientSettingsEditor(service: PatientSettingsAPI(transport: NativeAPI(config: config),
+                contract: contract, fetch: { try await session.fetch() }), maxNameLength: contract.patientSettings.maxNameLength)
+            let appointments = AppointmentsAPI(config: config, contract: contract)
+            api = appointments
+            cancellationService = AppointmentCancellationAPI(appointments: appointments, transport: NativeAPI(config: config), contract: contract, fetch: { try await session.fetch() })
+            cancellationPolicy = contract.cancellation
+        } catch { auth = nil; api = nil }
+        self.init(residency: residency, content: content, policies: policies, auth: auth, api: api,
+                  profileService: profileService, cancellationService: cancellationService,
+                  cancellationPolicy: cancellationPolicy, signInLatch: StoredSignInLatch(defaults: .standard), settings: settingsEditor)
+    }
+
+    // Tests inject services into the same production model without configuring the SDK.
+    init(residency: String, content: MobileContent?, policies: MobilePolicies?, auth: WorkspaceSession?,
+         api: WorkspaceAppointments?, profileService: ProfileService?, cancellationService: CancellationService?,
+         cancellationPolicy: CancellationContract?, signInLatch: ExplicitSignInLatch, settings: PatientSettingsEditor? = nil) {
+        self.residency = residency; self.content = content; self.policies = policies
+        self.auth = auth; self.api = api; self.signInLatch = signInLatch; self.settings = settings
+        cancellation = AppointmentCancellation(service: cancellationService, policy: cancellationPolicy)
+        profile = ProfileEnrollment(service: profileService, policyVersion: policies?.policyVersion ?? "")
+        recovery = PasswordRecovery(service: auth)
+        registration = AccountRegistration(service: policies == nil ? nil : auth)
+        profileObservation = profile.$state.filter { $0.step == .ready }.sink { [weak self] value in
+            Task { @MainActor [weak self] in
+                guard let self, value.profile?.subject == identity?.subject, profile.state.step == .ready else { return }
+                refresh()
+            }
+        }
+    }
+
+    private func clear(visible: Bool = true) {
+        cancellation.close(clearSession: true)
+        profile.close()
+        settings?.close()
+        generation += 1
+        operation?.cancel()
+        expiry?.cancel()
+        identity = nil
+        appointments = []
+        next = nil
+        busy = false
+        challenge = false
+        challengeInput = .code
+        challengeChoices = []
+        authenticatorSetup = nil
+        message = nil
+        self.visible = visible
+    }
+    func hide() {
+        registration.close(); recovery.close()
+        if SignInChallenge.retainForAuthenticator(challenge: challenge, input: challengeInput, setup: authenticatorSetup, busy: busy, authenticated: identity != nil) {
+            generation += 1; operation?.cancel(); visible = false
+        } else { clear(visible: false) }
+    }
+    func openRegistration() {
+        guard configured, policies != nil else { return }
+        requiresExplicitSignIn = true
+        recovery.close(); clear(); registration.open()
+    }
+    func openRecovery() {
+        registration.close()
+        guard configured else { return }
+        requiresExplicitSignIn = true
+        clear()
+        recovery.open()
+    }
+    func resume() {
+        guard recovery.state.step == .closed, registration.state.step == .closed else { return }
+        visible = true
+        guard !busy, identity == nil, !requiresExplicitSignIn, let auth else { return }
+        run(message: "sessionExpired") { [weak self] in
+            let access = try await auth.fetch()
+            try Task.checkCancellation()
+            try await self?.accept(access)
+        }
+    }
+    func signIn(email: String, password: String) {
+        guard !busy, !email.isEmpty, !password.isEmpty, let auth else { return }
+        requiresExplicitSignIn = true
+        run(message: "signInFailed") { [weak self] in
+            await auth.signOut()
+            try Task.checkCancellation()
+            let result = try await auth.signIn(email: email.trimmingCharacters(in: .whitespacesAndNewlines), password: password)
+            try Task.checkCancellation()
+            if case .confirmSignUp = result.nextStep { self?.registration.resumeConfirmation(email) }
+            else { try await self?.complete(result) }
+        }
+    }
+    func confirm(code: String) {
+        guard !busy, challenge, let auth else { return }
+        let selected = challengeChoices.isEmpty ? SignInChallenge.response(challengeInput, value: code)
+            : SignInChallenge.selectionResponse(challengeChoices, value: code)
+        guard let response = selected else { return }
+        run(message: "signInFailed") { [weak self] in
+            let result = try await auth.confirm(code: response)
+            try Task.checkCancellation()
+            try await self?.complete(result)
+        }
+    }
+    private func complete(_ result: AuthSignInResult) async throws {
+        guard let auth else { throw MobileFailure.configuration }
+        if result.isSignedIn {
+            let access = try await auth.fetch()
+            try Task.checkCancellation()
+            requiresExplicitSignIn = false
+            try await accept(access)
+        } else {
+            authenticatorSetup = AuthenticatorSetup.fromSDK(result.nextStep)
+            var input = SignInChallenge.input(result.nextStep)
+            if input == .totpSetup && authenticatorSetup == nil { input = nil }
+            challengeChoices = SignInChallenge.choices(result.nextStep)
+            challenge = input != nil || !challengeChoices.isEmpty
+            challengeInput = input ?? .code
+            message = challenge ? nil : "additionalStep"
+        }
+    }
+    private func accept(_ access: SessionAccess) async throws {
+        try Task.checkCancellation()
+        settings?.close()
+        identity = access.identity
+        challenge = false
+        challengeChoices = []
+        authenticatorSetup = nil
+        expiry?.cancel()
+        let expiresAt = access.identity.expiresAt
+        expiry = Task { [weak self] in
+            do { try await Task.sleep(until: .now + .seconds(max(0, expiresAt.timeIntervalSinceNow)), clock: .continuous) }
+            catch { return }
+            self?.clear()
+            self?.message = "sessionExpired"
+        }
+        profile.open(access.identity)
+    }
+    func refresh(more: Bool = false) {
+        guard !busy, profile.state.step == .ready, let identity, let auth, let api, !more || next != nil else { return }
+        let cursor = more ? next : nil
+        let previous = more ? appointments : []
+        run(message: "unavailable") { [weak self] in
+            let access = try await auth.fetch()
+            try Task.checkCancellation()
+            guard access.identity.subject == identity.subject, access.identity.role == identity.role else { throw MobileFailure.session }
+            let page = try await api.load(access: access, cursor: cursor)
+            try Task.checkCancellation()
+            var ids = Set<String>()
+            self?.appointments = (previous + page.items).filter { ids.insert($0.id).inserted }
+            self?.next = page.next
+        }
+    }
+    func openSettings() {
+        guard visible, !busy, profile.state.step == .ready, let identity, identity.role == .patient else { return }
+        settings?.open(identity)
+    }
+    func openCancellation(_ appointment: Appointment) {
+        guard !busy, profile.state.step == .ready, let identity, appointments.contains(where: { $0.id == appointment.id }) else { return }
+        cancellation.open(identity, appointment: appointment)
+    }
+    func closeCancellation() {
+        let confirmed = cancellation.state.step == .confirmed
+        cancellation.close()
+        if confirmed { refresh() }
+    }
+    func signOut() {
+        registration.close()
+        recovery.close()
+        requiresExplicitSignIn = true
+        clear()
+        guard let auth else { return }
+        run(message: "signInFailed") { await auth.signOut() }
+    }
+    private func run(message: String, block: @escaping @MainActor () async throws -> Void) {
+        operation?.cancel()
+        generation += 1
+        let current = generation
+        busy = true
+        self.message = nil
+        operation = Task { [weak self] in
+            do { try await block() }
+            catch is CancellationError { return }
+            catch {
+                guard let self, current == generation, !Task.isCancelled else { return }
+                if (error as? HTTPFailure)?.status == 401 {
+                    clear()
+                    self.message = "sessionExpired"
+                } else if (error as? HTTPFailure)?.status == 403 { self.message = "accessDenied" }
+                else { self.message = identity == nil ? message : "unavailable" }
+            }
+            if let self, current == generation { busy = false }
+        }
+    }
+}

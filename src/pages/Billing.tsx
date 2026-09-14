@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { fetchUserAttributes, fetchAuthSession, signOut } from 'aws-amplify/auth';
 import {
@@ -19,6 +19,8 @@ import { cn } from "@/lib/utils";
 
 import { useCheckout } from "@/context/CheckoutContext";
 import { api } from "@/lib/api";
+import { usePaymentLifetime } from "@/hooks/use-payment-lifetime";
+import paymentCopy from "@/content/payment";
 import { getUser, setUser as setStoredUser, clearAllSensitive } from "@/lib/secure-storage";
 
 export default function Billing() {
@@ -28,7 +30,9 @@ export default function Billing() {
 function BillingContent() {
     const navigate = useNavigate();
     const { toast } = useToast();
-    const { requestPayment, stripe } = useCheckout();
+    const { requestPayment } = useCheckout();
+    const lifetime = usePaymentLifetime();
+    const paying = useRef(false);
 
     // --- STATE ---
     const [userProfile, setUserProfile] = useState(() => {
@@ -58,6 +62,8 @@ function BillingContent() {
 
     // --- MAIN DATA FETCH ---
     async function loadFreshData() {
+        const signal = lifetime.current.signal;
+        if (signal.aborted) return;
         try {
             setLoadingBilling(true);
             const token = await getAuthToken();
@@ -71,6 +77,8 @@ function BillingContent() {
                 // 2. BILLING: Fetch transaction history
                 api.get(`/billing?patientId=${userId}`)
             ]);
+
+            if (signal.aborted) return;
 
             // 1. Update Profile (if needed)
             if (profileRes.status === "fulfilled") {
@@ -103,7 +111,7 @@ function BillingContent() {
             }
 
         } catch (e: any) {
-    console.error("Auth/Load Error", e);
+    if (signal.aborted) return;
     const msg = e?.message || String(e);
     // Logic: Only logout if user is actually deleted/banned
     if (msg.includes('401')) {
@@ -116,7 +124,7 @@ function BillingContent() {
     toast({ variant: "destructive", title: "Error", description: msg });
 }
 } finally {
-    setLoadingBilling(false);
+    if (!signal.aborted) setLoadingBilling(false);
 }
     }
 
@@ -127,6 +135,8 @@ function BillingContent() {
 
     // --- HANDLERS ---
     const handleLogout = async () => {
+        lifetime.current.abort();
+        clearAllSensitive();
         try {
             await signOut();
             // ─── SECURE STORAGE FIX ───
@@ -134,14 +144,14 @@ function BillingContent() {
             clearAllSensitive();
             navigate("/auth");
         } catch (error) {
-            console.error("Error signing out:", error);
+            navigate("/auth", { replace: true });
         }
     };
 
     // 🟢 PROFESSIONAL PAYMENT HANDLER (FIFO Strategy)
     const handlePayBill = async () => {
-        if (!stripe) return;
-        if (!billingData?.transactions) return;
+        const signal = lifetime.current.signal;
+        if (!billingData?.transactions || paying.current || signal.aborted) return;
 
         // 1. Find the Oldest Unpaid Bill (FIFO)
         // This ensures patients pay off old debt before new debt
@@ -154,6 +164,7 @@ function BillingContent() {
             return;
         }
 
+        paying.current = true;
         setProcessingPayment(true);
 
         try {
@@ -164,6 +175,8 @@ function BillingContent() {
                 description: `Invoice #${billToPay.billId.slice(0, 8)}`
             });
 
+            if (signal.aborted) return;
+
             // STEP B: Create Payment Intent on Backend (Zero-Trust)
             // We send the Payment Method ID so backend can confirm it securely
             const paymentIntent: any = await api.post('/billing/pay', {
@@ -172,29 +185,34 @@ function BillingContent() {
                 paymentMethodId: paymentMethod.id // 🟢 CRITICAL: Pass the ID to controller
             });
 
-            // STEP C: Handle Success
-            if (paymentIntent.success || paymentIntent.status === 'succeeded') {
-                toast({
-                    title: "Payment Successful",
-                    description: `Transaction ${billToPay.billId.slice(0, 8)}... completed.`,
-                    className: "bg-green-50 border-green-200 text-green-900"
-                });
-
-                // 🟢 Auto-Refresh Data to show $0.00 Balance
-                await loadFreshData();
+            if (signal.aborted) return;
+            // HTTP success acknowledges processing; only an explicit status proves settlement.
+            const status = paymentIntent?.status;
+            if (status === 'succeeded') {
+                toast({ title: paymentCopy.succeededTitle, description: paymentCopy.succeededDescription });
+            } else if (status === 'processing' || status === 'requires_capture') {
+                toast({ title: paymentCopy.processingTitle, description: paymentCopy.processingDescription });
+            } else if (status === 'requires_action' || status === 'requires_confirmation') {
+                toast({ title: paymentCopy.actionTitle, description: paymentCopy.actionDescription });
+            } else if (status === 'requires_payment_method' || status === 'canceled') {
+                toast({ title: paymentCopy.failedTitle, description: paymentCopy.failedDescription, variant: 'destructive' });
+            } else {
+                toast({ title: paymentCopy.unknownTitle, description: paymentCopy.unknownDescription, variant: 'destructive' });
             }
+            await loadFreshData();
 
         } catch (e: any) {
+            if (signal.aborted || e.message === "PAYMENT_UI_CLOSED") return;
             if (e.message !== "User cancelled payment") {
-                console.error("Payment Error:", e);
                 toast({
                     variant: "destructive",
-                    title: "Payment Failed",
-                    description: e.message || "Please check your card details and try again."
+                    title: e.code === "OUTCOME_UNKNOWN" ? paymentCopy.unknownTitle : paymentCopy.failedTitle,
+                    description: e.code === "OUTCOME_UNKNOWN" ? paymentCopy.unknownDescription : paymentCopy.failedDescription
                 });
             }
         } finally {
-            setProcessingPayment(false);
+            paying.current = false;
+            if (!signal.aborted) setProcessingPayment(false);
         }
     };
 

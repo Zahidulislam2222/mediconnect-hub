@@ -1,0 +1,48 @@
+{
+  "plans": [
+    {
+      "id": "free",
+      "name": "Free",
+      "price": 0,
+      "discountPercent": 0,
+      "features": [
+        "Pay-per-visit at full rate",
+        "Access to all doctors",
+        "Secure video consultations",
+        "FHIR health records"
+      ]
+    },
+    {
+      "id": "plus",
+      "name": "MediConnect Plus",
+      "price": 19,
+      "discountPercent": 20,
+      "highlighted": true,
+      "features": [
+        "{discountPercent}% discount on all visits",
+        "Priority booking (24h early access)",
+        "Chat follow-ups with doctors",
+        "Access to all doctors",
+        "Secure video consultations",
+        "FHIR health records"
+      ]
+    },
+    {
+      "id": "premium",
+      "name": "MediConnect Premium",
+      "price": 39,
+      "discountPercent": 30,
+      "features": [
+        "{discountPercent}% discount on all visits",
+        "1 free GP visit per month",
+        "Family sharing (up to 4 members)",
+        "Priority booking (24h early access)",
+        "Chat follow-ups with doctors",
+        "Access to all specialists",
+        "Secure video consultations",
+        "FHIR health records"
+      ]
+    }
+  ],
+  "unknownPlanName": "Unknown plan"
+}

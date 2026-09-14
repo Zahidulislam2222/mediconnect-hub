@@ -1,0 +1,8 @@
+mediconnect.zahidul-islam.com {
+    header Cache-Control "no-store"
+    # This hostname publishes the static showcase; external backend integrations
+    # remain retained in source and are not activated by this release.
+    header Content-Security-Policy "connect-src 'self'; frame-src 'none'; form-action 'self'; object-src 'none'; base-uri 'self'"
+    reverse_proxy 127.0.0.1:18082
+    log
+}

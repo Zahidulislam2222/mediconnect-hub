@@ -1,0 +1,68 @@
+name: Security verification
+
+on:
+  push:
+    branches: [main, master, 'fix/security-ci-*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  scan:
+    # Standard hosted runners are free for this public repository.
+    # Re-check billing eligibility before running in a private repository.
+    if: github.event.repository.private == false
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        gate: [current-secrets, history-secrets, semgrep, bandit]
+    name: ${{ matrix.gate }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Install verified scanner versions
+        shell: bash
+        run: |
+          python3 -m venv "$RUNNER_TEMP/security-tools"
+          "$RUNNER_TEMP/security-tools/bin/python" - <<'PY'
+          import hashlib
+          import io
+          import json
+          import os
+          from pathlib import Path
+          import subprocess
+          import sys
+          import tarfile
+          import urllib.request
+
+          config = json.loads(Path('.github/security-tools.json').read_text())
+          subprocess.run([sys.executable, '-m', 'pip', 'install',
+                          'semgrep==' + config['semgrep_version'],
+                          'bandit==' + config['bandit_version']], check=True)
+          with urllib.request.urlopen(config['gitleaks_linux_archive'], timeout=60) as response:
+              archive = response.read()
+          if hashlib.sha256(archive).hexdigest() != config['gitleaks_linux_sha256']:
+              raise SystemExit('Gitleaks checksum mismatch')
+          with tarfile.open(fileobj=io.BytesIO(archive), mode='r:gz') as bundle:
+              member = bundle.getmember('gitleaks')
+              if not member.isfile():
+                  raise SystemExit('Gitleaks archive entry must be a regular file')
+              binary = Path(sys.executable).parent / 'gitleaks'
+              binary.write_bytes(bundle.extractfile(member).read())
+              binary.chmod(0o755)
+          with open(os.environ['GITHUB_PATH'], 'a', encoding='utf-8') as path_file:
+              path_file.write(str(Path(sys.executable).parent) + '\n')
+          PY
+      - name: Verify scanner failure and output handling
+        run: python3 -m unittest discover -s .github/scripts/tests -v
+      - name: Run ${{ matrix.gate }}
+        run: python3 .github/scripts/security_scan.py '${{ matrix.gate }}'
+
+# Paid API review is intentionally disabled. Enabling it requires separate
+# explicit cost approval; this workflow uses no model API or repository secrets.

@@ -1,4 +1,5 @@
-import { useState, useEffect, useMemo, useRef } from "react";
+import { emptyVitals, clinicalNumber, parseMeasuredVitals, ageFromBirthDate, completeVitals } from '@/lib/clinical-inputs';
+import { useState, useEffect, useLayoutEffect, useCallback, useMemo, useRef } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { getCurrentUser, signOut, fetchAuthSession } from 'aws-amplify/auth';
 import {
@@ -45,12 +46,10 @@ export default function PatientRecords() {
     // AI Prediction State
     const [isAnalyzing, setIsAnalyzing] = useState(false);
     const [predictionResult, setPredictionResult] = useState<any>(null);
-    const [vitals, setVitals] = useState({
-        temp: 98.6,
-        heartRate: 72,
-        bpSys: 120,
-        age: 0 // Will be updated from real DOB
-    });
+    const [vitals, setVitals] = useState(emptyVitals);
+    const detailsVersion = useRef(0);
+    const selectedIdRef = useRef(selectedPatientId);
+    selectedIdRef.current = selectedPatientId;
     const [records, setRecords] = useState<any[]>([]);
     const [isUploading, setIsUploading] = useState(false);
     const vaultInputRef = useRef<HTMLInputElement>(null);
@@ -139,56 +138,47 @@ export default function PatientRecords() {
         }
     };
 
-    // --- 2. SELECT PATIENT LOGIC ---
-    useEffect(() => {
+    const loadPatientDetails = useCallback(async (pid: string) => {
+        if (selectedIdRef.current !== pid) return;
+        const version = ++detailsVersion.current;
+        const current = () => version === detailsVersion.current && selectedIdRef.current === pid;
+        const [profile, documents, measurements] = await Promise.allSettled([
+            api.get(`/register-patient?id=${encodeURIComponent(pid)}`),
+            api.post('/ehr', { action: 'list_records', patientId: pid }),
+            api.get(`/vitals?patientId=${encodeURIComponent(pid)}`),
+        ]);
+        if (!current()) return;
+        const patient = profile.status === 'fulfilled' ? profile.value : null;
+        const files = documents.status === 'fulfilled' && Array.isArray(documents.value) ? documents.value : [];
+        const data = measurements.status === 'fulfilled' ? measurements.value : null;
+        setSelectedPatientProfile(patient);
+        setRecords([...files].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
+        setVitals({ ...parseMeasuredVitals(data?.vitals), age: ageFromBirthDate(patient?.dob) });
+    }, []);
+
+    // Invalidate old patient work before the newly selected patient is painted.
+    useLayoutEffect(() => {
+        detailsVersion.current++;
+        setSelectedPatientProfile(null);
+        setRecords([]);
+        setVitals(emptyVitals());
+        setPredictionResult(null);
+        setIsAnalyzing(false);
+        setNoteText('');
+        setNoteTitle('');
+        setSelectedNote(null);
+        setIsModalOpen(false);
         if (selectedPatientId) {
-            setSearchParams({ patientId: selectedPatientId });
-            setPredictionResult(null);
-            loadPatientDetails(selectedPatientId);
+            void loadPatientDetails(selectedPatientId);
         }
-    }, [selectedPatientId]);
+        return () => { detailsVersion.current++; };
+    }, [selectedPatientId, loadPatientDetails]);
 
-    const loadPatientDetails = async (pid: string) => {
-        try {
-            // 1. Fetch Profile (Existing Logic)
-            const res: any = await api.get(`/register-patient?id=${pid}`);
-            if (res) {
-                const profile = res;
-                setSelectedPatientProfile(profile);
-                if (profile.dob) {
-                    const dobYear = new Date(profile.dob).getFullYear();
-                    const currentYear = new Date().getFullYear();
-                    setVitals(prev => ({ ...prev, age: currentYear - dobYear }));
-                }
-            }
-
-            // 🟢 2. ADDED: Fetch Document Vault Records
-            const ehrRes: any = await api.post('/ehr', {
-                action: "list_records",
-                patientId: pid
-            });
-            if (ehrRes) {
-                const data = ehrRes;
-                const sorted = Array.isArray(data) ? data.sort((a: any, b: any) =>
-                    new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-                ) : [];
-                setRecords(sorted);
-            }
-
-        } catch (e) { console.error("Patient Detail Error", e); }
-        // 🟢 Fetch real-time vitals for the AI
-        try {
-            const vitalsRes: any = await api.get(`/vitals?patientId=${pid}`);
-            if (vitalsRes && vitalsRes.vitals) {
-                setVitals({
-                    temp: parseFloat(vitalsRes.vitals.temperature) || 98.6,
-                    heartRate: vitalsRes.vitals.heartRate || 72,
-                    bpSys: vitalsRes.vitals.bloodPressureSys || 120,
-                    age: vitals.age
-                });
-            }
-        } catch (e) { console.warn("Vitals not found for patient"); }
-    };
+    useEffect(() => {
+        if (selectedPatientId && searchParams.get('patientId') !== selectedPatientId) {
+            setSearchParams({ patientId: selectedPatientId });
+        }
+    }, [selectedPatientId, searchParams, setSearchParams]);
 
     const handleLogout = async () => {
         await signOut();
@@ -242,7 +232,9 @@ export default function PatientRecords() {
 
     // --- 5. AI PREDICTION LOGIC (Real Inputs) ---
     const handleRunPrediction = async (modelType: string) => {
-        if (!selectedPatientId) return;
+        if (!selectedPatientId || isAnalyzing || !completeVitals(vitals)) return;
+        const version = detailsVersion.current;
+        const current = () => version === detailsVersion.current;
         setIsAnalyzing(true);
         setPredictionResult(null);
 
@@ -266,9 +258,10 @@ export default function PatientRecords() {
             };
 
             const res: any = await api.post('/ai/predict', payload);
+            if (!current()) return;
 
             if (res && res.analysis) {
-                // 🟢 Map the new FHIR-compliant response to your UI
+                // 🟢 Map the provider response; FHIR conformance is a separate validation gate
                 const data = {
                     modelType: res.modelType || modelType,
                     confidence: res.analysis.riskScore / 100, // Converts 85 to 0.85
@@ -282,9 +275,10 @@ export default function PatientRecords() {
                 toast({ title: "Analysis Complete", description: `Ran ${modelType} model successfully.` });
             } else { throw new Error("Prediction API Failed"); }
         } catch (err) {
+            if (!current()) return;
             console.error(err);
             toast({ variant: "destructive", title: "AI Error", description: "Failed to run predictive model." });
-        } finally { setIsAnalyzing(false); }
+        } finally { if (current()) setIsAnalyzing(false); }
     };
 
     // --- HELPERS ---
@@ -708,8 +702,8 @@ export default function PatientRecords() {
                                                                 <Input
                                                                     type="number"
                                                                     className="pl-9"
-                                                                    value={vitals.temp}
-                                                                    onChange={(e) => setVitals({ ...vitals, temp: parseFloat(e.target.value) })}
+                                                                    value={vitals.temp ?? ""}
+                                                                    onChange={(e) => setVitals({ ...vitals, temp: clinicalNumber(e.target.value) })}
                                                                 />
                                                             </div>
                                                         </div>
@@ -720,8 +714,8 @@ export default function PatientRecords() {
                                                                 <Input
                                                                     type="number"
                                                                     className="pl-9"
-                                                                    value={vitals.heartRate}
-                                                                    onChange={(e) => setVitals({ ...vitals, heartRate: parseFloat(e.target.value) })}
+                                                                    value={vitals.heartRate ?? ""}
+                                                                    onChange={(e) => setVitals({ ...vitals, heartRate: clinicalNumber(e.target.value) })}
                                                                 />
                                                             </div>
                                                         </div>
@@ -732,8 +726,8 @@ export default function PatientRecords() {
                                                                 <Input
                                                                     type="number"
                                                                     className="pl-9"
-                                                                    value={vitals.bpSys}
-                                                                    onChange={(e) => setVitals({ ...vitals, bpSys: parseFloat(e.target.value) })}
+                                                                    value={vitals.bpSys ?? ""}
+                                                                    onChange={(e) => setVitals({ ...vitals, bpSys: clinicalNumber(e.target.value) })}
                                                                 />
                                                             </div>
                                                         </div>
@@ -744,8 +738,8 @@ export default function PatientRecords() {
                                                                 <Input
                                                                     type="number"
                                                                     className="pl-9"
-                                                                    value={vitals.age}
-                                                                    onChange={(e) => setVitals({ ...vitals, age: parseFloat(e.target.value) })}
+                                                                    value={vitals.age ?? ""}
+                                                                    onChange={(e) => setVitals({ ...vitals, age: clinicalNumber(e.target.value) })}
                                                                 />
                                                             </div>
                                                         </div>
@@ -758,7 +752,7 @@ export default function PatientRecords() {
                                                                 variant="outline"
                                                                 className="justify-start hover:border-red-300 hover:bg-red-50"
                                                                 onClick={() => handleRunPrediction("SEPSIS")}
-                                                                disabled={isAnalyzing}
+                                                                disabled={isAnalyzing || !completeVitals(vitals)}
                                                             >
                                                                 <AlertTriangle className="h-4 w-4 mr-2 text-red-500" />
                                                                 Check Sepsis Risk (Early Warning)
@@ -767,7 +761,7 @@ export default function PatientRecords() {
                                                                 variant="outline"
                                                                 className="justify-start hover:border-blue-300 hover:bg-blue-50"
                                                                 onClick={() => handleRunPrediction("READMISSION")}
-                                                                disabled={isAnalyzing}
+                                                                disabled={isAnalyzing || !completeVitals(vitals)}
                                                             >
                                                                 <TrendingUp className="h-4 w-4 mr-2 text-blue-500" />
                                                                 Predict 30-Day Readmission
@@ -776,7 +770,7 @@ export default function PatientRecords() {
                                                                 variant="outline"
                                                                 className="justify-start hover:border-orange-300 hover:bg-orange-50"
                                                                 onClick={() => handleRunPrediction("NO_SHOW")}
-                                                                disabled={isAnalyzing}
+                                                                disabled={isAnalyzing || !completeVitals(vitals)}
                                                             >
                                                                 <Clock className="h-4 w-4 mr-2 text-orange-500" />
                                                                 No-Show Probability
@@ -833,9 +827,9 @@ export default function PatientRecords() {
                                                     <div className="text-center p-10">
                                                         <Brain className="h-12 w-12 mx-auto mb-3 text-slate-300" />
                                                         <p className="font-medium text-slate-500">Clinical Decision Support</p>
-                                                        {vitals.heartRate === 72 && vitals.temp === 98.6 ? (
+                                                        {!completeVitals(vitals) ? (
                                                             <Badge variant="outline" className="mt-2 text-orange-500 border-orange-200">
-                                                                Waiting for Wearable Sync...
+                                                                Measurements incomplete
                                                             </Badge>
                                                         ) : (
                                                             <p className="text-xs text-slate-400">Vitals loaded. Select a model to run AI risk assessment.</p>

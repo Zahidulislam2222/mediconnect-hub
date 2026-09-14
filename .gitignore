@@ -97,6 +97,10 @@ Thumbs.db
 # Build output
 dist
 dist-ssr
+dist-cinematic/
+dist-continuity/
+dist-journey/
+deploy/shared-vps/release/
 
 # Firebase
 .firebase/
@@ -113,3 +117,6 @@ google-services.json
 
 # Claude Code
 CLAUDE.md
+
+# Vite cache belongs to this checkout, outside shared dependencies.
+/.vite/

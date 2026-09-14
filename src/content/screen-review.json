@@ -1,0 +1,32 @@
+{
+  "title": "A more connected screen.",
+  "eyebrow": "Blender · Local comparison",
+  "description": "The same care story, with a MediConnect interface composited into the wall display. The moving doctor, laptop and room are preserved.",
+  "originalLabel": "Original Seedance film",
+  "compositeLabel": "With Blender compositing",
+  "original": "/media/journey/connected-care-v1.mp4",
+  "composite": "/media/journey/connected-care-blender-v1.mp4",
+  "poster": "/media/journey/home-followup-v1.webp",
+  "compositePoster": "/media/journey/connected-care-blender-v1.webp",
+  "notice": "Local comparison only. The homepage still uses your accepted original. These filmed controls are illustrative, not a live call.",
+  "play": "Play comparison",
+  "pause": "Pause comparison",
+  "scrub": "Compare at the same moment",
+  "replay": "Replay screen entrance",
+  "back": "Return to the accepted homepage",
+  "error": "The comparison film could not load. The accepted homepage is still available.",
+  "loading": "Loading both versions…",
+  "detailsTitle": "What changed — and what did not",
+  "details": [
+    "Blender corner-pin compositing places a brand header and redesigned call controls inside the wall display.",
+    "The interface uses the existing MediConnect typography, brand and theme colours; no new AI footage was generated.",
+    "The original clinician image remains visible. This is planar compositing, not a reconstructed 3D room or recovered camera path.",
+    "The display enters near the end of the film. On narrow mobile crops, part of the display is outside the homepage's portrait framing."
+  ],
+  "duration": 22.333333,
+  "initialTime": 20,
+  "entranceTime": 16.75,
+  "seekStep": 0.041666667,
+  "synchronizationTolerance": 0.08,
+  "endTolerance": 0.06
+}
