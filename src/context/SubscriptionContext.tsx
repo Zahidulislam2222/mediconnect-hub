@@ -3,39 +3,31 @@
  *
  * Provides subscription status to all components.
  * Fetches from server on mount (never trusts JWT — loophole #10).
- * Caches in secure-storage (AES-GCM encrypted — HIPAA compliant).
+ * Caches through the in-memory profile storage boundary; cache state never establishes identity or compliance.
  */
 
-import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useLayoutEffect, useRef, useCallback, ReactNode } from 'react';
 import { subscriptionApi, SubscriptionInfo, PlanId } from '@/lib/subscription';
-import { isAuthenticated } from '@/lib/secure-storage';
+import { SESSION_CLEARED_EVENT } from '@/lib/secure-storage';
+import { useVerifiedSession } from '@/context/VerifiedSession';
+import { Hub } from 'aws-amplify/utils';
+import paymentCopy from '@/content/payment';
 
 interface SubscriptionContextType {
     subscription: SubscriptionInfo | null;
     isLoading: boolean;
     error: string | null;
-    refresh: () => Promise<void>;
+    refresh: (signal?: AbortSignal) => Promise<boolean>;
     isSubscribed: boolean;
     discountPercent: number;
     planName: string;
 }
 
-const defaultSubscription: SubscriptionInfo = {
-    planId: 'free',
-    status: 'none',
-    discountPercent: 0,
-    freeGpVisitsRemaining: 0,
-    familyMembers: [],
-    cycleStart: '',
-    cycleEnd: '',
-    cancelAtPeriodEnd: false,
-};
-
 const SubscriptionContext = createContext<SubscriptionContextType>({
     subscription: null,
     isLoading: false,
     error: null,
-    refresh: async () => {},
+    refresh: async () => false,
     isSubscribed: false,
     discountPercent: 0,
     planName: 'Free',
@@ -48,25 +40,65 @@ export const SubscriptionProvider: React.FC<{ children: ReactNode }> = ({ childr
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
-    const refresh = useCallback(async () => {
-        if (!isAuthenticated()) return;
+    const identity = useVerifiedSession();
+    const generation = useRef(0);
+    const active = useRef(false);
 
+    const refresh = useCallback(async (signal?: AbortSignal): Promise<boolean> => {
+        if (!active.current || !identity || signal?.aborted) return false;
+        const request = ++generation.current;
+        const current = () => active.current && generation.current === request && !signal?.aborted;
+        const abort = () => {
+            if (generation.current === request) {
+                generation.current++;
+                if (active.current) setIsLoading(false);
+            }
+        };
+        signal?.addEventListener('abort', abort, { once: true });
         setIsLoading(true);
         setError(null);
         try {
             const data = await subscriptionApi.getStatus();
-            setSubscription(data || defaultSubscription);
-        } catch (err: any) {
-            setError(err.message || 'Failed to fetch subscription');
-            setSubscription(defaultSubscription);
+            if (!current()) return false;
+            if (!data) throw new Error('MISSING_SUBSCRIPTION_STATUS');
+            setSubscription(data);
+            return true;
+        } catch {
+            if (current()) {
+                setError(paymentCopy.subscriptionStatusUnavailable);
+                setSubscription(null);
+            }
+            return false;
         } finally {
-            setIsLoading(false);
+            signal?.removeEventListener('abort', abort);
+            if (current()) setIsLoading(false);
         }
-    }, []);
+    }, [identity]);
 
-    useEffect(() => {
-        refresh();
-    }, [refresh]);
+    useLayoutEffect(() => {
+        active.current = Boolean(identity);
+        const invalidate = () => {
+            active.current = false;
+            generation.current++;
+            setSubscription(null);
+            setIsLoading(false);
+            setError(null);
+        };
+        setSubscription(null);
+        setIsLoading(false);
+        setError(null);
+        const unsubscribe = Hub.listen('auth', ({ payload }) => {
+            if (payload.event === 'signedOut' || payload.event === 'tokenRefresh_failure' || payload.event === 'signedIn') invalidate();
+        });
+        window.addEventListener(SESSION_CLEARED_EVENT, invalidate);
+        void refresh();
+        return () => {
+            active.current = false;
+            generation.current++;
+            unsubscribe();
+            window.removeEventListener(SESSION_CLEARED_EVENT, invalidate);
+        };
+    }, [identity, refresh]);
 
     const isSubscribed = subscription?.status === 'active' && subscription?.planId !== 'free';
     const discountPercent = subscription?.discountPercent || 0;

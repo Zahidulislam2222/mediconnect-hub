@@ -424,7 +424,7 @@ export default function Index() {
               className="inline-flex items-center gap-2 rounded-full border border-border bg-card px-4 py-1.5 text-sm font-medium text-muted-foreground mb-8 shadow-soft"
             >
               <span className="flex h-2 w-2 rounded-full bg-success animate-pulse" />
-              Trusted by 50,000+ patients across US & EU
+              Trusted by 50,000+ patients across US &amp; EU
             </motion.div>
 
             <motion.h1
@@ -549,7 +549,7 @@ export default function Index() {
         <div className="container mx-auto max-w-5xl">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
             <div>
-              <p className="text-sm font-medium text-accent uppercase tracking-wider mb-3">Security & Compliance</p>
+              <p className="text-sm font-medium text-accent uppercase tracking-wider mb-3">Security &amp; Compliance</p>
               <h2 className="font-display text-3xl md:text-4xl font-bold text-foreground mb-6">
                 Built for healthcare-grade security
               </h2>
@@ -619,7 +619,7 @@ export default function Index() {
                   onClick={() => navigate("/admin-auth")}
                   className="text-background/60 hover:text-background hover:bg-background/10 text-base px-8 h-13 rounded-xl transition-all duration-200"
                 >
-                  Staff & Admin Portal
+                  Staff &amp; Admin Portal
                 </Button>
               </div>
             </div>
@@ -646,7 +646,7 @@ export default function Index() {
             </div>
           </div>
           <div className="mt-10 pt-8 border-t border-border text-center text-sm text-muted-foreground/60">
-            &copy; 2026 MediConnect. All rights reserved. Multi-region deployment on AWS, Azure & GCP.
+            &copy; 2026 MediConnect. All rights reserved. Multi-region deployment on AWS, Azure &amp; GCP.
           </div>
         </div>
       </footer>

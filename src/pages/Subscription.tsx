@@ -5,9 +5,13 @@
  * Includes GDPR consent, auto-renewal disclosure, and subscription management.
  */
 
-import React, { useState } from 'react';
+import React, { useState, useRef, useLayoutEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import { Elements } from '@stripe/react-stripe-js';
-import { loadStripe } from '@stripe/stripe-js';
+import type { Stripe } from '@stripe/stripe-js';
+import { getPaymentClient } from '@/lib/payment-client';
+import paymentCopy from '@/content/payment';
+import { usePaymentLifetime } from '@/hooks/use-payment-lifetime';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -18,48 +22,98 @@ import { PlanCard } from '@/components/subscription/PlanCard';
 import { SubscriptionCheckout } from '@/components/subscription/SubscriptionCheckout';
 import { PLAN_DISPLAY, PlanId, subscriptionApi } from '@/lib/subscription';
 
-const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY || '');
 
 export default function Subscription() {
+    const [stripe, setStripe] = useState<Stripe | null>(null);
     const { subscription, isLoading, refresh, isSubscribed, planName } = useSubscription();
     const { toast } = useToast();
     const [selectedPlan, setSelectedPlan] = useState<PlanId | null>(null);
     const [cancelLoading, setCancelLoading] = useState(false);
     const [portalLoading, setPortalLoading] = useState(false);
+    const [selectionLoading, setSelectionLoading] = useState(false);
+    const selecting = useRef<AbortSignal | null>(null);
+    const managing = useRef<AbortSignal | null>(null);
+    const lifetime = usePaymentLifetime();
+    const { key } = useLocation();
+    useLayoutEffect(() => {
+        const signal = lifetime.current.signal;
+        const reset = () => {
+            selecting.current = null;
+            managing.current = null;
+            setCancelLoading(false);
+            setPortalLoading(false);
+            setSelectionLoading(false);
+            setSelectedPlan(null);
+            setStripe(null);
+        };
+        signal.addEventListener('abort', reset, { once: true });
+        return () => signal.removeEventListener('abort', reset);
+    }, [key, lifetime]);
 
-    const handleSelectPlan = (planId: string) => {
-        setSelectedPlan(planId as PlanId);
+    const handleSelectPlan = async (planId: string) => {
+        const signal = lifetime.current.signal;
+        if (selecting.current || managing.current || selectedPlan || signal.aborted) return;
+        if (planId === 'free') { setSelectedPlan('free'); return; }
+        selecting.current = signal;
+        setSelectionLoading(true);
+        try {
+            const client = await getPaymentClient();
+            if (signal.aborted) return;
+            if (!client) throw new Error('PAYMENT_SERVICE_UNAVAILABLE');
+            setStripe(client);
+            setSelectedPlan(planId as PlanId);
+        } catch {
+            if (!signal.aborted) toast({ title: paymentCopy.unavailableTitle, variant: 'destructive' });
+        } finally {
+            if (selecting.current === signal) selecting.current = null;
+            if (!signal.aborted) setSelectionLoading(false);
+        }
     };
 
     const handleCancel = async () => {
-        if (!confirm('Your plan will remain active until the end of your billing period. No refund for the remaining period. Continue?')) {
-            return;
-        }
-
+        const signal = lifetime.current.signal;
+        if (signal.aborted || managing.current || selecting.current || selectedPlan) return;
+        if (!confirm(paymentCopy.cancellationConfirmation)) return;
+        managing.current = signal;
         setCancelLoading(true);
         try {
-            const result = await subscriptionApi.cancel('User requested cancellation');
+            const result = await subscriptionApi.cancel(paymentCopy.cancellationReason);
+            if (signal.aborted) return;
+            const accessUntil = typeof result.accessUntil === 'string' ? new Date(result.accessUntil) : null;
+            if (!accessUntil || !Number.isFinite(accessUntil.getTime())) throw new Error('INVALID_CANCELLATION_RESPONSE');
+            const refreshed = await refresh(signal);
+            if (!refreshed) throw new Error('SUBSCRIPTION_REFRESH_UNCONFIRMED');
+            if (signal.aborted) return;
             toast({
-                title: 'Cancellation Scheduled',
-                description: `Your ${planName} plan will end on ${new Date(result.accessUntil).toLocaleDateString()}`,
+                title: paymentCopy.cancellationScheduledTitle,
+                description: paymentCopy.cancellationScheduledTemplate.replace('{date}', accessUntil.toLocaleDateString()),
             });
-            await refresh();
-        } catch (err: any) {
-            toast({ title: 'Cancel Failed', description: err.message, variant: 'destructive' });
+        } catch {
+            if (!signal.aborted) toast({ title: paymentCopy.cancellationUnconfirmedTitle,
+                description: paymentCopy.cancellationUnconfirmedDescription, variant: 'destructive' });
         } finally {
-            setCancelLoading(false);
+            if (managing.current === signal) managing.current = null;
+            if (!signal.aborted) setCancelLoading(false);
         }
     };
 
     const handleManageBilling = async () => {
+        const signal = lifetime.current.signal;
+        if (signal.aborted || managing.current || selecting.current || selectedPlan) return;
+        managing.current = signal;
         setPortalLoading(true);
         try {
             const { url } = await subscriptionApi.getPortalUrl();
-            window.open(url, '_blank');
-        } catch (err: any) {
-            toast({ title: 'Portal Error', description: err.message, variant: 'destructive' });
+            if (signal.aborted) return;
+            const destination = new URL(url);
+            if (destination.protocol !== 'https:' || destination.username || destination.password) throw new Error('INVALID_PORTAL_RESPONSE');
+            window.open(destination.href, '_blank', 'noopener,noreferrer');
+        } catch {
+            if (!signal.aborted) toast({ title: paymentCopy.portalUnavailableTitle,
+                description: paymentCopy.portalUnavailableDescription, variant: 'destructive' });
         } finally {
-            setPortalLoading(false);
+            if (managing.current === signal) managing.current = null;
+            if (!signal.aborted) setPortalLoading(false);
         }
     };
 
@@ -112,7 +166,7 @@ export default function Subscription() {
                                 size="sm"
                                 className="rounded-xl flex-1 sm:flex-none"
                                 onClick={handleManageBilling}
-                                disabled={portalLoading}
+                                disabled={portalLoading || cancelLoading || selectionLoading || selectedPlan !== null}
                             >
                                 {portalLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ExternalLink className="h-4 w-4 mr-1.5" />}
                                 Manage Billing
@@ -123,7 +177,7 @@ export default function Subscription() {
                                     size="sm"
                                     className="rounded-xl text-muted-foreground flex-1 sm:flex-none"
                                     onClick={handleCancel}
-                                    disabled={cancelLoading}
+                                    disabled={cancelLoading || portalLoading || selectionLoading || selectedPlan !== null}
                                 >
                                     {cancelLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Cancel Plan'}
                                 </Button>
@@ -141,21 +195,23 @@ export default function Subscription() {
                         plan={plan}
                         currentPlanId={subscription?.planId}
                         onSelect={handleSelectPlan}
-                        isLoading={isLoading}
+                        isLoading={selectionLoading || cancelLoading || portalLoading || selectedPlan !== null}
                     />
                 ))}
             </div>
 
+            {selectionLoading && <p role="status" className="text-center text-muted-foreground">{paymentCopy.loadingTitle}</p>}
+
             {/* Bottom info */}
             <div className="text-center text-xs text-muted-foreground space-y-1 max-w-lg mx-auto">
-                <p>All plans include HIPAA-compliant video consultations and FHIR health records.</p>
+                <p>{paymentCopy.readinessDisclosure}</p>
                 <p>Subscription renews automatically. Cancel anytime from Settings or Manage Billing.</p>
                 <p>Prices shown in USD. Actual charge may include applicable taxes.</p>
             </div>
 
             {/* Checkout dialog — wrapped in Stripe Elements */}
             {selectedPlan && selectedPlan !== 'free' && (
-                <Elements stripe={stripePromise}>
+                <Elements stripe={stripe}>
                     <SubscriptionCheckout
                         planId={selectedPlan}
                         isOpen={true}

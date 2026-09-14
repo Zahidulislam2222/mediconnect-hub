@@ -25,5 +25,14 @@ const schema = z.object({
   cardPrivacy: z.string().min(1),
   totalAmount: z.string().min(1),
   payAmountTemplate: z.string().min(1),
+  cancellationConfirmation: z.string().min(1),
+  cancellationReason: z.string().min(1),
+  cancellationScheduledTitle: z.string().min(1),
+  cancellationScheduledTemplate: z.string().min(1),
+  cancellationUnconfirmedTitle: z.string().min(1),
+  cancellationUnconfirmedDescription: z.string().min(1),
+  portalUnavailableTitle: z.string().min(1),
+  portalUnavailableDescription: z.string().min(1),
+  subscriptionStatusUnavailable: z.string().min(1),
 }).strict();
 export default schema.parse(source);

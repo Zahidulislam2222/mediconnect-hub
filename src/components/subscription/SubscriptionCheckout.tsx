@@ -6,7 +6,9 @@
  * Auto-renewal: Clear disclosure per FTC/EU/California requirements
  */
 
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
+import { usePaymentLifetime } from '@/hooks/use-payment-lifetime';
+import paymentCopy from '@/content/payment';
 import { CardElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -22,7 +24,7 @@ interface SubscriptionCheckoutProps {
     onClose: () => void;
 }
 
-const TERMS_VERSION = '1.0';
+const TERMS_VERSION = paymentCopy.termsVersion;
 
 export function SubscriptionCheckout({ planId, isOpen, onClose }: SubscriptionCheckoutProps) {
     const stripe = useStripe();
@@ -31,6 +33,10 @@ export function SubscriptionCheckout({ planId, isOpen, onClose }: SubscriptionCh
     const { refresh } = useSubscription();
 
     const [loading, setLoading] = useState(false);
+    const submitting = useRef(false);
+    const paymentCompleted = useRef(false);
+    const [pendingConfirmation, setPendingConfirmation] = useState(false);
+    const lifetime = usePaymentLifetime();
     const [consentBilling, setConsentBilling] = useState(false);
     const [consentData, setConsentData] = useState(false);
     const [consentRetention, setConsentRetention] = useState(false);
@@ -44,21 +50,25 @@ export function SubscriptionCheckout({ planId, isOpen, onClose }: SubscriptionCh
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!stripe || !elements || !allConsented) return;
+        const signal = lifetime.current.signal;
+        if (!stripe || !elements || !allConsented || submitting.current || paymentCompleted.current || signal.aborted || (isEU && !consentRetention)) return;
+        submitting.current = true;
 
         setLoading(true);
         try {
             // Step 1: Create subscription server-side (returns clientSecret)
             const result = await subscriptionApi.create(planId as 'plus' | 'premium', TERMS_VERSION);
+            if (signal.aborted) return;
 
             // Step 2: Confirm payment with Stripe Elements
             const cardElement = elements.getElement(CardElement);
             if (!cardElement) throw new Error('Card element not found');
 
-            const { error } = await stripe.confirmCardPayment(result.clientSecret, {
+            const { error, paymentIntent } = await stripe.confirmCardPayment(result.clientSecret, {
                 payment_method: { card: cardElement },
             });
 
+            if (signal.aborted) return;
             if (error) {
                 toast({
                     title: 'Payment Failed',
@@ -68,22 +78,34 @@ export function SubscriptionCheckout({ planId, isOpen, onClose }: SubscriptionCh
                 return;
             }
 
-            // Step 3: Success — subscription activates via webhook (loophole #3)
-            toast({
-                title: 'Subscription Active!',
-                description: `Welcome to ${plan.name}. Your ${plan.discountPercent}% discount applies to all visits.`,
-            });
-
-            await refresh();
-            onClose();
+            if (paymentIntent?.status !== 'succeeded') {
+                toast({ title: paymentCopy.subscriptionPendingTitle, description: paymentCopy.subscriptionPendingDescription });
+                return;
+            }
+            paymentCompleted.current = true;
+            setPendingConfirmation(true);
+            const current = await subscriptionApi.getStatus();
+            if (signal.aborted) return;
+            const active = current?.status === 'active' && current.planId === planId;
+            const refreshed = await refresh(signal);
+            if (signal.aborted) return;
+            if (!refreshed) {
+                toast({ title: paymentCopy.subscriptionPendingTitle, description: paymentCopy.subscriptionPendingDescription });
+                return;
+            }
+            toast({ title: active ? paymentCopy.subscriptionActiveTitle : paymentCopy.subscriptionPendingTitle,
+                description: active ? paymentCopy.subscriptionActiveDescription : paymentCopy.subscriptionPendingDescription });
+            if (!signal.aborted) onClose();
         } catch (err: any) {
+            if (signal.aborted) return;
             toast({
-                title: 'Subscription Failed',
-                description: err.message || 'Please try again',
+                title: paymentCopy.unknownTitle,
+                description: paymentCopy.unknownDescription,
                 variant: 'destructive',
             });
         } finally {
-            setLoading(false);
+            submitting.current = false;
+            if (!signal.aborted) setLoading(false);
         }
     };
 
@@ -121,7 +143,7 @@ export function SubscriptionCheckout({ planId, isOpen, onClose }: SubscriptionCh
                                 className="mt-0.5"
                             />
                             <span className="text-muted-foreground leading-tight">
-                                I agree to the <a href="/terms" className="text-primary underline" target="_blank">Subscription Terms</a> and
+                                I agree to the <a href={paymentCopy.termsPath} className="text-primary underline" target="_blank">Subscription Terms</a> and
                                 authorize MediConnect to charge <strong>${plan.price}/month</strong> to my payment method.
                                 This is a recurring charge that renews automatically until cancelled.
                                 I can cancel at any time from Settings.
@@ -136,7 +158,7 @@ export function SubscriptionCheckout({ planId, isOpen, onClose }: SubscriptionCh
                             />
                             <span className="text-muted-foreground leading-tight">
                                 I consent to MediConnect processing my billing data for subscription management,
-                                as described in the <a href="/privacy" className="text-primary underline" target="_blank">Privacy Policy</a>.
+                                as described in the <a href={paymentCopy.privacyPath} className="text-primary underline" target="_blank">Privacy Policy</a>.
                             </span>
                         </label>
 
@@ -148,8 +170,7 @@ export function SubscriptionCheckout({ planId, isOpen, onClose }: SubscriptionCh
                                     className="mt-0.5"
                                 />
                                 <span className="text-muted-foreground leading-tight">
-                                    I understand that my billing data will be retained for 7 years after subscription ends,
-                                    as required by tax regulations (GDPR Art 6(1)(c)).
+                                    {paymentCopy.retentionDisclosure}
                                 </span>
                             </label>
                         )}
@@ -157,15 +178,15 @@ export function SubscriptionCheckout({ planId, isOpen, onClose }: SubscriptionCh
 
                     <div className="flex items-center gap-2 text-xs text-muted-foreground">
                         <Shield className="h-3.5 w-3.5" />
-                        <span>Card data is processed by Stripe. MediConnect never sees your card number.</span>
+                        <span>{paymentCopy.cardPrivacy}</span>
                     </div>
 
                     <Button
                         type="submit"
                         className="w-full rounded-xl bg-accent text-accent-foreground"
-                        disabled={loading || !stripe || !allConsented || (isEU && !consentRetention)}
+                        disabled={loading || pendingConfirmation || !stripe || !allConsented || (isEU && !consentRetention)}
                     >
-                        {loading ? (
+                        {pendingConfirmation && !loading ? paymentCopy.subscriptionPendingTitle : loading ? (
                             <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Processing...</>
                         ) : (
                             <><Lock className="mr-2 h-4 w-4" /> Subscribe - ${plan.price}/month</>

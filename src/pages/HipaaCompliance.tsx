@@ -29,7 +29,7 @@ export default function HipaaCompliance() {
 
                 <div className="grid gap-8 md:grid-cols-2 mb-12">
                     <div className="p-6 border rounded-xl bg-card">
-                        <h3 className="text-lg font-semibold mb-2">Encryption at Rest & Transit</h3>
+                        <h3 className="text-lg font-semibold mb-2">Encryption at Rest &amp; Transit</h3>
                         <p className="text-sm text-muted-foreground">
                             All sensitive data is encrypted using AES-256 encryption. We use TLS 1.2+ for all data in transit to ensure that your information is secure during transmission.
                         </p>

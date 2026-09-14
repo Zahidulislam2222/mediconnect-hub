@@ -101,7 +101,7 @@ const GdprBanner = () => {
       <div className="mx-4 mb-4 sm:mx-6 sm:mb-6 max-w-2xl sm:ml-auto">
         <div className="rounded-2xl bg-foreground/95 backdrop-blur-xl text-background p-5 shadow-elevated border border-white/10">
           <p className="text-sm mb-4 text-background/80 leading-relaxed">
-            We use cookies and process data strictly in your region to comply with GDPR & HIPAA.
+            We use cookies and process data strictly in your region to comply with GDPR &amp; HIPAA.
             See our <a href="/privacy-policy" className="underline text-primary-foreground/90 hover:text-primary-foreground">Privacy Policy</a>.
           </p>
           {showCustomize ? (
