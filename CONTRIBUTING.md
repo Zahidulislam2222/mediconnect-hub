@@ -30,7 +30,7 @@ npm run lint
 npm run build
 ```
 
-The security workflow (Gitleaks, Semgrep, Bandit) runs on every pull request. New findings in your change must be fixed, never suppressed. The full-history secret scan may still report known findings in old commits; those are tracked separately and do not block your change.
+The security workflow (Gitleaks, Semgrep, Bandit) runs on every pull request. New findings in your change must be fixed, never suppressed. The full-history secret scan is report-only while known findings in old commits are revoked at their providers; all other gates block.
 
 ## Pull requests
 
