@@ -1,3 +1,19 @@
+# Security policy
+
+## Reporting a vulnerability
+
+Please report security problems **privately**. Do not open a public issue, pull request or discussion.
+
+- Use GitHub private vulnerability reporting: [report a vulnerability](https://github.com/Zahidulislam2222/mediconnect-hub/security/advisories/new)
+  (Security tab → "Report a vulnerability").
+- Include what is affected, the steps to reproduce it and the impact. Do not include real personal or health data.
+- If you find an exposed credential, report where it is, but **do not post or use the value**.
+
+We aim to acknowledge reports within 5 business days. Only the latest commit on the default branch
+is supported. Platform security design: [security architecture](https://github.com/Zahidulislam2222/mediconnect-infrastructure-production/blob/main/docs/SECURITY-ARCHITECTURE.md).
+
+---
+
 # Security verification
 
 The security workflow has four independent gates:

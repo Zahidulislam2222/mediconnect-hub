@@ -16,28 +16,37 @@ name: "Frontend CI/CD (MediConnect)"
 #   LIGHTHOUSE_MIN_ACCESSIBILITY — default: 90
 # ─────────────────────────────────────────────────────────────────
 
+# ─────────────────────────────────────────────────────────────────
+# DISABLED 2026-09-24 — automatic push / pull_request triggers are commented out,
+# not deleted, and kept as reference (client proof of the original pipeline).
+# Reason: the live site now runs on the operator VPS (mediconnect.zahidul-islam.com);
+# the Firebase project askme-82f72 is retired. With only workflow_dispatch left,
+# a manual run executes build/quality jobs; both Firebase deploy jobs are skipped
+# because their conditions require push or pull_request events.
+# To re-enable, uncomment the lines below after owner approval.
+# ─────────────────────────────────────────────────────────────────
 on:
-  push:
-    branches: [main]
-    paths:
-      - "src/**"
-      - "index.html"
-      - "package.json"
-      - "package-lock.json"
-      - "tailwind.config.ts"
-      - "vite.config.ts"
-      - "tsconfig*.json"
-      - ".github/workflows/frontend-deploy.yml"
-  pull_request:
-    branches: [main]
-    paths:
-      - "src/**"
-      - "index.html"
-      - "package.json"
-      - "package-lock.json"
-      - "tailwind.config.ts"
-      - "vite.config.ts"
-      - "tsconfig*.json"
+#  push:
+#    branches: [main]
+#    paths:
+#      - "src/**"
+#      - "index.html"
+#      - "package.json"
+#      - "package-lock.json"
+#      - "tailwind.config.ts"
+#      - "vite.config.ts"
+#      - "tsconfig*.json"
+#      - ".github/workflows/frontend-deploy.yml"
+#  pull_request:
+#    branches: [main]
+#    paths:
+#      - "src/**"
+#      - "index.html"
+#      - "package.json"
+#      - "package-lock.json"
+#      - "tailwind.config.ts"
+#      - "vite.config.ts"
+#      - "tsconfig*.json"
   workflow_dispatch: {}
 
 permissions:
