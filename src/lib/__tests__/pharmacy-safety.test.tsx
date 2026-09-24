@@ -45,6 +45,20 @@ describe('Pharmacy response and action safety', () => {
     expect(screen.getAllByText('Pending')[0].parentElement).toHaveTextContent('1');
   });
 
+  it('offers a refill for a fill the backend reports as DISPENSED', async () => {
+    rows = [prescription('test-alpha', { status: 'DISPENSED' })];
+    await open();
+    expect(screen.getByText('Completed')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /Refill/ }));
+    await waitFor(() => expect(mocks.post).toHaveBeenCalledWith('/pharmacy/request-refill', { prescriptionId: 'test-alpha' }));
+  });
+
+  it('does not offer a refill before the current fill is dispensed', async () => {
+    rows = [prescription('test-alpha', { status: 'READY_FOR_PICKUP' })];
+    await open();
+    expect(screen.getByRole('button', { name: /Refill/ })).toBeDisabled();
+  });
+
   it('ignores a pickup result after session invalidation', async () => {
     const result = deferred<{ qrPayload: string }>(); mocks.post.mockReturnValue(result.promise);
     await open(); fireEvent.click(screen.getByRole('button', { name: 'Pickup Code' }));

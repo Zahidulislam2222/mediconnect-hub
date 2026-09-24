@@ -4,6 +4,9 @@ import paymentCopy from '@/content/payment';
 
 const route = z.string().regex(/^\/[A-Za-z0-9/-]+$/);
 export const pharmacyRoutes = z.object({ profile: route, prescriptions: route, billing: route, pay: route, pickup: route, refill: route }).strict().parse(routing);
+
+// The pharmacy service records a completed pickup as DISPENSED; PICKED_UP is the legacy name for the same state.
+export function isDispensed(status: string) { return status === 'DISPENSED' || status === 'PICKED_UP'; }
 const text = z.string().trim().min(1);
 const number = z.union([z.number().finite(), z.string().regex(/^\d+(?:\.\d+)?$/).transform(Number)]);
 const schema = z.object({

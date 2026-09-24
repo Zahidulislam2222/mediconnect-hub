@@ -14,7 +14,7 @@ import { getUser, setUser as setStoredUser, clearAllSensitive } from "@/lib/secu
 import { useCheckout } from "@/context/CheckoutContext";
 import { usePaymentLifetime } from "@/hooks/use-payment-lifetime";
 import copy from "@/content/pharmacy";
-import { pharmacyRoutes as routes, prescriptionsFrom, pickupFrom, refillAcknowledged, payableBillFrom, paymentNotice, type Prescription } from "@/lib/pharmacy-contract";
+import { pharmacyRoutes as routes, prescriptionsFrom, pickupFrom, refillAcknowledged, payableBillFrom, paymentNotice, isDispensed, type Prescription } from "@/lib/pharmacy-contract";
 
 type Action = { id: string; signal: AbortSignal };
 export default function Pharmacy() {
@@ -103,7 +103,7 @@ export default function Pharmacy() {
     finally { end(action); }
   }
   async function handleRefillRequest(rx: Prescription) {
-    if (refillReview.includes(rx.prescriptionId) || rx.status !== 'PICKED_UP' || !rx.refillsRemaining) return;
+    if (refillReview.includes(rx.prescriptionId) || !isDispensed(rx.status) || !rx.refillsRemaining) return;
     const action = begin(rx); if (!action) return;
     // A lost response can still represent a completed refill/bill. Never retry it automatically.
     setRefillReview(previous => [...previous, action.id]);
@@ -149,6 +149,7 @@ export default function Pharmacy() {
       case "READY_FOR_PICKUP": return <Badge className="bg-primary/10 text-primary hover:bg-primary/10 border-border">{copy.ready}</Badge>;
       case "PENDING":
       case "REFILL_REQUESTED": return <Badge className="bg-primary/10 text-primary hover:bg-primary/10 border-border">{copy.pending}</Badge>;
+      case "DISPENSED":
       case "PICKED_UP": return <Badge variant="secondary">{copy.completed}</Badge>;
       default: return <Badge variant="outline">{status}</Badge>;
     }
@@ -290,7 +291,7 @@ export default function Pharmacy() {
                         size="sm"
                         className="bg-primary rounded-xl"
                         onClick={() => void handleRefillRequest(rx)}
-                        disabled={!!processingId || rx.status !== 'PICKED_UP' || !rx.refillsRemaining || refillReview.includes(rx.prescriptionId)}
+                        disabled={!!processingId || !isDispensed(rx.status) || !rx.refillsRemaining || refillReview.includes(rx.prescriptionId)}
                       >
                         <RefreshCw className="h-3.5 w-3.5 mr-2" />
                         {rx.refillsRemaining ? copy.refillTemplate.replace('{remaining}', String(rx.refillsRemaining)) : copy.requestRefill}
