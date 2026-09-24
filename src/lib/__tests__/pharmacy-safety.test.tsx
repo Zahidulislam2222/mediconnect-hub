@@ -59,6 +59,22 @@ describe('Pharmacy response and action safety', () => {
     expect(screen.getByRole('button', { name: /Refill/ })).toBeDisabled();
   });
 
+  it('offers payment for a refill awaiting its new bill and no pickup code before it is paid', async () => {
+    rows = [prescription('test-alpha', { status: 'PENDING', paymentStatus: 'UNPAID' })];
+    mocks.post.mockResolvedValue({ status: 'succeeded' });
+    await open();
+    expect(screen.queryByRole('button', { name: 'Pickup Code' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /Pay/ }));
+    await waitFor(() => expect(mocks.post).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({ billId: 'test-bill' })));
+  });
+
+  it('asks for the refill payment, not a pickup code, when a refill still carries a previous fill payment', async () => {
+    rows = [prescription('test-alpha', { status: 'PENDING', paymentStatus: 'PAID' })];
+    await open();
+    expect(screen.queryByRole('button', { name: 'Pickup Code' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Pay/ })).toBeEnabled();
+  });
+
   it('ignores a pickup result after session invalidation', async () => {
     const result = deferred<{ qrPayload: string }>(); mocks.post.mockReturnValue(result.promise);
     await open(); fireEvent.click(screen.getByRole('button', { name: 'Pickup Code' }));

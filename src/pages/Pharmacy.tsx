@@ -14,7 +14,7 @@ import { getUser, setUser as setStoredUser, clearAllSensitive } from "@/lib/secu
 import { useCheckout } from "@/context/CheckoutContext";
 import { usePaymentLifetime } from "@/hooks/use-payment-lifetime";
 import copy from "@/content/pharmacy";
-import { pharmacyRoutes as routes, prescriptionsFrom, pickupFrom, refillAcknowledged, payableBillFrom, paymentNotice, isDispensed, type Prescription } from "@/lib/pharmacy-contract";
+import { pharmacyRoutes as routes, prescriptionsFrom, pickupFrom, refillAcknowledged, payableBillFrom, paymentNotice, isDispensed, awaitsPayment, type Prescription } from "@/lib/pharmacy-contract";
 
 type Action = { id: string; signal: AbortSignal };
 export default function Pharmacy() {
@@ -254,7 +254,7 @@ export default function Pharmacy() {
 
                     <div className="flex flex-wrap items-center gap-2 md:flex-shrink-0">
 
-                      {rx.status === "ISSUED" && rx.paymentStatus !== "PAID" && (
+                      {awaitsPayment(rx) && (
                         <Button
                           size="sm"
                           className="bg-accent text-accent-foreground rounded-xl"

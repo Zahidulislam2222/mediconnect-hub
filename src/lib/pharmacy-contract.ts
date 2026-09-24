@@ -7,6 +7,12 @@ export const pharmacyRoutes = z.object({ profile: route, prescriptions: route, b
 
 // The pharmacy service records a completed pickup as DISPENSED; PICKED_UP is the legacy name for the same state.
 export function isDispensed(status: string) { return status === 'DISPENSED' || status === 'PICKED_UP'; }
+
+// A first fill is paid while ISSUED. A refill is PENDING until its own bill is paid, even when it still carries the
+// previous fill's PAID flag; the pharmacy service only issues a pickup code once payment makes it READY_FOR_PICKUP.
+export function awaitsPayment(rx: { status?: string; paymentStatus?: string }) {
+  return rx.status === 'PENDING' || (rx.status === 'ISSUED' && rx.paymentStatus !== 'PAID');
+}
 const text = z.string().trim().min(1);
 const number = z.union([z.number().finite(), z.string().regex(/^\d+(?:\.\d+)?$/).transform(Number)]);
 const schema = z.object({
