@@ -21,6 +21,7 @@ import { useCheckout } from "@/context/CheckoutContext";
 import { api } from "@/lib/api";
 import { usePaymentLifetime } from "@/hooks/use-payment-lifetime";
 import paymentCopy from "@/content/payment";
+import { refusedBeforeCharge } from "@/lib/payment-refusal";
 import { getUser, setUser as setStoredUser, clearAllSensitive } from "@/lib/secure-storage";
 
 export default function Billing() {
@@ -203,7 +204,11 @@ function BillingContent() {
 
         } catch (e: any) {
             if (signal.aborted || e.message === "PAYMENT_UI_CLOSED") return;
-            if (e.message !== "User cancelled payment") {
+            if (refusedBeforeCharge(e)) {
+                // The booking service refused before calling the provider, so nothing was charged.
+                toast({ variant: "destructive", title: paymentCopy.notChargedTitle, description: paymentCopy.notChargedDescription });
+                await loadFreshData();
+            } else if (e.message !== "User cancelled payment") {
                 toast({
                     variant: "destructive",
                     title: e.code === "OUTCOME_UNKNOWN" ? paymentCopy.unknownTitle : paymentCopy.failedTitle,

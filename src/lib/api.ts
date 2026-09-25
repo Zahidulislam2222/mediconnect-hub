@@ -124,7 +124,8 @@ export const api = {
 
 class RetryableReadError extends Error {}
 export class HttpResponseError extends Error {
-    constructor(message: string, readonly status: number) { super(message); }
+    /** code is the service's machine-readable refusal code, when its reply carried one as text. */
+    constructor(message: string, readonly status: number, readonly code?: string) { super(message); }
 }
 
 export class MutationOutcomeUnknownError extends Error {
@@ -234,14 +235,15 @@ async function request(endpoint: string, method: string, body?: any, options?: A
 async function handleResponse(response: Response) {
     if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
+        const code = typeof errorData?.code === 'string' ? errorData.code : undefined;
 
         if (response.status === 404) throw new HttpResponseError("404_NOT_FOUND", response.status);
         
         if (response.status === 401) throw new HttpResponseError("401 Unauthorized", response.status);
 
-        if (response.status === 403) throw new HttpResponseError(errorData.error || errorData.message || "403 Forbidden", response.status);
+        if (response.status === 403) throw new HttpResponseError(errorData.error || errorData.message || "403 Forbidden", response.status, code);
 
-        throw new HttpResponseError(errorData.error || errorData.message || `API Error: ${response.status}`, response.status);
+        throw new HttpResponseError(errorData.error || errorData.message || `API Error: ${response.status}`, response.status, code);
     }
     return await response.json();
 }

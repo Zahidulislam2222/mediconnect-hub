@@ -14,6 +14,8 @@ const schema = z.object({
   unknownDescription: z.string().min(1),
   failedTitle: z.string().min(1),
   failedDescription: z.string().min(1),
+  notChargedTitle: z.string().min(1),
+  notChargedDescription: z.string().min(1),
   termsVersion: z.string().min(1),
   termsPath: z.string().min(1),
   privacyPath: z.string().min(1),
