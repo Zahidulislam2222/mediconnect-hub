@@ -34,5 +34,8 @@ const schema = z.object({
   portalUnavailableTitle: z.string().min(1),
   portalUnavailableDescription: z.string().min(1),
   subscriptionStatusUnavailable: z.string().min(1),
+  refundedBadge: z.string().min(1),
+  refundPendingBadge: z.string().min(1),
+  refundReviewBadge: z.string().min(1),
 }).strict();
 export default schema.parse(source);

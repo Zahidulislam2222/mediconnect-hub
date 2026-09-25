@@ -31,5 +31,8 @@
   "cancellationUnconfirmedDescription": "We could not confirm your current subscription status. Check it before trying again.",
   "portalUnavailableTitle": "Billing portal unavailable",
   "portalUnavailableDescription": "We could not open billing management. Please try again.",
-  "subscriptionStatusUnavailable": "We could not confirm your subscription status. Please try again."
+  "subscriptionStatusUnavailable": "We could not confirm your subscription status. Please try again.",
+  "refundedBadge": "Refunded",
+  "refundPendingBadge": "Refund pending",
+  "refundReviewBadge": "Refund under review"
 }

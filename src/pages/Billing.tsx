@@ -317,13 +317,17 @@ function BillingContent() {
                                         // 🟢 CATEGORY LOGIC
                                         const isRefund = tx.type === 'REFUND' || tx.status === 'REFUNDED' || tx.amount < 0;
                                         const isUnpaid = tx.status === 'PENDING' || tx.status === 'DUE' || tx.status === 'UNPAID';
+                                        // Only a refund that went through is money back; a pending or failed one is not.
+                                        const refundPending = isRefund && tx.refundStatus === 'PENDING';
+                                        const isRefunded = isRefund && !refundPending && (tx.status === 'PROCESSED' || tx.status === 'REFUNDED');
+                                        const refundOpen = isRefund && !isRefunded;
                                         
                                         return (
                                             <div key={i} className="p-3 sm:p-4 border border-border rounded-2xl flex items-start sm:items-center justify-between gap-3 bg-card hover:bg-secondary/30 transition-colors">
                                                 <div className="flex items-start sm:items-center gap-3 min-w-0 flex-1">
                                                     <div className={cn(
                                                         "h-9 w-9 sm:h-10 sm:w-10 rounded-xl flex items-center justify-center flex-shrink-0",
-                                                        isRefund ? "bg-green-500/10 text-green-600" :
+                                                        isRefunded ? "bg-green-500/10 text-green-600" :
                                                             isUnpaid ? "bg-orange-500/10 text-orange-600" : "bg-secondary text-muted-foreground"
                                                     )}>
                                                         {isRefund ? <ArrowUpRight className="h-4 w-4 sm:h-5 sm:w-5" /> :
@@ -354,9 +358,14 @@ function BillingContent() {
                                                                     Unpaid
                                                                 </Badge>
                                                             )}
-                                                            {isRefund && (
+                                                            {isRefunded && (
                                                                 <Badge variant="outline" className="text-[9px] h-5 px-1.5 border-green-200 text-green-700 bg-green-50 rounded-md">
-                                                                    Refunded
+                                                                    {paymentCopy.refundedBadge}
+                                                                </Badge>
+                                                            )}
+                                                            {refundOpen && (
+                                                                <Badge variant="outline" className="text-[9px] h-5 px-1.5 rounded-md">
+                                                                    {refundPending ? paymentCopy.refundPendingBadge : paymentCopy.refundReviewBadge}
                                                                 </Badge>
                                                             )}
                                                         </div>
@@ -371,9 +380,9 @@ function BillingContent() {
                                                 <div className="text-right flex-shrink-0">
                                                     <span className={cn(
                                                         "font-bold block text-base sm:text-lg whitespace-nowrap",
-                                                        isRefund ? "text-green-600" : "text-foreground"
+                                                        isRefunded ? "text-green-600" : refundOpen ? "text-muted-foreground" : "text-foreground"
                                                     )}>
-                                                        {isRefund ? '+' : '-'}${Math.abs(tx.amount || tx.totalAmount || 0).toFixed(2)}
+                                                        {isRefunded ? '+' : refundOpen ? '' : '-'}${Math.abs(tx.amount || tx.totalAmount || 0).toFixed(2)}
                                                     </span>
                                                     {isUnpaid && processingPayment && (
                                                         <span className="text-[10px] text-muted-foreground flex items-center justify-end gap-1">
