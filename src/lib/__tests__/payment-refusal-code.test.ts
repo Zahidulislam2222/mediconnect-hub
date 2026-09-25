@@ -10,7 +10,7 @@ const mockFetch = vi.fn();
 vi.stubGlobal('fetch', mockFetch);
 
 const { api, HttpResponseError, MutationOutcomeUnknownError } = await import('../api');
-const { refusedBeforeCharge } = await import('../payment-refusal');
+const { refusedBeforeCharge, outcomeUnconfirmed } = await import('../payment-refusal');
 
 const reply = (status: number, body: unknown) => ({ ok: false, status, json: async () => body });
 const pay = () => api.post('/billing/pay', { billId: 'test-bill' }).then(() => { throw new Error('expected a refusal'); }, (e: unknown) => e);
@@ -48,5 +48,15 @@ describe('pay refusals made before any charge', () => {
     const error = await pay();
     expect(error).toBeInstanceOf(MutationOutcomeUnknownError);
     expect(refusedBeforeCharge(error)).toBe(false);
+    expect(outcomeUnconfirmed(error)).toBe(true);
+  });
+
+  it('a reconciliation 409 is an unconfirmed outcome; a pre-charge refusal is not', async () => {
+    mockFetch.mockResolvedValueOnce(reply(409, { code: 'PAYMENT_RECONCILIATION_REQUIRED' }));
+    expect(outcomeUnconfirmed(await pay())).toBe(true);
+    mockFetch.mockResolvedValueOnce(reply(409, { code: 'BILL_NOT_PAYABLE' }));
+    expect(outcomeUnconfirmed(await pay())).toBe(false);
+    mockFetch.mockResolvedValueOnce(reply(400, { code: 'PAYMENT_RECONCILIATION_REQUIRED' }));
+    expect(outcomeUnconfirmed(await pay())).toBe(false);
   });
 });

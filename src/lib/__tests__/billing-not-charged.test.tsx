@@ -19,6 +19,9 @@ vi.mock('@/hooks/use-toast', () => ({ useToast: () => ({ toast: mocks.toast }) }
 vi.mock('aws-amplify/auth', () => ({ fetchAuthSession: async () => ({}), fetchUserAttributes: async () => ({ sub: 'test-patient' }), signOut: async () => {} }));
 vi.mock('@/components/layout/DashboardLayout', () => ({ DashboardLayout: ({ children }: { children: ReactNode }) => <>{children}</> }));
 
+// Built without relying on constructor argument order, which differs between hub branches.
+const refusal = (code: string) => Object.assign(new HttpResponseError('API Error: 409', 409), { code });
+
 describe('Billing refusal made before any charge', () => {
   beforeEach(() => {
     cleanup(); vi.clearAllMocks();
@@ -37,21 +40,23 @@ describe('Billing refusal made before any charge', () => {
 
   it('has not-charged copy', () => {
     expect(paymentCopy.notChargedTitle).toBeTruthy();
-    expect(paymentCopy.notChargedDescription).toMatch(/not (been )?charged/i);
+    // BILL_ALREADY_PAID and BILL_NOT_PAYABLE come back exactly when money was already taken: speak only of this attempt.
+    expect(paymentCopy.notChargedDescription).toMatch(/no new charge/i);
+    expect(`${paymentCopy.notChargedTitle} ${paymentCopy.notChargedDescription}`).not.toMatch(/you have not been charged|cannot be paid/i);
   });
 
   it.each(['BILL_NOT_PAYABLE', 'BILL_ALREADY_PAID', 'BILL_AMOUNT_REQUIRES_REVIEW'])('a 409 %s is shown as not charged', async code => {
-    mocks.post.mockRejectedValue(new HttpResponseError('API Error: 409', 409, code));
+    mocks.post.mockRejectedValue(refusal(code));
     const notices = await payAndRead();
     expect(notices).toContainEqual(expect.objectContaining({ title: paymentCopy.notChargedTitle, description: paymentCopy.notChargedDescription }));
     expect(notices.some(n => n.title === paymentCopy.failedTitle || n.description === paymentCopy.failedDescription)).toBe(false);
     expect(notices.some(n => n.title === paymentCopy.unknownTitle)).toBe(false);
   });
 
-  it('a reconciliation 409 is never shown as not charged', async () => {
-    mocks.post.mockRejectedValue(new HttpResponseError('API Error: 409', 409, 'PAYMENT_RECONCILIATION_REQUIRED'));
+  it('a reconciliation 409 is shown as unconfirmed, never as not charged or provider-declined', async () => {
+    mocks.post.mockRejectedValue(refusal('PAYMENT_RECONCILIATION_REQUIRED'));
     const notices = await payAndRead();
-    expect(notices.length).toBeGreaterThan(0);
-    expect(notices.some(n => /not (been )?charged/i.test(`${n.title} ${n.description}`))).toBe(false);
+    expect(notices).toContainEqual(expect.objectContaining({ title: paymentCopy.unknownTitle, description: paymentCopy.unknownDescription }));
+    expect(notices.some(n => n.title === paymentCopy.notChargedTitle || n.title === paymentCopy.failedTitle)).toBe(false);
   });
 });

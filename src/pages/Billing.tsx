@@ -21,7 +21,7 @@ import { useCheckout } from "@/context/CheckoutContext";
 import { api } from "@/lib/api";
 import { usePaymentLifetime } from "@/hooks/use-payment-lifetime";
 import paymentCopy from "@/content/payment";
-import { refusedBeforeCharge } from "@/lib/payment-refusal";
+import { refusedBeforeCharge, outcomeUnconfirmed } from "@/lib/payment-refusal";
 import { getUser, setUser as setStoredUser, clearAllSensitive } from "@/lib/secure-storage";
 
 export default function Billing() {
@@ -209,10 +209,12 @@ function BillingContent() {
                 toast({ variant: "destructive", title: paymentCopy.notChargedTitle, description: paymentCopy.notChargedDescription });
                 await loadFreshData();
             } else if (e.message !== "User cancelled payment") {
+                // A payment that may have charged is never reported as declined, so the patient is not invited to retry.
+                const unconfirmed = outcomeUnconfirmed(e);
                 toast({
                     variant: "destructive",
-                    title: e.code === "OUTCOME_UNKNOWN" ? paymentCopy.unknownTitle : paymentCopy.failedTitle,
-                    description: e.code === "OUTCOME_UNKNOWN" ? paymentCopy.unknownDescription : paymentCopy.failedDescription
+                    title: unconfirmed ? paymentCopy.unknownTitle : paymentCopy.failedTitle,
+                    description: unconfirmed ? paymentCopy.unknownDescription : paymentCopy.failedDescription
                 });
             }
         } finally {
