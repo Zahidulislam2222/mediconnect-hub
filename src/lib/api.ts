@@ -124,8 +124,11 @@ export const api = {
 
 class RetryableReadError extends Error {}
 export class HttpResponseError extends Error {
-    /** serverReason is the text the reply body carried; it is absent when the client had to describe the failure. */
-    constructor(message: string, readonly status: number, readonly serverReason?: string) { super(message); }
+    /**
+     * serverReason is the text the reply body carried; it is absent when the client had to describe the failure.
+     * code is the service's machine-readable refusal code, when its reply carried one as text.
+     */
+    constructor(message: string, readonly status: number, readonly serverReason?: string, readonly code?: string) { super(message); }
 }
 
 // Only these refusals carry a reason written for the person who acted; other 4xx replies are transport codes.
@@ -247,14 +250,15 @@ async function handleResponse(response: Response) {
     if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
         const reason = [errorData?.error, errorData?.message].find((value): value is string => typeof value === 'string' && value.trim() !== '');
+        const code = typeof errorData?.code === 'string' ? errorData.code : undefined;
 
         if (response.status === 404) throw new HttpResponseError("404_NOT_FOUND", response.status);
         
         if (response.status === 401) throw new HttpResponseError("401 Unauthorized", response.status);
 
-        if (response.status === 403) throw new HttpResponseError(reason ?? "403 Forbidden", response.status, reason);
+        if (response.status === 403) throw new HttpResponseError(reason ?? "403 Forbidden", response.status, reason, code);
 
-        throw new HttpResponseError(reason ?? `API Error: ${response.status}`, response.status, reason);
+        throw new HttpResponseError(reason ?? `API Error: ${response.status}`, response.status, reason, code);
     }
     return await response.json();
 }

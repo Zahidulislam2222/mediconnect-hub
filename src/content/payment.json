@@ -12,6 +12,8 @@
   "unknownDescription": "We could not confirm this payment. Check billing or contact support before trying again.",
   "failedTitle": "Payment not completed",
   "failedDescription": "The provider did not complete this payment.",
+  "notChargedTitle": "Payment not accepted",
+  "notChargedDescription": "This bill cannot be paid right now, and you have not been charged. Refresh billing to see its current status.",
   "termsVersion": "demo-2026-09-09",
   "termsPath": "/terms-of-service",
   "privacyPath": "/privacy-policy",

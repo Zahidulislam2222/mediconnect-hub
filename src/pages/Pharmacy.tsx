@@ -10,6 +10,8 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { api, isRejection, rejectionReason } from "@/lib/api";
+import { refusedBeforeCharge } from "@/lib/payment-refusal";
+import paymentCopy from "@/content/payment";
 import { getUser, setUser as setStoredUser, clearAllSensitive } from "@/lib/secure-storage";
 import { useCheckout } from "@/context/CheckoutContext";
 import { usePaymentLifetime } from "@/hooks/use-payment-lifetime";
@@ -143,6 +145,12 @@ export default function Pharmacy() {
     } catch (error) {
       if (!current(action)) return;
       if (error instanceof Error && ['User cancelled payment', 'PAYMENT_UI_CLOSED'].includes(error.message)) return;
+      if (refusedBeforeCharge(error)) {
+        // The booking service refused before calling the provider: nothing was charged, so the row unlocks.
+        setPaymentReview(previous => previous.filter(id => id !== action.id));
+        toast({ variant: 'destructive', title: paymentCopy.notChargedTitle, description: paymentCopy.notChargedDescription });
+        return;
+      }
       toast(submitted ? { ...paymentNotice(undefined), variant: 'destructive' } : {
         variant: 'destructive', title: copy.billingErrorTitle, description: copy.billingErrorDescription,
       });
