@@ -115,7 +115,8 @@ export default function Pharmacy() {
       toast({ title: copy.refillTitle, description: copy.refillDescription });
     } catch (error) {
       if (!current(action)) return;
-      // A refusal was not applied and says so; any other failure may have committed, so the row stays locked.
+      // A refusal was not applied, so the row unlocks; any other failure may have committed, so it stays locked.
+      if (isRejection(error)) setRefillReview(previous => previous.filter(id => id !== action.id));
       toast(isRejection(error)
         ? { variant: 'destructive', title: copy.refillRejectedTitle, description: rejectionReason(error) ?? copy.refillRejectedDescription }
         : { variant: 'destructive', title: copy.refillErrorTitle, description: copy.refillErrorDescription });

@@ -173,16 +173,26 @@ describe('Pharmacy response and action safety', () => {
     await open(); fireEvent.click(screen.getByRole('button', { name: /Refill/ }));
     await waitFor(() => expect(mocks.toast).toHaveBeenCalledWith({ variant: 'destructive', title: copy.refillRejectedTitle, description: reason }));
     expect(mocks.post).toHaveBeenCalledTimes(1);
+    // A35: nothing was applied, so once the patient has acted on the reason the request can be made again.
+    await waitFor(() => expect(screen.getByRole('button', { name: /Refill/ })).toBeEnabled());
+    expect(screen.queryByText(copy.refillReview)).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: /Refill/ }));
+    await waitFor(() => expect(mocks.post).toHaveBeenCalledTimes(2));
   });
 
   it.each([
-    ['a refusal without a reason', new HttpResponseError('API Error: 409', 409), copy.refillRejectedTitle, copy.refillRejectedDescription],
-    ['a missing prescription', new HttpResponseError('404_NOT_FOUND', 404), copy.refillRejectedTitle, copy.refillRejectedDescription],
-    ['a server failure', new Error('API Error: 500'), copy.refillErrorTitle, copy.refillErrorDescription],
-  ])('never shows a raw code after %s', async (_name, error, title, description) => {
+    ['a refusal without a reason', new HttpResponseError('API Error: 409', 409), copy.refillRejectedTitle, copy.refillRejectedDescription, false],
+    ['a missing prescription', new HttpResponseError('404_NOT_FOUND', 404), copy.refillRejectedTitle, copy.refillRejectedDescription, false],
+    ['a server failure', new Error('API Error: 500'), copy.refillErrorTitle, copy.refillErrorDescription, true],
+    ['a gateway failure', new HttpResponseError('API Error: 502', 502), copy.refillErrorTitle, copy.refillErrorDescription, true],
+  ])('never shows a raw code after %s', async (_name, error, title, description, locked) => {
     rows = [prescription('test-alpha', { status: 'PICKED_UP' })]; mocks.post.mockRejectedValue(error);
     await open(); fireEvent.click(screen.getByRole('button', { name: /Refill/ }));
     await waitFor(() => expect(mocks.toast).toHaveBeenCalledWith({ variant: 'destructive', title, description }));
+    // A35: only a failure that may have committed keeps the row locked against a second request.
+    await waitFor(() => locked ? expect(screen.getByRole('button', { name: /Refill/ })).toBeDisabled()
+      : expect(screen.getByRole('button', { name: /Refill/ })).toBeEnabled());
+    expect(!!screen.queryByText(copy.refillReview)).toBe(locked);
   });
 
   it('cancelling payment collection allows another deliberate attempt without charging', async () => {
