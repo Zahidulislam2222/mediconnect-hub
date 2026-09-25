@@ -58,5 +58,7 @@ describe('Billing refusal made before any charge', () => {
     const notices = await payAndRead();
     expect(notices).toContainEqual(expect.objectContaining({ title: paymentCopy.unknownTitle, description: paymentCopy.unknownDescription }));
     expect(notices.some(n => n.title === paymentCopy.notChargedTitle || n.title === paymentCopy.failedTitle)).toBe(false);
+    // R6: the charge may have landed, so billing is reloaded and a paid bill is not offered again.
+    await waitFor(() => expect(mocks.get.mock.calls.filter(([path]) => String(path).startsWith('/billing')).length).toBeGreaterThanOrEqual(2));
   });
 });

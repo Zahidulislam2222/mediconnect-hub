@@ -216,6 +216,8 @@ function BillingContent() {
                     title: unconfirmed ? paymentCopy.unknownTitle : paymentCopy.failedTitle,
                     description: unconfirmed ? paymentCopy.unknownDescription : paymentCopy.failedDescription
                 });
+                // The charge may have landed; reload so a paid bill is not offered again.
+                if (unconfirmed) await loadFreshData();
             }
         } finally {
             paying.current = false;
