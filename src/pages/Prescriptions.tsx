@@ -19,7 +19,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 
-import { api, HttpResponseError } from "@/lib/api";
+import { api, isRejection, rejectionReason } from "@/lib/api";
 import copy from "@/content/pharmacy";
 import { pharmacyRoutes, refillApprovalFrom } from "@/lib/pharmacy-contract";
 import { clearAllSensitive } from "@/lib/secure-storage";
@@ -193,8 +193,6 @@ export default function Prescriptions() {
     // --- 3. APPROVE REFILL ---
     // The pharmacy service decides the outcome: a billed refill (PENDING, awaiting the patient's payment) or, when the
     // previous fill was never collected, that fill restored (ISSUED). Nothing changes on screen until it has answered.
-    // Only these rejections carry a reason written for the doctor; other 4xx replies are transport codes.
-    const REASONED_REJECTIONS = [400, 403, 409];
     // A rejection (4xx) was not applied. Any other failure may have committed, so the doctor is told to check the list
     // first rather than approve again.
     const handleApproveRefill = async (rx: any) => {
@@ -210,10 +208,9 @@ export default function Prescriptions() {
                 : approval.paymentStatus === "PAID" ? copy.restoredTemplate : copy.restoredUnpaidTemplate;
             toast({ title: status === "PENDING" ? copy.approvedTitle : copy.restoredTitle, description: template.replace('{medication}', rx.medication) });
         } catch (e) {
-            toast(!(e instanceof HttpResponseError && e.status >= 400 && e.status < 500)
+            toast(!isRejection(e)
                 ? { variant: "destructive", title: copy.approveUnconfirmedTitle, description: copy.approveUnconfirmedDescription }
-                : { variant: "destructive", title: copy.approveRejectedTitle,
-                    description: REASONED_REJECTIONS.includes(e.status) ? e.message : copy.approveRejectedDescription });
+                : { variant: "destructive", title: copy.approveRejectedTitle, description: rejectionReason(e) ?? copy.approveRejectedDescription });
         } finally {
             setApprovingIds(current => { const next = new Set(current); next.delete(id); return next; });
         }

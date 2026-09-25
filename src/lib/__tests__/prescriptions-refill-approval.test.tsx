@@ -63,7 +63,8 @@ describe('doctor approval of a legacy refill request', () => {
   });
 
   it.each([400, 403, 409])('shows the service reason for a %i rejection, and keeps the request', async code => {
-    mocks.post.mockRejectedValue(new HttpResponseError('This prescription was cancelled. Issue a new prescription instead.', code));
+    const reason = 'This prescription was cancelled. Issue a new prescription instead.';
+    mocks.post.mockRejectedValue(new HttpResponseError(reason, code, reason));
     fireEvent.click((await openRefillRequests())[0]);
     await waitFor(() => expect(mocks.toast).toHaveBeenCalledWith({
       variant: 'destructive', title: copy.approveRejectedTitle, description: 'This prescription was cancelled. Issue a new prescription instead.' }));
@@ -72,7 +73,7 @@ describe('doctor approval of a legacy refill request', () => {
     expect(screen.getByRole('button', { name: /approve/i })).toBeEnabled();
   });
 
-  it.each([[404, '404_NOT_FOUND'], [401, '401 Unauthorized']])('never shows a raw %i code to the doctor', async (code, message) => {
+  it.each([[404, '404_NOT_FOUND'], [401, '401 Unauthorized'], [409, 'API Error: 409'], [400, 'API Error: 400']])('never shows a raw %i code to the doctor', async (code, message) => {
     mocks.post.mockRejectedValue(new HttpResponseError(message, code));
     fireEvent.click((await openRefillRequests())[0]);
     await waitFor(() => expect(mocks.toast).toHaveBeenCalledWith({

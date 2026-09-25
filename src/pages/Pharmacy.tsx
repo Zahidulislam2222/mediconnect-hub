@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { api } from "@/lib/api";
+import { api, isRejection, rejectionReason } from "@/lib/api";
 import { getUser, setUser as setStoredUser, clearAllSensitive } from "@/lib/secure-storage";
 import { useCheckout } from "@/context/CheckoutContext";
 import { usePaymentLifetime } from "@/hooks/use-payment-lifetime";
@@ -113,7 +113,13 @@ export default function Pharmacy() {
       if (!refillAcknowledged(response)) throw new Error('REFILL_UNCONFIRMED');
       updateLocalStatus(action.id, 'PENDING');
       toast({ title: copy.refillTitle, description: copy.refillDescription });
-    } catch { if (current(action)) toast({ variant: 'destructive', title: copy.refillErrorTitle, description: copy.refillErrorDescription }); }
+    } catch (error) {
+      if (!current(action)) return;
+      // A refusal was not applied and says so; any other failure may have committed, so the row stays locked.
+      toast(isRejection(error)
+        ? { variant: 'destructive', title: copy.refillRejectedTitle, description: rejectionReason(error) ?? copy.refillRejectedDescription }
+        : { variant: 'destructive', title: copy.refillErrorTitle, description: copy.refillErrorDescription });
+    }
     finally { end(action); }
   }
   async function handlePayMedication(rx: Prescription) {

@@ -6,10 +6,12 @@ import Pharmacy from '@/pages/Pharmacy';
 import { SESSION_CLEARED_EVENT } from '@/lib/secure-storage';
 import type * as StorageNamespace from '@/lib/secure-storage';
 import paymentCopy from '@/content/payment';
+import copy from '@/content/pharmacy';
+import { HttpResponseError } from '@/lib/api';
 
 const mocks = vi.hoisted(() => ({ get: vi.fn(), post: vi.fn(), payment: vi.fn(), toast: vi.fn(), setUser: vi.fn() }));
 vi.mock('@/context/CheckoutContext', () => ({ useCheckout: () => ({ requestPayment: mocks.payment }) }));
-vi.mock('@/lib/api', () => ({ api: { get: mocks.get, post: mocks.post } }));
+vi.mock('@/lib/api', async importOriginal => ({ ...await importOriginal<typeof import('@/lib/api')>(), api: { get: mocks.get, post: mocks.post } }));
 vi.mock('@/lib/secure-storage', async original => ({ ...await original<typeof StorageNamespace>(), getUser: () => ({ id: 'test-patient', name: 'Test Patient' }), setUser: mocks.setUser }));
 vi.mock('@/hooks/use-toast', () => ({ useToast: () => ({ toast: mocks.toast }) }));
 vi.mock('aws-amplify/auth', () => ({ getCurrentUser: async () => ({ userId: 'test-patient' }), fetchAuthSession: async () => ({}), signOut: async () => {} }));
@@ -163,6 +165,24 @@ describe('Pharmacy response and action safety', () => {
     await open(); fireEvent.click(screen.getByRole('button', { name: /Refill/ }));
     await waitFor(() => expect(mocks.toast).toHaveBeenCalledWith(expect.objectContaining({ variant: 'destructive' })));
     expect(screen.getByRole('button', { name: /Refill/ })).toBeDisabled(); expect(mocks.post).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([400, 403, 409])('shows the pharmacy service reason when it refuses a refill (%i)', async status => {
+    const reason = 'Settle the outstanding bill for this prescription in Billing before requesting a refill.';
+    rows = [prescription('test-alpha', { status: 'PICKED_UP' })]; mocks.post.mockRejectedValue(new HttpResponseError(reason, status, reason));
+    await open(); fireEvent.click(screen.getByRole('button', { name: /Refill/ }));
+    await waitFor(() => expect(mocks.toast).toHaveBeenCalledWith({ variant: 'destructive', title: copy.refillRejectedTitle, description: reason }));
+    expect(mocks.post).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    ['a refusal without a reason', new HttpResponseError('API Error: 409', 409), copy.refillRejectedTitle, copy.refillRejectedDescription],
+    ['a missing prescription', new HttpResponseError('404_NOT_FOUND', 404), copy.refillRejectedTitle, copy.refillRejectedDescription],
+    ['a server failure', new Error('API Error: 500'), copy.refillErrorTitle, copy.refillErrorDescription],
+  ])('never shows a raw code after %s', async (_name, error, title, description) => {
+    rows = [prescription('test-alpha', { status: 'PICKED_UP' })]; mocks.post.mockRejectedValue(error);
+    await open(); fireEvent.click(screen.getByRole('button', { name: /Refill/ }));
+    await waitFor(() => expect(mocks.toast).toHaveBeenCalledWith({ variant: 'destructive', title, description }));
   });
 
   it('cancelling payment collection allows another deliberate attempt without charging', async () => {

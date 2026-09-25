@@ -50,5 +50,7 @@
   "approveUnconfirmedTitle": "Refill outcome unconfirmed",
   "approveUnconfirmedDescription": "We could not confirm this approval. Refresh the list and check its status before approving again.",
   "restoredUnpaidTemplate": "{medication} was never collected, so no new refill was charged. Its existing bill must be paid before pickup.",
-  "approveRejectedDescription": "The pharmacy service did not apply this approval. Refresh the list to see the prescription's current state."
+  "approveRejectedDescription": "The pharmacy service did not apply this approval. Refresh the list to see the prescription's current state.",
+  "refillRejectedTitle": "Refill not requested",
+  "refillRejectedDescription": "The pharmacy did not accept this refill request. Sync to see the prescription's current state."
 }
