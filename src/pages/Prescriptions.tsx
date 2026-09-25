@@ -19,7 +19,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 
-import { api } from "@/lib/api";
+import { api, HttpResponseError } from "@/lib/api";
+import copy from "@/content/pharmacy";
 import { pharmacyRoutes, refillApprovalFrom } from "@/lib/pharmacy-contract";
 import { clearAllSensitive } from "@/lib/secure-storage";
 
@@ -42,7 +43,7 @@ export default function Prescriptions() {
     // Modal State
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
-    const [approvingId, setApprovingId] = useState<string | null>(null);
+    const [approvingIds, setApprovingIds] = useState<ReadonlySet<string>>(new Set());
     const [interactionError, setInteractionError] = useState<string | null>(null);
 
     const [formData, setFormData] = useState({
@@ -192,20 +193,25 @@ export default function Prescriptions() {
     // --- 3. APPROVE REFILL ---
     // The pharmacy service decides the outcome: a billed refill (PENDING, awaiting the patient's payment) or, when the
     // previous fill was never collected, that fill restored (ISSUED). Nothing changes on screen until it has answered.
+    // A rejection (4xx) carries the service's reason. Any other failure may have committed, so the doctor is told to
+    // check the list first rather than approve again.
     const handleApproveRefill = async (rx: any) => {
-        setApprovingId(rx.prescriptionId);
+        const id = rx.prescriptionId;
+        setApprovingIds(current => new Set(current).add(id));
         try {
-            const status = refillApprovalFrom(await api.post(pharmacyRoutes.refill, { prescriptionId: rx.prescriptionId }));
+            const status = refillApprovalFrom(await api.post(pharmacyRoutes.refill, { prescriptionId: id }));
             setPrescriptions(current => current.map(item =>
-                item.prescriptionId === rx.prescriptionId ? { ...item, status, updatedAt: new Date().toISOString() } : item
+                item.prescriptionId === id ? { ...item, status, updatedAt: new Date().toISOString() } : item
             ));
             toast(status === "PENDING"
-                ? { title: "Refill Approved", description: `The patient has been asked to pay for ${rx.medication}.` }
-                : { title: "Previous Fill Restored", description: `${rx.medication} was never collected, so no new refill was charged.` });
+                ? { title: copy.approvedTitle, description: copy.approvedTemplate.replace('{medication}', rx.medication) }
+                : { title: copy.restoredTitle, description: copy.restoredTemplate.replace('{medication}', rx.medication) });
         } catch (e) {
-            toast({ variant: "destructive", title: "Refill not approved", description: "The prescription may have changed. Refresh and try again." });
+            toast(e instanceof HttpResponseError && e.status >= 400 && e.status < 500
+                ? { variant: "destructive", title: copy.approveRejectedTitle, description: e.message }
+                : { variant: "destructive", title: copy.approveUnconfirmedTitle, description: copy.approveUnconfirmedDescription });
         } finally {
-            setApprovingId(null);
+            setApprovingIds(current => { const next = new Set(current); next.delete(id); return next; });
         }
     };
 
@@ -417,7 +423,7 @@ export default function Prescriptions() {
                                                 </div>
                                                 <Button
                                                     className="bg-green-600 hover:bg-green-700 text-white"
-                                                    disabled={approvingId === rx.prescriptionId}
+                                                    disabled={approvingIds.has(rx.prescriptionId)}
                                                     onClick={() => handleApproveRefill(rx)}
                                                 >
                                                     <CheckCircle2 className="w-4 h-4 mr-2" /> Approve

@@ -41,5 +41,12 @@
   "interactionTitle": "Medication safety",
   "interactionDescription": "Ask your pharmacist or prescriber to review interactions. This page does not establish that an interaction check has been completed.",
   "qrTitle": "Scan at Pharmacy",
-  "qrDescription": "Show this prescription's code to the pharmacist."
+  "qrDescription": "Show this prescription's code to the pharmacist.",
+  "approvedTitle": "Refill approved",
+  "approvedTemplate": "{medication} is billed and waits for the patient's payment before pickup.",
+  "restoredTitle": "Previous fill restored",
+  "restoredTemplate": "{medication} was never collected, so no new refill was charged.",
+  "approveRejectedTitle": "Refill not approved",
+  "approveUnconfirmedTitle": "Refill outcome unconfirmed",
+  "approveUnconfirmedDescription": "We could not confirm this approval. Refresh the list and check its status before approving again."
 }
