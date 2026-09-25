@@ -40,9 +40,10 @@ describe('doctor approval of a legacy refill request', () => {
   afterEach(cleanup);
 
   it.each([
-    ['PENDING', copy.approvedTitle, copy.approvedTemplate],
-    ['ISSUED', copy.restoredTitle, copy.restoredTemplate],
-  ])('asks the pharmacy service and shows the %s outcome it returns', async (status, title, template) => {
+    ['a billed refill', { status: 'PENDING' }, copy.approvedTitle, copy.approvedTemplate],
+    ['a restored paid fill', { status: 'ISSUED', paymentStatus: 'PAID' }, copy.restoredTitle, copy.restoredTemplate],
+    ['a restored fill that still needs its bill paid', { status: 'ISSUED', paymentStatus: 'UNPAID' }, copy.restoredTitle, copy.restoredUnpaidTemplate],
+  ])('asks the pharmacy service and shows %s', async (_name, outcome, title, template) => {
     const answer = deferred();
     mocks.post.mockReturnValue(answer.promise);
     const [approve] = await openRefillRequests();
@@ -55,14 +56,14 @@ describe('doctor approval of a legacy refill request', () => {
     expect(approve).toBeDisabled();
     expect(screen.getByText('Refill Requested')).toBeInTheDocument();
 
-    answer.resolve({ message: 'ignored', status });
+    answer.resolve({ message: 'ignored', ...outcome });
     await waitFor(() => expect(mocks.toast).toHaveBeenCalledWith({ title, description: template.replace('{medication}', 'test-med') }));
     expect(screen.queryByText('Refill Requested')).not.toBeInTheDocument();
     expect(screen.getByRole('tab', { name: /active/i })).toHaveTextContent('Active (1)');
   });
 
-  it('shows the service reason when it rejects the approval, and keeps the request', async () => {
-    mocks.post.mockRejectedValue(new HttpResponseError('This prescription was cancelled. Issue a new prescription instead.', 409));
+  it.each([400, 403, 409])('shows the service reason for a %i rejection, and keeps the request', async code => {
+    mocks.post.mockRejectedValue(new HttpResponseError('This prescription was cancelled. Issue a new prescription instead.', code));
     fireEvent.click((await openRefillRequests())[0]);
     await waitFor(() => expect(mocks.toast).toHaveBeenCalledWith({
       variant: 'destructive', title: copy.approveRejectedTitle, description: 'This prescription was cancelled. Issue a new prescription instead.' }));
@@ -71,12 +72,20 @@ describe('doctor approval of a legacy refill request', () => {
     expect(screen.getByRole('button', { name: /approve/i })).toBeEnabled();
   });
 
+  it.each([[404, '404_NOT_FOUND'], [401, '401 Unauthorized']])('never shows a raw %i code to the doctor', async (code, message) => {
+    mocks.post.mockRejectedValue(new HttpResponseError(message, code));
+    fireEvent.click((await openRefillRequests())[0]);
+    await waitFor(() => expect(mocks.toast).toHaveBeenCalledWith({
+      variant: 'destructive', title: copy.approveRejectedTitle, description: copy.approveRejectedDescription }));
+  });
+
   it.each([
     ['an outcome the client could not confirm', new MutationOutcomeUnknownError()],
+    ['a restore reply without its payment state', { status: 'ISSUED' }],
     ['a server failure', new Error('API Error: 500')],
     ['a response without a recognised status (an older pharmacy service)', null],
   ])('never invites a blind retry after %s', async (_name, error) => {
-    if (error) mocks.post.mockRejectedValue(error); else mocks.post.mockResolvedValue({ message: 'Refill authorized' });
+    if (error instanceof Error) mocks.post.mockRejectedValue(error); else mocks.post.mockResolvedValue(error ?? { message: 'Refill authorized' });
     fireEvent.click((await openRefillRequests())[0]);
     await waitFor(() => expect(mocks.toast).toHaveBeenCalledWith({
       variant: 'destructive', title: copy.approveUnconfirmedTitle, description: copy.approveUnconfirmedDescription }));
@@ -93,7 +102,7 @@ describe('doctor approval of a legacy refill request', () => {
     await waitFor(() => expect(mocks.toast).toHaveBeenCalledTimes(1));
     const rowA = screen.getByText('med-a').closest('div.flex-col, [class*="flex-col"]') as HTMLElement;
     expect(within(rowA).getByRole('button', { name: /approve/i })).toBeDisabled();
-    first.resolve({ status: 'ISSUED' });
+    first.resolve({ status: 'ISSUED', paymentStatus: 'PAID' });
     await waitFor(() => expect(mocks.toast).toHaveBeenCalledTimes(2));
     expect(screen.queryByText('Refill Requested')).not.toBeInTheDocument();
   });

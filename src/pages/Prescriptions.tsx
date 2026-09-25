@@ -193,23 +193,27 @@ export default function Prescriptions() {
     // --- 3. APPROVE REFILL ---
     // The pharmacy service decides the outcome: a billed refill (PENDING, awaiting the patient's payment) or, when the
     // previous fill was never collected, that fill restored (ISSUED). Nothing changes on screen until it has answered.
-    // A rejection (4xx) carries the service's reason. Any other failure may have committed, so the doctor is told to
-    // check the list first rather than approve again.
+    // Only these rejections carry a reason written for the doctor; other 4xx replies are transport codes.
+    const REASONED_REJECTIONS = [400, 403, 409];
+    // A rejection (4xx) was not applied. Any other failure may have committed, so the doctor is told to check the list
+    // first rather than approve again.
     const handleApproveRefill = async (rx: any) => {
         const id = rx.prescriptionId;
         setApprovingIds(current => new Set(current).add(id));
         try {
-            const status = refillApprovalFrom(await api.post(pharmacyRoutes.refill, { prescriptionId: id }));
+            const approval = refillApprovalFrom(await api.post(pharmacyRoutes.refill, { prescriptionId: id }));
+            const { status } = approval;
             setPrescriptions(current => current.map(item =>
                 item.prescriptionId === id ? { ...item, status, updatedAt: new Date().toISOString() } : item
             ));
-            toast(status === "PENDING"
-                ? { title: copy.approvedTitle, description: copy.approvedTemplate.replace('{medication}', rx.medication) }
-                : { title: copy.restoredTitle, description: copy.restoredTemplate.replace('{medication}', rx.medication) });
+            const template = approval.status === "PENDING" ? copy.approvedTemplate
+                : approval.paymentStatus === "PAID" ? copy.restoredTemplate : copy.restoredUnpaidTemplate;
+            toast({ title: status === "PENDING" ? copy.approvedTitle : copy.restoredTitle, description: template.replace('{medication}', rx.medication) });
         } catch (e) {
-            toast(e instanceof HttpResponseError && e.status >= 400 && e.status < 500
-                ? { variant: "destructive", title: copy.approveRejectedTitle, description: e.message }
-                : { variant: "destructive", title: copy.approveUnconfirmedTitle, description: copy.approveUnconfirmedDescription });
+            toast(!(e instanceof HttpResponseError && e.status >= 400 && e.status < 500)
+                ? { variant: "destructive", title: copy.approveUnconfirmedTitle, description: copy.approveUnconfirmedDescription }
+                : { variant: "destructive", title: copy.approveRejectedTitle,
+                    description: REASONED_REJECTIONS.includes(e.status) ? e.message : copy.approveRejectedDescription });
         } finally {
             setApprovingIds(current => { const next = new Set(current); next.delete(id); return next; });
         }
