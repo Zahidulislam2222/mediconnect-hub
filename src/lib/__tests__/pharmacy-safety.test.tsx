@@ -7,7 +7,7 @@ import { SESSION_CLEARED_EVENT } from '@/lib/secure-storage';
 import type * as StorageNamespace from '@/lib/secure-storage';
 import paymentCopy from '@/content/payment';
 import copy from '@/content/pharmacy';
-import { HttpResponseError } from '@/lib/api';
+import { HttpResponseError, MutationOutcomeUnknownError } from '@/lib/api';
 
 const mocks = vi.hoisted(() => ({ get: vi.fn(), post: vi.fn(), payment: vi.fn(), toast: vi.fn(), setUser: vi.fn() }));
 vi.mock('@/context/CheckoutContext', () => ({ useCheckout: () => ({ requestPayment: mocks.payment }) }));
@@ -184,7 +184,8 @@ describe('Pharmacy response and action safety', () => {
     ['a refusal without a reason', new HttpResponseError('API Error: 409', 409), copy.refillRejectedTitle, copy.refillRejectedDescription, false],
     ['a missing prescription', new HttpResponseError('404_NOT_FOUND', 404), copy.refillRejectedTitle, copy.refillRejectedDescription, false],
     ['a server failure', new Error('API Error: 500'), copy.refillErrorTitle, copy.refillErrorDescription, true],
-    ['a gateway failure', new HttpResponseError('API Error: 502', 502), copy.refillErrorTitle, copy.refillErrorDescription, true],
+    // A POST that times out or gets a 5xx may have committed; api.ts reports it as an unknown outcome.
+    ['an unknown outcome', new MutationOutcomeUnknownError(), copy.refillErrorTitle, copy.refillErrorDescription, true],
   ])('never shows a raw code after %s', async (_name, error, title, description, locked) => {
     rows = [prescription('test-alpha', { status: 'PICKED_UP' })]; mocks.post.mockRejectedValue(error);
     await open(); fireEvent.click(screen.getByRole('button', { name: /Refill/ }));
