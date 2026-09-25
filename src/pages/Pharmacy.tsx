@@ -149,6 +149,8 @@ export default function Pharmacy() {
         // The booking service refused before calling the provider: nothing was charged, so the row unlocks.
         setPaymentReview(previous => previous.filter(id => id !== action.id));
         toast({ variant: 'destructive', title: paymentCopy.notChargedTitle, description: paymentCopy.notChargedDescription });
+        // The bill may already be paid or under review; reload so the row shows its real state.
+        await fetchPrescriptions();
         return;
       }
       toast(submitted ? { ...paymentNotice(undefined), variant: 'destructive' } : {

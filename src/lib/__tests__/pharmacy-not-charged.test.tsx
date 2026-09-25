@@ -21,7 +21,8 @@ vi.mock('react-qr-code', () => ({ default: ({ value }: { value: string }) => <di
 
 const unpaid = { prescriptionId: 'test-alpha', medication: 'test-alpha', dosage: 'Test dosage', instructions: 'Test instructions', timestamp: '2026-01-01T00:00:00Z',
   status: 'ISSUED', paymentStatus: 'UNPAID', livePrice: 12, price: 99, liveStock: 5, refillsRemaining: 2 };
-const refusal = (code: string) => new HttpResponseError('API Error: 409', 409, undefined, code);
+// Built without relying on constructor argument order, which differs between hub branches.
+const refusal = (code: string) => Object.assign(new HttpResponseError('API Error: 409', 409), { code });
 
 async function payAndRead(error: Error) {
   mocks.post.mockRejectedValue(error);
@@ -49,6 +50,8 @@ describe('Pharmacy payment refused before any charge', () => {
     expect(notices.some(n => n.title === paymentCopy.unknownTitle)).toBe(false);
     await waitFor(() => expect(screen.getByRole('button', { name: /Pay/ })).toBeEnabled());
     expect(screen.queryByText(copy.paymentReview)).not.toBeInTheDocument();
+    const prescriptionLoads = mocks.get.mock.calls.filter(([path]) => String(path).startsWith('/prescription')).length;
+    expect(prescriptionLoads, 'prescriptions reloaded after the refusal').toBeGreaterThanOrEqual(2);
   });
 
   it('a reconciliation 409 stays unconfirmed and locked', async () => {
