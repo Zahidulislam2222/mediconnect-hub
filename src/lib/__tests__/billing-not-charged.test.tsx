@@ -6,7 +6,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ReactNode } from 'react';
 import Billing from '@/pages/Billing';
 import paymentCopy from '@/content/payment';
-import { HttpResponseError } from '@/lib/api';
+import { HttpResponseError, MutationOutcomeUnknownError } from '@/lib/api';
 import type * as ApiNamespace from '@/lib/api';
 import type * as StorageNamespace from '@/lib/secure-storage';
 type StorageModule = typeof StorageNamespace;
@@ -60,5 +60,30 @@ describe('Billing refusal made before any charge', () => {
     expect(notices.some(n => n.title === paymentCopy.notChargedTitle || n.title === paymentCopy.failedTitle)).toBe(false);
     // R6: the charge may have landed, so billing is reloaded and a paid bill is not offered again.
     await waitFor(() => expect(mocks.get.mock.calls.filter(([path]) => String(path).startsWith('/billing')).length).toBeGreaterThanOrEqual(2));
+  });
+
+  // R6b: a lost response may hide a charge that landed; the reload shows the bill as paid and stops offering it.
+  it('a lost payment response reloads billing and shows a bill that was paid meanwhile', async () => {
+    let billingLoads = 0;
+    mocks.get.mockImplementation(async (path: string) => {
+      if (!path.startsWith('/billing')) return { name: 'Test Patient' };
+      billingLoads++;
+      return billingLoads === 1
+        ? { outstandingBalance: 10, transactions: [{ billId: 'test-invoice', patientId: 'test-patient', amount: 10, status: 'DUE' }] }
+        : { outstandingBalance: 0, transactions: [{ billId: 'test-invoice', patientId: 'test-patient', amount: 10, status: 'PAID' }] };
+    });
+    mocks.post.mockRejectedValue(new MutationOutcomeUnknownError());
+    const notices = await payAndRead();
+    expect(notices).toContainEqual(expect.objectContaining({ title: paymentCopy.unknownTitle }));
+    await waitFor(() => expect(billingLoads).toBeGreaterThanOrEqual(2));
+    await waitFor(() => expect(screen.queryByRole('button', { name: /pay/i })).toBeNull());
+  });
+
+  it('a provider-declined payment keeps the declined notice and does not reload', async () => {
+    mocks.post.mockRejectedValue(new Error('Your card was declined.'));
+    const notices = await payAndRead();
+    expect(notices).toContainEqual(expect.objectContaining({ title: paymentCopy.failedTitle }));
+    await act(async () => {});
+    expect(mocks.get.mock.calls.filter(([path]) => String(path).startsWith('/billing')).length).toBe(1);
   });
 });
