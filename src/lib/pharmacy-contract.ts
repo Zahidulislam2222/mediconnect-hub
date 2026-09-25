@@ -36,6 +36,11 @@ export function pickupFrom(value: unknown, prescriptionId: string) {
 export function refillAcknowledged(value: unknown) {
   return z.object({ message: z.literal('Refill authorized') }).safeParse(value).success;
 }
+// Approving a legacy refill request either bills a real refill (PENDING) or, when the previous fill was never
+// collected, restores that fill (ISSUED). The status the service returns is the only status the page may show.
+export function refillApprovalFrom(value: unknown) {
+  return z.object({ status: z.enum(['PENDING', 'ISSUED']) }).parse(value).status;
+}
 const bill = z.object({ billId: text, referenceId: text, patientId: text, amount: number, status: text,
   paymentAttemptId: z.unknown().optional(), paymentIntentId: z.unknown().optional() });
 export function payableBillFrom(value: unknown, prescriptionId: string, patientId: string) {
