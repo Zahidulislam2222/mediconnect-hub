@@ -75,8 +75,11 @@ describe('Billing refusal made before any charge', () => {
     mocks.post.mockRejectedValue(new MutationOutcomeUnknownError());
     const notices = await payAndRead();
     expect(notices).toContainEqual(expect.objectContaining({ title: paymentCopy.unknownTitle }));
+    expect(notices.some(n => n.title === paymentCopy.failedTitle || n.title === paymentCopy.notChargedTitle)).toBe(false);
     await waitFor(() => expect(billingLoads).toBeGreaterThanOrEqual(2));
-    await waitFor(() => expect(screen.queryByRole('button', { name: /pay/i })).toBeNull());
+    // The reloaded PAID state is rendered (not merely a loading state without the button).
+    expect(await screen.findByText('No Balance Due')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /pay/i })).toBeNull();
   });
 
   it('a provider-declined payment keeps the declined notice and does not reload', async () => {
