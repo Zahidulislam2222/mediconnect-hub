@@ -8,10 +8,11 @@ import type * as StorageNamespace from '@/lib/secure-storage';
 import paymentCopy from '@/content/payment';
 import copy from '@/content/pharmacy';
 import { HttpResponseError, MutationOutcomeUnknownError } from '@/lib/api';
+import type * as ApiNamespace from '@/lib/api';
 
 const mocks = vi.hoisted(() => ({ get: vi.fn(), post: vi.fn(), payment: vi.fn(), toast: vi.fn(), setUser: vi.fn() }));
 vi.mock('@/context/CheckoutContext', () => ({ useCheckout: () => ({ requestPayment: mocks.payment }) }));
-vi.mock('@/lib/api', async importOriginal => ({ ...await importOriginal<typeof import('@/lib/api')>(), api: { get: mocks.get, post: mocks.post } }));
+vi.mock('@/lib/api', async importOriginal => ({ ...await importOriginal<typeof ApiNamespace>(), api: { get: mocks.get, post: mocks.post } }));
 vi.mock('@/lib/secure-storage', async original => ({ ...await original<typeof StorageNamespace>(), getUser: () => ({ id: 'test-patient', name: 'Test Patient' }), setUser: mocks.setUser }));
 vi.mock('@/hooks/use-toast', () => ({ useToast: () => ({ toast: mocks.toast }) }));
 vi.mock('aws-amplify/auth', () => ({ getCurrentUser: async () => ({ userId: 'test-patient' }), fetchAuthSession: async () => ({}), signOut: async () => {} }));

@@ -5,10 +5,11 @@ import type { ReactNode } from 'react';
 import Prescriptions from '@/pages/Prescriptions';
 import { pharmacyRoutes } from '@/lib/pharmacy-contract';
 import { HttpResponseError, MutationOutcomeUnknownError } from '@/lib/api';
+import type * as ApiNamespace from '@/lib/api';
 import copy from '@/content/pharmacy';
 
 const mocks = vi.hoisted(() => ({ get: vi.fn(), post: vi.fn(), put: vi.fn(), toast: vi.fn() }));
-vi.mock('@/lib/api', async importOriginal => ({ ...await importOriginal<typeof import('@/lib/api')>(), api: { get: mocks.get, post: mocks.post, put: mocks.put } }));
+vi.mock('@/lib/api', async importOriginal => ({ ...await importOriginal<typeof ApiNamespace>(), api: { get: mocks.get, post: mocks.post, put: mocks.put } }));
 vi.mock('@/hooks/use-toast', () => ({ useToast: () => ({ toast: mocks.toast }) }));
 vi.mock('aws-amplify/auth', () => ({ getCurrentUser: async () => ({ userId: 'test-doctor' }), fetchAuthSession: async () => ({}), signOut: async () => {} }));
 vi.mock('@/components/layout/DashboardLayout', () => ({ DashboardLayout: ({ children }: { children: ReactNode }) => <>{children}</> }));
