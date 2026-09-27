@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Page } from './test';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 const safety = JSON.parse(readFileSync(path.join(process.cwd(), 'src/content/symptom-safety.json'), 'utf8')) as Record<string, string>;
@@ -8,7 +8,7 @@ async function open(page: Page, outcome: 'available' | 'unavailable' | 'malforme
   const writes: unknown[] = [];
   await page.route('**/*', async route => {
     const request = route.request(); const url = new URL(request.url());
-    if (url.hostname === '127.0.0.1') return route.continue();
+    if (url.hostname === '127.0.0.1') return route.fallback();
     if (url.hostname !== 'symptoms.example.test') return route.abort();
     if (request.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: {
       'access-control-allow-origin': '*', 'access-control-allow-methods': 'GET, POST',

@@ -10,6 +10,7 @@ export default defineConfig({
   use: {
     baseURL: e2eBaseUrl,
     trace: 'on-first-retry',
+    serviceWorkers: 'block',
   },
   webServer: {
     command: `npm run dev -- --host 127.0.0.1 --port ${e2ePort} --strictPort`,

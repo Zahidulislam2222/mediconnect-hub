@@ -1,4 +1,4 @@
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect, type Page } from './test';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 interface Bridge { __statusMode?: string; __finishStatus?: () => void; __finishPortal?: () => void; __opened: string[] }
@@ -8,7 +8,7 @@ async function open(page: Page, mode = 'deferred') {
     window.confirm = () => true;
     window.open = url => { bridge.__opened.push(String(url)); return null; };
   }, mode);
-  await page.route('**/*', route => new URL(route.request().url()).hostname === '127.0.0.1' ? route.continue() : route.abort());
+  await page.route('**/*', route => new URL(route.request().url()).hostname === '127.0.0.1' ? route.fallback() : route.abort());
   await page.route('**/src/context/VerifiedSession.tsx*', route => route.fulfill({ contentType: 'application/javascript',
     body: 'const identity = { id: "test-user", role: "patient", expires: 2000000000 }; export const useVerifiedSession = () => identity;' }));
   await page.route('**/src/lib/subscription.ts*', route => route.fulfill({ contentType: 'application/javascript',

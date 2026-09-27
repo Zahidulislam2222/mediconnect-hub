@@ -1,11 +1,11 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './test';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 
 test('catalog data changes reach the actual page without changing server entitlement', async ({ page }) => {
   const catalog = JSON.parse(readFileSync(path.join(process.cwd(), 'src/content/subscription-plans.json'), 'utf8'));
   catalog.plans[1].name = 'Test Plus Updated'; catalog.plans[1].price = 23.5; catalog.plans[1].discountPercent = 27;
-  await page.route('**/*', route => new URL(route.request().url()).hostname === '127.0.0.1' ? route.continue() : route.abort());
+  await page.route('**/*', route => new URL(route.request().url()).hostname === '127.0.0.1' ? route.fallback() : route.abort());
   await page.route('**/src/context/VerifiedSession.tsx*', route => route.fulfill({ contentType: 'application/javascript',
     body: 'const identity = { id: "test-user", role: "patient", expires: 2000000000 }; export const useVerifiedSession = () => identity;' }));
   await page.route('**/src/lib/api.ts*', route => route.fulfill({ contentType: 'application/javascript',

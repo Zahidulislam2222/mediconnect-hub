@@ -55,7 +55,9 @@ export default function Pharmacy() {
       const name = typeof profile?.name === 'string' && profile.name.trim() ? profile.name : copy.patient;
       const avatar = typeof profile?.avatar === 'string' ? profile.avatar : undefined;
       const verifiedUser = { id: authUser.userId, name, avatar };
-      setStoredUser({ ...getUser(), ...verifiedUser });
+      const cachedUser = getUser<unknown>();
+      const cachedProfile = cachedUser && typeof cachedUser === 'object' && !Array.isArray(cachedUser) ? cachedUser : {};
+      setStoredUser({ ...cachedProfile, ...verifiedUser });
       setUser(verifiedUser); setPrescriptions(rows);
     } catch (error) {
       if (!current()) return;

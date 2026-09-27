@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './test';
 
 test.describe('Route Protection', () => {
   test('unauthenticated user visiting /patient-dashboard redirects to /auth', async ({ page }) => {

@@ -4,6 +4,7 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
+    "typecheck": "tsc -p tsconfig.app.json --noEmit && tsc -p tsconfig.node.json --noEmit && tsc -p tsconfig.e2e.json --noEmit",
     "verify:config": "node scripts/verify_frontend_config.mjs",
     "build:screen-review": "vite build --config vite.screen-review.config.ts",
     "typecheck:screen-review": "tsc -p tsconfig.screen-review.json --noEmit",

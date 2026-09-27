@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './test';
 
 test.describe('Auth Page', () => {
   test('login form renders with email and password fields', async ({ page }) => {
@@ -47,13 +47,20 @@ test.describe('Auth Page', () => {
   test('can switch between login and signup views', async ({ page }) => {
     await page.goto('/auth');
 
-    // Look for a link or button to switch to signup
-    const signUpLink = page.getByText(/create an account|sign up|register/i);
-    if (await signUpLink.isVisible()) {
-      await signUpLink.click();
-      // After switching, a name field should appear (signup has name, login does not)
-      const nameInput = page.locator('input[id="name"], input[placeholder*="name" i]');
-      await expect(nameInput).toBeVisible({ timeout: 5000 });
-    }
+    await page.getByRole('button', { name: 'Customize', exact: true }).click();
+    await page.getByRole('checkbox', { name: /Functional/ }).uncheck();
+    await page.getByRole('checkbox', { name: /Analytics/ }).uncheck();
+    await page.getByRole('button', { name: 'Accept Selected', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Customize', exact: true })).toBeHidden();
+
+    const signUpLink = page.getByRole('button', { name: 'Create one now', exact: true });
+    await expect(signUpLink).toBeVisible();
+    await signUpLink.click();
+    // Signup exposes the name field that is absent from login.
+    const nameInput = page.getByLabel('Full Name', { exact: true });
+    await expect(nameInput).toBeVisible({ timeout: 5000 });
+    await page.getByRole('button', { name: 'Sign in', exact: true }).click();
+    await expect(nameInput).toBeHidden();
+    await expect(signUpLink).toBeVisible();
   });
 });

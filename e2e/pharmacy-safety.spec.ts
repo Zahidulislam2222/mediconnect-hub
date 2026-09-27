@@ -1,11 +1,11 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Page } from './test';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
-type FixtureWindow = Window & { __pharmacyScenario: string; __pharmacyCalls: { path: string; body: { prescriptionId?: string } }[]; __pharmacyPayments: { amount: number }[]; __finishPharmacy?: () => void };
+type FixtureWindow = typeof window & { __pharmacyScenario: string; __pharmacyCalls: { path: string; body: { prescriptionId?: string } }[]; __pharmacyPayments: { amount: number }[]; __finishPharmacy?: () => void };
 async function open(page: Page, scenario: string) {
   const pageErrors: string[] = [];
   page.on('pageerror', error => pageErrors.push(error.message));
-  await page.route('**/*', route => new URL(route.request().url()).hostname === '127.0.0.1' ? route.continue() : route.abort());
+  await page.route('**/*', route => new URL(route.request().url()).hostname === '127.0.0.1' ? route.fallback() : route.abort());
   for (const [pattern, name] of [
     ['**/.vite/deps/aws-amplify_auth.js*', 'symptom-auth.mock.js'],
     ['**/src/lib/api.ts*', 'pharmacy-api.mock.js'],

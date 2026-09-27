@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './test';
 
 for (const route of ['/', '/auth']) {
   test(`security badges remain qualified at ${route}`, async ({ page }) => {

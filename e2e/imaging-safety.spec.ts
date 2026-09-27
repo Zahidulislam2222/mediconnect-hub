@@ -1,9 +1,9 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Page } from './test';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 
 async function open(page: Page, outcome: string) {
-  await page.route('**/*', route => new URL(route.request().url()).hostname === '127.0.0.1' ? route.continue() : route.abort());
+  await page.route('**/*', route => new URL(route.request().url()).hostname === '127.0.0.1' ? route.fallback() : route.abort());
   for (const [pattern, name] of [
     ['**/.vite/deps/aws-amplify_auth.js*', 'symptom-auth.mock.js'],
     ['**/src/lib/api.ts*', 'imaging-api.mock.js'],

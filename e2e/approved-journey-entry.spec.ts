@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './test';
 import content from '../src/content/journey.json' with { type: 'json' };
 import routing from '../src/config/journey-routing.json' with { type: 'json' };
 
@@ -16,7 +16,7 @@ for (const role of ['staff', 'patient', 'doctor']) {
 
 test.beforeEach(async ({ page }) => {
   await page.route('**/*', route => new URL(route.request().url()).hostname === '127.0.0.1'
-    ? route.continue() : route.abort());
+    ? route.fallback() : route.abort());
 });
 
 test('the main app opens the owner-approved connected-care design', async ({ page }) => {

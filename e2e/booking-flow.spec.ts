@@ -1,4 +1,4 @@
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect, type Page } from './test';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 
@@ -12,7 +12,7 @@ async function open(page: Page) {
   await page.route('**/*', route => {
     const url = new URL(route.request().url());
     if (url.hostname !== '127.0.0.1') return route.abort();
-    return route.continue();
+    return route.fallback();
   });
   for (const [module, fixture] of [['lib/api.ts', 'booking-api.mock.js'], ['context/CheckoutContext.tsx', 'booking-payment.mock.js']]) {
     await page.route(`**/src/${module}*`, route => route.fulfill({ contentType: 'application/javascript',

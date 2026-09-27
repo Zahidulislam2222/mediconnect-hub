@@ -10,10 +10,10 @@ import copy from '@/content/pharmacy';
 import { HttpResponseError, MutationOutcomeUnknownError } from '@/lib/api';
 import type * as ApiNamespace from '@/lib/api';
 
-const mocks = vi.hoisted(() => ({ get: vi.fn(), post: vi.fn(), payment: vi.fn(), toast: vi.fn(), setUser: vi.fn() }));
+const mocks = vi.hoisted(() => ({ get: vi.fn(), post: vi.fn(), payment: vi.fn(), toast: vi.fn(), getUser: vi.fn(), setUser: vi.fn() }));
 vi.mock('@/context/CheckoutContext', () => ({ useCheckout: () => ({ requestPayment: mocks.payment }) }));
 vi.mock('@/lib/api', async importOriginal => ({ ...await importOriginal<typeof ApiNamespace>(), api: { get: mocks.get, post: mocks.post } }));
-vi.mock('@/lib/secure-storage', async original => ({ ...await original<typeof StorageNamespace>(), getUser: () => ({ id: 'test-patient', name: 'Test Patient' }), setUser: mocks.setUser }));
+vi.mock('@/lib/secure-storage', async original => ({ ...await original<typeof StorageNamespace>(), getUser: mocks.getUser, setUser: mocks.setUser }));
 vi.mock('@/hooks/use-toast', () => ({ useToast: () => ({ toast: mocks.toast }) }));
 vi.mock('aws-amplify/auth', () => ({ getCurrentUser: async () => ({ userId: 'test-patient' }), fetchAuthSession: async () => ({}), signOut: async () => {} }));
 vi.mock('@/components/layout/DashboardLayout', () => ({ DashboardLayout: ({ children, onLogout }: { children: ReactNode; onLogout: () => void }) => <><button onClick={onLogout}>Test logout</button>{children}</> }));
@@ -27,11 +27,24 @@ async function open() { render(<MemoryRouter><Pharmacy /></MemoryRouter>); await
 describe('Pharmacy response and action safety', () => {
   beforeEach(() => {
     vi.clearAllMocks(); rows = [prescription('test-alpha')];
+    mocks.getUser.mockReturnValue({ id: 'test-patient', name: 'Test Patient' });
     mocks.get.mockImplementation(async (path: string) => path.startsWith('/prescription') ? { prescriptions: rows } : path.startsWith('/billing') ? { currency: 'USD', transactions: [{ billId: 'test-bill', referenceId: 'test-alpha', patientId: 'test-patient', amount: 12, status: 'PENDING' }] } : { name: 'Test Patient' });
     mocks.payment.mockResolvedValue({ id: 'test-method' });
     mocks.post.mockResolvedValue({ message: 'Refill authorized' });
   });
   afterEach(cleanup);
+
+  it.each([null, 'test-stale-profile', ['test-stale-profile'], 7])('discards malformed cached profile %j', async cached => {
+    mocks.getUser.mockReturnValue(cached);
+    await open();
+    expect(mocks.setUser).toHaveBeenCalledWith({ id: 'test-patient', name: 'Test Patient', avatar: undefined });
+  });
+
+  it('preserves cached presentation fields while replacing stale identity fields', async () => {
+    mocks.getUser.mockReturnValue({ id: 'test-other', name: 'Test Old', avatar: 'test-old-avatar', theme: 'test-theme' });
+    await open();
+    expect(mocks.setUser).toHaveBeenCalledWith({ id: 'test-patient', name: 'Test Patient', avatar: undefined, theme: 'test-theme' });
+  });
 
   it.each([{}, { qrPayload: '' }, { qrPayload: '   ' }, { qrPayload: 'PICKUP-test-other' }])('does not invent or display a pickup code from %j', async response => {
     mocks.post.mockResolvedValue(response); await open(); fireEvent.click(screen.getByRole('button', { name: 'Pickup Code' }));

@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Page } from './test';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 
@@ -9,7 +9,7 @@ async function open(page: Page, outcome: 'success' | 'failure' = 'success') {
   await page.clock.setFixedTime(new Date('2026-09-10T00:00:00Z'));
   await page.route('**/*', async route => {
     const request = route.request(); const url = new URL(request.url());
-    if (url.hostname === '127.0.0.1') return route.continue();
+    if (url.hostname === '127.0.0.1') return route.fallback();
     if (url.hostname !== 'appointments.example.test') return route.abort();
     const method = request.method();
     if (method === 'OPTIONS') return route.fulfill({ status: 204, headers: {
