@@ -1,4 +1,15 @@
 # Logs
+# Project-private recovery, personal tooling and credentials
+memory/
+CREDENTIALS.md
+PROJECT-DOSSIER.md
+local-tests/
+.credentials/
+.env.*
+!.env.example
+*.p12
+*.pfx
+
 logs
 *.log
 npm-debug.log*
