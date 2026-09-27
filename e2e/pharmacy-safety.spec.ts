@@ -3,14 +3,19 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 type FixtureWindow = Window & { __pharmacyScenario: string; __pharmacyCalls: { path: string; body: { prescriptionId?: string } }[]; __pharmacyPayments: { amount: number }[]; __finishPharmacy?: () => void };
 async function open(page: Page, scenario: string) {
+  const pageErrors: string[] = [];
+  page.on('pageerror', error => pageErrors.push(error.message));
   await page.route('**/*', route => new URL(route.request().url()).hostname === '127.0.0.1' ? route.continue() : route.abort());
   for (const [pattern, name] of [
     ['**/.vite/deps/aws-amplify_auth.js*', 'symptom-auth.mock.js'],
     ['**/src/lib/api.ts*', 'pharmacy-api.mock.js'],
     ['**/src/context/CheckoutContext.tsx*', 'pharmacy-payment.mock.js'],
-  ]) await page.route(pattern, route => route.fulfill({ contentType: 'application/javascript', body: readFileSync(path.join(process.cwd(), 'e2e/fixtures', name), 'utf8') }));
+  ]) await page.route(pattern, route => new URL(route.request().url()).searchParams.has('pharmacy-fixture-original')
+    ? route.fallback()
+    : route.fulfill({ contentType: 'application/javascript', body: readFileSync(path.join(process.cwd(), 'e2e/fixtures', name), 'utf8') }));
   await page.addInitScript(value => { const fixture = window as FixtureWindow; fixture.__pharmacyScenario = value; fixture.__pharmacyCalls = []; fixture.__pharmacyPayments = []; }, scenario);
   await page.goto('/e2e/fixtures/pharmacy-safety.html');
+  expect(pageErrors, 'pharmacy fixture must load without module or runtime errors').toEqual([]);
   await expect(page.getByText('test-alpha', { exact: true })).toBeVisible();
 }
 test('missing server token never opens a pickup dialog', async ({ page }) => {

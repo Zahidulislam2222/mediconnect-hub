@@ -9,12 +9,14 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { api } from "@/lib/api";
+import { api, isRejection, rejectionReason } from "@/lib/api";
+import { refusedBeforeCharge } from "@/lib/payment-refusal";
+import paymentCopy from "@/content/payment";
 import { getUser, setUser as setStoredUser, clearAllSensitive } from "@/lib/secure-storage";
 import { useCheckout } from "@/context/CheckoutContext";
 import { usePaymentLifetime } from "@/hooks/use-payment-lifetime";
 import copy from "@/content/pharmacy";
-import { pharmacyRoutes as routes, prescriptionsFrom, pickupFrom, refillAcknowledged, payableBillFrom, paymentNotice, type Prescription } from "@/lib/pharmacy-contract";
+import { pharmacyRoutes as routes, prescriptionsFrom, pickupFrom, refillAcknowledged, payableBillFrom, paymentNotice, isDispensed, awaitsPayment, type Prescription } from "@/lib/pharmacy-contract";
 
 type Action = { id: string; signal: AbortSignal };
 export default function Pharmacy() {
@@ -103,7 +105,7 @@ export default function Pharmacy() {
     finally { end(action); }
   }
   async function handleRefillRequest(rx: Prescription) {
-    if (refillReview.includes(rx.prescriptionId) || rx.status !== 'PICKED_UP' || !rx.refillsRemaining) return;
+    if (refillReview.includes(rx.prescriptionId) || !isDispensed(rx.status) || !rx.refillsRemaining) return;
     const action = begin(rx); if (!action) return;
     // A lost response can still represent a completed refill/bill. Never retry it automatically.
     setRefillReview(previous => [...previous, action.id]);
@@ -113,7 +115,14 @@ export default function Pharmacy() {
       if (!refillAcknowledged(response)) throw new Error('REFILL_UNCONFIRMED');
       updateLocalStatus(action.id, 'PENDING');
       toast({ title: copy.refillTitle, description: copy.refillDescription });
-    } catch { if (current(action)) toast({ variant: 'destructive', title: copy.refillErrorTitle, description: copy.refillErrorDescription }); }
+    } catch (error) {
+      if (!current(action)) return;
+      // A refusal was not applied, so the row unlocks; any other failure may have committed, so it stays locked.
+      if (isRejection(error)) setRefillReview(previous => previous.filter(id => id !== action.id));
+      toast(isRejection(error)
+        ? { variant: 'destructive', title: copy.refillRejectedTitle, description: rejectionReason(error) ?? copy.refillRejectedDescription }
+        : { variant: 'destructive', title: copy.refillErrorTitle, description: copy.refillErrorDescription });
+    }
     finally { end(action); }
   }
   async function handlePayMedication(rx: Prescription) {
@@ -136,6 +145,14 @@ export default function Pharmacy() {
     } catch (error) {
       if (!current(action)) return;
       if (error instanceof Error && ['User cancelled payment', 'PAYMENT_UI_CLOSED'].includes(error.message)) return;
+      if (refusedBeforeCharge(error)) {
+        // The booking service refused before calling the provider: nothing was charged, so the row unlocks.
+        setPaymentReview(previous => previous.filter(id => id !== action.id));
+        toast({ variant: 'destructive', title: paymentCopy.notChargedTitle, description: paymentCopy.notChargedDescription });
+        // The bill may already be paid or under review; reload so the row shows its real state.
+        await fetchPrescriptions();
+        return;
+      }
       toast(submitted ? { ...paymentNotice(undefined), variant: 'destructive' } : {
         variant: 'destructive', title: copy.billingErrorTitle, description: copy.billingErrorDescription,
       });
@@ -149,6 +166,7 @@ export default function Pharmacy() {
       case "READY_FOR_PICKUP": return <Badge className="bg-primary/10 text-primary hover:bg-primary/10 border-border">{copy.ready}</Badge>;
       case "PENDING":
       case "REFILL_REQUESTED": return <Badge className="bg-primary/10 text-primary hover:bg-primary/10 border-border">{copy.pending}</Badge>;
+      case "DISPENSED":
       case "PICKED_UP": return <Badge variant="secondary">{copy.completed}</Badge>;
       default: return <Badge variant="outline">{status}</Badge>;
     }
@@ -253,7 +271,7 @@ export default function Pharmacy() {
 
                     <div className="flex flex-wrap items-center gap-2 md:flex-shrink-0">
 
-                      {rx.status === "ISSUED" && rx.paymentStatus !== "PAID" && (
+                      {awaitsPayment(rx) && (
                         <Button
                           size="sm"
                           className="bg-accent text-accent-foreground rounded-xl"
@@ -290,7 +308,7 @@ export default function Pharmacy() {
                         size="sm"
                         className="bg-primary rounded-xl"
                         onClick={() => void handleRefillRequest(rx)}
-                        disabled={!!processingId || rx.status !== 'PICKED_UP' || !rx.refillsRemaining || refillReview.includes(rx.prescriptionId)}
+                        disabled={!!processingId || !isDispensed(rx.status) || !rx.refillsRemaining || refillReview.includes(rx.prescriptionId)}
                       >
                         <RefreshCw className="h-3.5 w-3.5 mr-2" />
                         {rx.refillsRemaining ? copy.refillTemplate.replace('{remaining}', String(rx.refillsRemaining)) : copy.requestRefill}

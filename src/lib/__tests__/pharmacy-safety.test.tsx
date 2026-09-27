@@ -6,10 +6,12 @@ import Pharmacy from '@/pages/Pharmacy';
 import { SESSION_CLEARED_EVENT } from '@/lib/secure-storage';
 import type * as StorageNamespace from '@/lib/secure-storage';
 import paymentCopy from '@/content/payment';
+import copy from '@/content/pharmacy';
+import { HttpResponseError, MutationOutcomeUnknownError } from '@/lib/api';
 
 const mocks = vi.hoisted(() => ({ get: vi.fn(), post: vi.fn(), payment: vi.fn(), toast: vi.fn(), setUser: vi.fn() }));
 vi.mock('@/context/CheckoutContext', () => ({ useCheckout: () => ({ requestPayment: mocks.payment }) }));
-vi.mock('@/lib/api', () => ({ api: { get: mocks.get, post: mocks.post } }));
+vi.mock('@/lib/api', async importOriginal => ({ ...await importOriginal<typeof import('@/lib/api')>(), api: { get: mocks.get, post: mocks.post } }));
 vi.mock('@/lib/secure-storage', async original => ({ ...await original<typeof StorageNamespace>(), getUser: () => ({ id: 'test-patient', name: 'Test Patient' }), setUser: mocks.setUser }));
 vi.mock('@/hooks/use-toast', () => ({ useToast: () => ({ toast: mocks.toast }) }));
 vi.mock('aws-amplify/auth', () => ({ getCurrentUser: async () => ({ userId: 'test-patient' }), fetchAuthSession: async () => ({}), signOut: async () => {} }));
@@ -43,6 +45,36 @@ describe('Pharmacy response and action safety', () => {
     await waitFor(() => expect(mocks.post).toHaveBeenCalledWith('/pharmacy/request-refill', { prescriptionId: 'test-beta' }));
     expect(mocks.toast.mock.calls.flat().some(item => String(item.description).includes('Doctor notified'))).toBe(false);
     expect(screen.getAllByText('Pending')[0].parentElement).toHaveTextContent('1');
+  });
+
+  it('offers a refill for a fill the backend reports as DISPENSED', async () => {
+    rows = [prescription('test-alpha', { status: 'DISPENSED' })];
+    await open();
+    expect(screen.getByText('Completed')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /Refill/ }));
+    await waitFor(() => expect(mocks.post).toHaveBeenCalledWith('/pharmacy/request-refill', { prescriptionId: 'test-alpha' }));
+  });
+
+  it('does not offer a refill before the current fill is dispensed', async () => {
+    rows = [prescription('test-alpha', { status: 'READY_FOR_PICKUP' })];
+    await open();
+    expect(screen.getByRole('button', { name: /Refill/ })).toBeDisabled();
+  });
+
+  it('offers payment for a refill awaiting its new bill and no pickup code before it is paid', async () => {
+    rows = [prescription('test-alpha', { status: 'PENDING', paymentStatus: 'UNPAID' })];
+    mocks.post.mockResolvedValue({ status: 'succeeded' });
+    await open();
+    expect(screen.queryByRole('button', { name: 'Pickup Code' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /Pay/ }));
+    await waitFor(() => expect(mocks.post).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({ billId: 'test-bill' })));
+  });
+
+  it('asks for the refill payment, not a pickup code, when a refill still carries a previous fill payment', async () => {
+    rows = [prescription('test-alpha', { status: 'PENDING', paymentStatus: 'PAID' })];
+    await open();
+    expect(screen.queryByRole('button', { name: 'Pickup Code' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Pay/ })).toBeEnabled();
   });
 
   it('ignores a pickup result after session invalidation', async () => {
@@ -133,6 +165,35 @@ describe('Pharmacy response and action safety', () => {
     await open(); fireEvent.click(screen.getByRole('button', { name: /Refill/ }));
     await waitFor(() => expect(mocks.toast).toHaveBeenCalledWith(expect.objectContaining({ variant: 'destructive' })));
     expect(screen.getByRole('button', { name: /Refill/ })).toBeDisabled(); expect(mocks.post).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([400, 403, 409])('shows the pharmacy service reason when it refuses a refill (%i)', async status => {
+    const reason = 'Settle the outstanding bill for this prescription in Billing before requesting a refill.';
+    rows = [prescription('test-alpha', { status: 'PICKED_UP' })]; mocks.post.mockRejectedValue(new HttpResponseError(reason, status, reason));
+    await open(); fireEvent.click(screen.getByRole('button', { name: /Refill/ }));
+    await waitFor(() => expect(mocks.toast).toHaveBeenCalledWith({ variant: 'destructive', title: copy.refillRejectedTitle, description: reason }));
+    expect(mocks.post).toHaveBeenCalledTimes(1);
+    // A35: nothing was applied, so once the patient has acted on the reason the request can be made again.
+    await waitFor(() => expect(screen.getByRole('button', { name: /Refill/ })).toBeEnabled());
+    expect(screen.queryByText(copy.refillReview)).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: /Refill/ }));
+    await waitFor(() => expect(mocks.post).toHaveBeenCalledTimes(2));
+  });
+
+  it.each([
+    ['a refusal without a reason', new HttpResponseError('API Error: 409', 409), copy.refillRejectedTitle, copy.refillRejectedDescription, false],
+    ['a missing prescription', new HttpResponseError('404_NOT_FOUND', 404), copy.refillRejectedTitle, copy.refillRejectedDescription, false],
+    ['a server failure', new Error('API Error: 500'), copy.refillErrorTitle, copy.refillErrorDescription, true],
+    // A POST that times out or gets a 5xx may have committed; api.ts reports it as an unknown outcome.
+    ['an unknown outcome', new MutationOutcomeUnknownError(), copy.refillErrorTitle, copy.refillErrorDescription, true],
+  ])('never shows a raw code after %s', async (_name, error, title, description, locked) => {
+    rows = [prescription('test-alpha', { status: 'PICKED_UP' })]; mocks.post.mockRejectedValue(error);
+    await open(); fireEvent.click(screen.getByRole('button', { name: /Refill/ }));
+    await waitFor(() => expect(mocks.toast).toHaveBeenCalledWith({ variant: 'destructive', title, description }));
+    // A35: only a failure that may have committed keeps the row locked against a second request.
+    await waitFor(() => locked ? expect(screen.getByRole('button', { name: /Refill/ })).toBeDisabled()
+      : expect(screen.getByRole('button', { name: /Refill/ })).toBeEnabled());
+    expect(!!screen.queryByText(copy.refillReview)).toBe(locked);
   });
 
   it('cancelling payment collection allows another deliberate attempt without charging', async () => {

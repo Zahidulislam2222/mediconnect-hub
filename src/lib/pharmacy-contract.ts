@@ -4,6 +4,15 @@ import paymentCopy from '@/content/payment';
 
 const route = z.string().regex(/^\/[A-Za-z0-9/-]+$/);
 export const pharmacyRoutes = z.object({ profile: route, prescriptions: route, billing: route, pay: route, pickup: route, refill: route }).strict().parse(routing);
+
+// The pharmacy service records a completed pickup as DISPENSED; PICKED_UP is the legacy name for the same state.
+export function isDispensed(status: string) { return status === 'DISPENSED' || status === 'PICKED_UP'; }
+
+// A first fill is paid while ISSUED. A refill is PENDING until its own bill is paid, even when it still carries the
+// previous fill's PAID flag; the pharmacy service only issues a pickup code once payment makes it READY_FOR_PICKUP.
+export function awaitsPayment(rx: { status?: string; paymentStatus?: string }) {
+  return rx.status === 'PENDING' || (rx.status === 'ISSUED' && rx.paymentStatus !== 'PAID');
+}
 const text = z.string().trim().min(1);
 const number = z.union([z.number().finite(), z.string().regex(/^\d+(?:\.\d+)?$/).transform(Number)]);
 const schema = z.object({
@@ -26,6 +35,16 @@ export function pickupFrom(value: unknown, prescriptionId: string) {
 }
 export function refillAcknowledged(value: unknown) {
   return z.object({ message: z.literal('Refill authorized') }).safeParse(value).success;
+}
+// Approving a legacy refill request either bills a real refill (PENDING) or, when the previous fill was never
+// collected, restores that fill (ISSUED). The status the service returns is the only status the page may show.
+// A billed refill waits for payment; a restored fill keeps the payment state of the bill it already has.
+const refillApproval = z.discriminatedUnion('status', [
+  z.object({ status: z.literal('PENDING') }),
+  z.object({ status: z.literal('ISSUED'), paymentStatus: z.enum(['PAID', 'UNPAID']) }),
+]);
+export function refillApprovalFrom(value: unknown) {
+  return refillApproval.parse(value);
 }
 const bill = z.object({ billId: text, referenceId: text, patientId: text, amount: number, status: text,
   paymentAttemptId: z.unknown().optional(), paymentIntentId: z.unknown().optional() });

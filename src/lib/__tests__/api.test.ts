@@ -60,7 +60,7 @@ const mockFetch = vi.fn();
 vi.stubGlobal('fetch', mockFetch);
 
 // Import AFTER mocking
-const { api } = await import('../api');
+const { api, rejectionReason } = await import('../api');
 
 describe('API Service URL Routing', () => {
   beforeEach(() => {
@@ -420,5 +420,37 @@ describe('Full response deadlines and uncertain writes', () => {
     mockFetch.mockResolvedValue({ ok: true, status: 200, json: async () => { throw new SyntaxError('test-invalid-json'); } });
     await expect(api.post('/billing/pay', { billId: 'test-bill' })).rejects.toMatchObject({ code: 'OUTCOME_UNKNOWN' });
     expect(mockFetch).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('rejection reasons', () => {
+  beforeEach(() => { mockFetch.mockReset(); localStorage.setItem('userRegion', 'US'); });
+
+  it.each([400, 403, 409])('keeps the reason a %i reply gives', async status => {
+    mockFetch.mockResolvedValue({ ok: false, status, json: async () => ({ error: 'test-reason' }) });
+    await expect(api.post('/prescriptions/test', {})).rejects.toMatchObject({ status, message: 'test-reason', serverReason: 'test-reason' });
+  });
+
+  it.each([400, 403, 409])('offers the %i reason to the user', async status => {
+    mockFetch.mockResolvedValue({ ok: false, status, json: async () => ({ error: 'test-reason' }) });
+    expect(rejectionReason(await api.post('/prescriptions/test', {}).catch(error => error))).toBe('test-reason');
+  });
+
+  it.each([422, 429])('keeps a %i reason away from the user', async status => {
+    mockFetch.mockResolvedValue({ ok: false, status, json: async () => ({ error: 'test-reason' }) });
+    const failure = await api.post('/prescriptions/test', {}).catch(error => error);
+    expect(failure.serverReason).toBe('test-reason');
+    expect(rejectionReason(failure)).toBeUndefined();
+  });
+
+  it.each([
+    ['an empty body', 409, async () => ({})],
+    ['an unreadable body', 400, async () => { throw new SyntaxError('test-invalid-json'); }],
+    ['a non-text reason', 409, async () => ({ error: { code: 'test' } })],
+  ])('never invents a reason from %s', async (_name, status, json) => {
+    mockFetch.mockResolvedValue({ ok: false, status, json });
+    const failure = await api.post('/prescriptions/test', {}).catch(error => error);
+    expect(failure).toMatchObject({ status, message: `API Error: ${status}` });
+    expect(failure.serverReason).toBeUndefined();
   });
 });

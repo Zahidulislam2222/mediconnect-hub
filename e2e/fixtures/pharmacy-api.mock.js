@@ -1,3 +1,6 @@
+// Keep the production error types and refusal helpers; only transport is synthetic.
+export { HttpResponseError, MutationOutcomeUnknownError, isRejection, rejectionReason } from '/src/lib/api.ts?pharmacy-fixture-original';
+
 const prescription = id => ({ prescriptionId: id, medication: id, dosage: 'Synthetic dosage', timestamp: '2026-01-01T00:00:00Z', status: window.__pharmacyScenario === 'refill' ? 'PICKED_UP' : 'ISSUED', paymentStatus: window.__pharmacyScenario === 'payment' ? 'UNPAID' : 'PAID', price: 99, livePrice: 12, liveStock: 5, refillsRemaining: 2 });
 export const api = {
   async get(path) {

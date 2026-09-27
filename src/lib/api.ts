@@ -124,8 +124,22 @@ export const api = {
 
 class RetryableReadError extends Error {}
 export class HttpResponseError extends Error {
-    /** code is the service's machine-readable refusal code, when its reply carried one as text. */
-    constructor(message: string, readonly status: number, readonly code?: string) { super(message); }
+    /**
+     * serverReason is the text the reply body carried; it is absent when the client had to describe the failure.
+     * code is the service's machine-readable refusal code, when its reply carried one as text.
+     */
+    constructor(message: string, readonly status: number, readonly serverReason?: string, readonly code?: string) { super(message); }
+}
+
+// Only these refusals carry a reason written for the person who acted; other 4xx replies are transport codes.
+const REASONED_REJECTION_STATUSES = [400, 403, 409];
+/** The service definitely refused the request (4xx), so nothing was applied. */
+export function isRejection(error: unknown): error is HttpResponseError {
+    return error instanceof HttpResponseError && error.status >= 400 && error.status < 500;
+}
+/** The service's own reason for a refusal, when it gave one meant for the user. */
+export function rejectionReason(error: unknown): string | undefined {
+    return isRejection(error) && REASONED_REJECTION_STATUSES.includes(error.status) ? error.serverReason : undefined;
 }
 
 export class MutationOutcomeUnknownError extends Error {
@@ -235,15 +249,16 @@ async function request(endpoint: string, method: string, body?: any, options?: A
 async function handleResponse(response: Response) {
     if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
+        const reason = [errorData?.error, errorData?.message].find((value): value is string => typeof value === 'string' && value.trim() !== '');
         const code = typeof errorData?.code === 'string' ? errorData.code : undefined;
 
         if (response.status === 404) throw new HttpResponseError("404_NOT_FOUND", response.status);
         
         if (response.status === 401) throw new HttpResponseError("401 Unauthorized", response.status);
 
-        if (response.status === 403) throw new HttpResponseError(errorData.error || errorData.message || "403 Forbidden", response.status, code);
+        if (response.status === 403) throw new HttpResponseError(reason ?? "403 Forbidden", response.status, reason, code);
 
-        throw new HttpResponseError(errorData.error || errorData.message || `API Error: ${response.status}`, response.status, code);
+        throw new HttpResponseError(reason ?? `API Error: ${response.status}`, response.status, reason, code);
     }
     return await response.json();
 }

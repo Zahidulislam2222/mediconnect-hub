@@ -19,7 +19,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 
-import { api } from "@/lib/api";
+import { api, isRejection, rejectionReason } from "@/lib/api";
+import copy from "@/content/pharmacy";
+import { pharmacyRoutes, refillApprovalFrom } from "@/lib/pharmacy-contract";
 import { clearAllSensitive } from "@/lib/secure-storage";
 
 export default function Prescriptions() {
@@ -41,6 +43,7 @@ export default function Prescriptions() {
     // Modal State
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [approvingIds, setApprovingIds] = useState<ReadonlySet<string>>(new Set());
     const [interactionError, setInteractionError] = useState<string | null>(null);
 
     const [formData, setFormData] = useState({
@@ -188,19 +191,28 @@ export default function Prescriptions() {
     };
 
     // --- 3. APPROVE REFILL ---
+    // The pharmacy service decides the outcome: a billed refill (PENDING, awaiting the patient's payment) or, when the
+    // previous fill was never collected, that fill restored (ISSUED). Nothing changes on screen until it has answered.
+    // A rejection (4xx) was not applied. Any other failure may have committed, so the doctor is told to check the list
+    // first rather than approve again.
     const handleApproveRefill = async (rx: any) => {
+        const id = rx.prescriptionId;
+        setApprovingIds(current => new Set(current).add(id));
         try {
-            const updatedList = prescriptions.map(item =>
-                item.prescriptionId === rx.prescriptionId
-                    ? { ...item, status: "ISSUED", timestamp: new Date().toISOString() }
-                    : item
-            );
-            setPrescriptions(updatedList);
-            toast({ title: "Refill Approved", description: `Sent to pharmacy for ${rx.medication}` });
-
-            await api.put(`/prescription`, { prescriptionId: rx.prescriptionId, status: "ISSUED" });
+            const approval = refillApprovalFrom(await api.post(pharmacyRoutes.refill, { prescriptionId: id }));
+            const { status } = approval;
+            setPrescriptions(current => current.map(item =>
+                item.prescriptionId === id ? { ...item, status, updatedAt: new Date().toISOString() } : item
+            ));
+            const template = approval.status === "PENDING" ? copy.approvedTemplate
+                : approval.paymentStatus === "PAID" ? copy.restoredTemplate : copy.restoredUnpaidTemplate;
+            toast({ title: status === "PENDING" ? copy.approvedTitle : copy.restoredTitle, description: template.replace('{medication}', rx.medication) });
         } catch (e) {
-            toast({ variant: "destructive", title: "Error", description: "Update failed." });
+            toast(!isRejection(e)
+                ? { variant: "destructive", title: copy.approveUnconfirmedTitle, description: copy.approveUnconfirmedDescription }
+                : { variant: "destructive", title: copy.approveRejectedTitle, description: rejectionReason(e) ?? copy.approveRejectedDescription });
+        } finally {
+            setApprovingIds(current => { const next = new Set(current); next.delete(id); return next; });
         }
     };
 
@@ -412,6 +424,7 @@ export default function Prescriptions() {
                                                 </div>
                                                 <Button
                                                     className="bg-green-600 hover:bg-green-700 text-white"
+                                                    disabled={approvingIds.has(rx.prescriptionId)}
                                                     onClick={() => handleApproveRefill(rx)}
                                                 >
                                                     <CheckCircle2 className="w-4 h-4 mr-2" /> Approve
