@@ -29,6 +29,7 @@ export const journeySchema = z
     brand: text,
     tagline: text,
     notice: text,
+    publicLinks: z.object({ privacy: z.string().regex(/^\/[a-z-]+$/), terms: z.string().regex(/^\/[a-z-]+$/), security: z.string().regex(/^\/[a-z-]+$/) }).strict(),
     labels: copy([
       "loading",
       "mainNavigation",
@@ -111,6 +112,7 @@ export const journeySchema = z
     motion: z.object({
       scrollHeightVh: z.number().min(200).max(900),
       mobileScrollHeightVh: z.number().min(200).max(700),
+      seekMinimumIntervalMs: z.number().min(8).max(100),
       seekToleranceSeconds: z.number().positive().max(0.2),
       seekWatchdogMs: z.number().int().min(250).max(5000),
       minimumHeight: z.number().min(400).max(900),

@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { matchPath } from 'react-router-dom';
 import source from './journey-routing.json';
+import { publicSiteRoutes } from './public-site-routing';
 
 const path = z.string().regex(/^\/(?:[a-z0-9-]+(?:\/[a-z0-9-]+)*)?$/);
 const routes = z.object({ home: path, knowledge: path, blog: path, auth: path,
@@ -10,6 +11,6 @@ export type JourneyRoutes = z.infer<typeof routes>;
 export type JourneyMode = keyof typeof journeyRouting;
 export function isJourneyApplicationPath(pathname: string): boolean {
   const r = journeyRouting.application;
-  return [r.home, `${r.knowledge}/*`, `${r.blog}/*`, `${r.workspace}/:role`, r.storyboard]
+  return [r.home, ...Object.values(publicSiteRoutes), `${r.knowledge}/*`, `${r.blog}/*`, `${r.workspace}/:role`, r.storyboard]
     .some(path => matchPath({ path, end: true }, pathname) !== null);
 }

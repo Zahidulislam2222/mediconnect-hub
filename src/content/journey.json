@@ -1,10 +1,10 @@
 {
   "brand": "MediConnect",
   "tagline": "People first. Care connected.",
-  "notice": "Interactive portfolio demo · Fictional people and sample information. No real appointments or medical advice. This is not a claim of regulatory certification.",
+  "notice": "Account and clinical services are currently unavailable on this public site. Please do not submit health records or payment information.",
   "labels": {
     "mainNavigation": "Main navigation",
-    "workspace": "Demo workspace",
+    "workspace": "Care workspace",
     "loginRole": "Choose a login role",
     "categories": "Guide categories",
     "minutesRead": "min read",
@@ -13,13 +13,13 @@
     "stories": "stories",
     "clinicComposition": "Clinic arrival composition",
     "homeComposition": "Home follow-up composition",
-    "noScript": "JavaScript is needed for this interactive local preview. No real care or account access is provided.",
+    "noScript": "JavaScript is needed for this site. Account and clinical services are currently unavailable.",
     "loading": "Preparing the care journey…"
   },
   "navigation": {
     "skip": "Skip to page content",
     "journey": "The care journey",
-    "knowledge": "Knowledge base",
+    "knowledge": "Guides",
     "blog": "Journal",
     "login": "Log in",
     "menu": "Open navigation",
@@ -32,20 +32,20 @@
     "title": "Care that stays",
     "emphasis": "with you.",
     "body": "A conversation in the clinic. A familiar face at home. One connected care journey.",
-    "primary": "Explore the patient demo",
+    "primary": "Account access",
     "secondary": "Meet the care team",
     "scroll": "Scroll to follow the story",
     "skip": "Skip the journey",
     "motionOff": "Reduce motion",
     "motionOn": "Enable motion",
     "motionStatic": "Static journey",
-    "openDetail": "Open appointment detail",
-    "closeDetail": "Close appointment detail",
+    "openDetail": "Read about this step",
+    "closeDetail": "Close step information",
     "chapters": "Journey chapters",
     "knowledgeLink": "Find a clearer next step.",
     "journalLink": "Read the thinking behind the care.",
-    "illustration": "AI-generated fictional care story",
-    "blockout": "Motion study · Blender previsualization"
+    "illustration": "Connected-care animation",
+    "blockout": "Connected-care animation"
   },
   "stages": [
     {
@@ -58,7 +58,7 @@
       "cardLabel": "Your next conversation",
       "cardTitle": "Start with what matters to you.",
       "cardBody": "Make room for your questions, your concerns, and your story.",
-      "cardStatus": "Appointment preview"
+      "cardStatus": "Your questions"
     },
     {
       "id": "listen",
@@ -70,7 +70,7 @@
       "cardLabel": "Your conversation, connected",
       "cardTitle": "Bring your questions with you.",
       "cardBody": "The same appointment stays in view as patient and clinician come together.",
-      "cardStatus": "Illustrative consultation"
+      "cardStatus": "Your conversation"
     },
     {
       "id": "connect",
@@ -82,7 +82,7 @@
       "cardLabel": "A familiar face, wherever you are",
       "cardTitle": "Keep the conversation going.",
       "cardBody": "Explore how a video visit and shared appointment information could fit together.",
-      "cardStatus": "Video visit preview"
+      "cardStatus": "Staying connected"
     },
     {
       "id": "continue",
@@ -94,25 +94,26 @@
       "cardLabel": "Your next step",
       "cardTitle": "A little more clarity.",
       "cardBody": "Explore the patient workspace or learn how to prepare for a conversation.",
-      "cardStatus": "Follow-up preview"
+      "cardStatus": "Your next step"
     }
   ],
   "motion": {
-    "scrollHeightVh": 680,
-    "mobileScrollHeightVh": 500,
+    "scrollHeightVh": 400,
+    "mobileScrollHeightVh": 340,
     "seekToleranceSeconds": 0.035,
     "seekWatchdogMs": 1200,
     "minimumHeight": 760,
     "cardTravelPx": 28,
     "cardTiltDegrees": 5,
-    "chapterFadeFraction": 0.035
+    "chapterFadeFraction": 0.035,
+    "seekMinimumIntervalMs": 32
   },
   "media": {
     "film": "/media/journey/connected-care-v1.mp4",
     "poster": "/media/journey/connected-care-v1.webp",
     "homePoster": "/media/journey/home-followup-v1.webp",
     "finished": true,
-    "alt": "An illustrative consultation space connected to a warm home environment.",
+    "alt": "A consultation space connected to a warm home environment.",
     "duration": 22.333333,
     "storyboard": [
       "/media/journey/clinic-blockout-v1.webp",
@@ -122,30 +123,30 @@
   "explore": {
     "eyebrow": "One connection. Different perspectives.",
     "title": "Find your place in the story.",
-    "body": "Explore the experience as a patient, clinician, or member of the clinic team. Every workspace below uses fictional local data.",
+    "body": "Find tools for patients, clinicians and clinic teams. Account access depends on verified service activation.",
     "roles": [
       {
         "id": "patient",
         "label": "For patients",
         "title": "Your care, easier to follow.",
-        "body": "Explore appointments, prepare a question, and see what a follow-up could look like.",
-        "action": "Open patient demo",
+        "body": "Appointments, preparation and follow-up information, organized around your care.",
+        "action": "Patient account access",
         "number": "01"
       },
       {
         "id": "doctor",
         "label": "For clinicians",
         "title": "More room for the conversation.",
-        "body": "See a sample queue, review a visit brief, and move into a consultation preview.",
-        "action": "Open clinician demo",
+        "body": "Schedules, visit context and communication tools for your authorized clinical role.",
+        "action": "Clinician account access",
         "number": "02"
       },
       {
         "id": "staff",
         "label": "For clinic teams",
         "title": "Help each visit come together.",
-        "body": "Coordinate the sample schedule and appointment readiness, without exposing clinical notes.",
-        "action": "Open staff demo",
+        "body": "Scheduling and visit coordination with separate staff access.",
+        "action": "Clinic team access",
         "number": "03"
       }
     ]
@@ -161,15 +162,15 @@
     "clear": "Clear filters",
     "back": "Back to the knowledge base",
     "read": "Read the guide",
-    "disclaimer": "Product-demo guides, not clinical advice. Features described here are illustrative and may not be connected to a live service."
+    "disclaimer": "General information, not clinical advice. Account and clinical services are currently unavailable on this public site."
   },
   "journal": {
     "eyebrow": "The MediConnect journal",
     "title": "Thoughts on care.\nDesigned around people.",
-    "body": "Stories about the decisions behind this connected-care concept—from human relationships to useful technology.",
+    "body": "Stories about the decisions behind this connected-care platform—from human relationships to useful technology.",
     "back": "Back to the journal",
     "read": "Read the story",
-    "disclaimer": "Concept journal · These articles describe design intentions, not verified clinical outcomes or live-service capabilities."
+    "disclaimer": "These articles explain platform design and do not claim verified clinical outcomes or active clinical services."
   },
   "articles": [
     {
@@ -214,30 +215,30 @@
         },
         {
           "heading": "Have a backup route",
-          "body": "Ask your clinic how to reconnect or contact them if a video call drops. This portfolio's consultation view is an illustration: it does not connect a real call or request device permissions."
+          "body": "Ask your clinic how to reconnect or contact them if a video call drops. Video consultations are currently unavailable on this public site."
         }
       ]
     },
     {
-      "slug": "understanding-the-demo",
+      "slug": "service-availability",
       "kind": "knowledge",
       "category": "Using MediConnect",
       "audience": "Everyone",
-      "title": "What this demonstration does—and does not do.",
-      "summary": "An honest guide to sample appointments, local-only controls, and the limits of this preview.",
+      "title": "What is available on this website?",
+      "summary": "Understand the public pages, account access and current service availability.",
       "minutes": 2,
       "sections": [
         {
-          "heading": "Fictional information",
-          "body": "All names, appointments, and consultation scenes in this preview are fictional. They are provided to demonstrate interface design, not to represent available clinicians or real patient records."
+          "heading": "Public information",
+          "body": "You can read about MediConnect, its services and the care journey through the public pages."
         },
         {
-          "heading": "Local interaction",
-          "body": "Changing a sample appointment time or readiness status affects only the running demonstration. Reloading the page resets it. No booking, notification, payment, or medical record is created."
+          "heading": "Account and care services",
+          "body": "Account, booking, payment and clinical services are currently unavailable on this public site. A page interaction does not create an appointment or complete a payment."
         },
         {
-          "heading": "No real sign-in",
-          "body": "The login design does not send credentials to a server. Do not enter a real password. Use the direct demo links to explore each role without signing in."
+          "heading": "Before services are activated",
+          "body": "Identity, permissions, providers, privacy operations and clinical readiness require verification before real care is delivered."
         }
       ]
     },
@@ -251,35 +252,39 @@
       "minutes": 3,
       "sections": [
         {
-          "heading": "Patient view",
-          "body": "The sample patient workspace puts appointment details, a preparation note, and the next step close together."
+          "heading": "Patients",
+          "body": "Patient tools organize appointment details, preparation and follow-up information."
         },
         {
-          "heading": "Clinician view",
-          "body": "The clinician demonstration brings the sample queue and visit context together. It illustrates a workflow; it is not a connected electronic health record."
+          "heading": "Clinicians",
+          "body": "Practitioner tools organize schedules, visit context and authorized patient records. Clinical decisions remain with the care professional."
         },
         {
-          "heading": "Clinic-team view",
-          "body": "The staff demonstration shows scheduling and readiness information without clinical notes. A real implementation also requires server-enforced authorization; hiding a panel alone is not access control."
+          "heading": "Clinic teams",
+          "body": "Staff tools support scheduling and visit coordination. Server-enforced permissions must keep staff and clinical access separate."
         }
       ]
     },
     {
-      "slug": "privacy-in-a-preview",
+      "slug": "privacy-and-your-information",
       "kind": "knowledge",
       "category": "Privacy",
       "audience": "Everyone",
-      "title": "Keep real information out of a demo.",
-      "summary": "How to explore safely without sharing personal health details or account credentials.",
+      "title": "Privacy and your information.",
+      "summary": "Understand what is available and how to keep personal information private.",
       "minutes": 2,
       "sections": [
         {
-          "heading": "Use sample information",
-          "body": "Do not enter personal health information, real credentials, or identifying details in a portfolio demonstration. The controls are here to explain an interaction, not to collect your records."
+          "heading": "Keep personal information private",
+          "body": "Do not submit health records, payment information or passwords through unverified channels."
         },
         {
-          "heading": "Know the boundary",
-          "body": "This preview does not connect the retained backend or authentication infrastructure. Production privacy and security require their own verification before accepting real data."
+          "heading": "Understand current availability",
+          "body": "Account and clinical services are currently unavailable on this public site. Operational privacy and security must be verified before patient information can be processed."
+        },
+        {
+          "heading": "Read the privacy notice",
+          "body": "Use the Privacy link in the footer for the current notice. Verified operating details are required before services are activated."
         }
       ]
     },
@@ -293,12 +298,16 @@
       "minutes": 2,
       "sections": [
         {
-          "heading": "Keep the schedule understandable",
-          "body": "In the demonstration, one appointment is shared across the three role views. Changing its time updates the sample display so you can inspect the relationship between those interfaces."
+          "heading": "A shared appointment",
+          "body": "Patient, practitioner and staff views need consistent appointment information. Changes require confirmation from the active service."
         },
         {
-          "heading": "Readiness is not a medical status",
-          "body": "The sample readiness control is an operational illustration. It does not confirm clinical suitability, notify anyone, or authorize treatment."
+          "heading": "Readiness and confirmation",
+          "body": "Operational readiness is separate from clinical suitability. A page interaction cannot authorize treatment or confirm an appointment."
+        },
+        {
+          "heading": "A clear next step",
+          "body": "Clinic teams should explain what happens next and how to contact them if a question remains."
         }
       ]
     },
@@ -313,7 +322,7 @@
       "sections": [
         {
           "heading": "Begin with two people",
-          "body": "A room full of impressive technology tells us little about whether someone feels heard. This concept begins with a patient and a clinician at the same eye level, with enough space for a conversation."
+          "body": "Care begins with a patient and clinician having room for a conversation. The website places that relationship at the center of its visual story."
         },
         {
           "heading": "Carry the relationship forward",
@@ -336,7 +345,7 @@
       "sections": [
         {
           "heading": "Movement should explain a relationship",
-          "body": "In this concept, moving toward the consultation brings people into focus. Travelling through the display connects two places. A care-plan card stays recognizable while its context changes."
+          "body": "The homepage follows a care journey through four chapters. Movement connects clinic and home while the care-plan card keeps the next step recognizable."
         },
         {
           "heading": "Keep the visitor in control",
@@ -358,16 +367,16 @@
       "minutes": 3,
       "sections": [
         {
-          "heading": "Make discovery simple",
-          "body": "A visitor may be a patient, clinician, coordinator, or someone simply exploring. Public guides should be easy to find from the main navigation, without requiring a demo account."
+          "heading": "Make information easy to find",
+          "body": "Patients, clinicians and coordinators should be able to find public guides without signing in."
         },
         {
-          "heading": "Separate public learning from private work",
-          "body": "Public product information and personal appointment records serve different purposes. The concept keeps learning open while reserving role-specific workspaces for their intended context."
+          "heading": "Keep information and accounts separate",
+          "body": "Public product information and personal appointment records serve different purposes. Personal workspaces require verified identity and authorization."
         },
         {
-          "heading": "Be clear about editorial status",
-          "body": "These guides explain a portfolio concept. A live medical knowledge base would need appropriate sourcing, clinical review, ownership, and an update process before publishing health guidance."
+          "heading": "Keep content accountable",
+          "body": "Public guides need clear ownership and an update process. Medical guidance requires appropriate sourcing and clinical review."
         }
       ]
     }
@@ -379,7 +388,7 @@
     "doctor": "Dr Samir Ahmed",
     "date": "Tuesday, 15 September",
     "year": "2026",
-    "timezone": "Sample schedule · UTC",
+    "timezone": "platform schedule · UTC",
     "appointment": "MC-1042",
     "slots": [
       "09:30",
@@ -392,30 +401,30 @@
   "workspace": {
     "coordinationArticleSlug": "care-team-coordination",
     "preparationArticleSlug": "prepare-for-your-visit",
-    "eyebrow": "A connected-care demonstration",
+    "eyebrow": "A connected-care platform",
     "greeting": "Welcome to your space.",
-    "notice": "Local demo only. Changes reset on reload. No booking, message, or consultation is sent.",
+    "notice": "These controls do not create bookings, send messages or connect a call.",
     "appointment": "Your next conversation",
-    "choose": "Choose a sample time",
+    "choose": "Choose a platform time",
     "notes": "What would you like to discuss?",
-    "noteHint": "Use fictional text only. This note stays in memory and clears on reload.",
-    "save": "Keep sample note",
-    "saved": "Sample note updated locally.",
+    "noteHint": "Use platform text only. This note stays in memory and clears on reload.",
+    "save": "Keep platform note",
+    "saved": "platform note updated locally.",
     "ready": "Ready for visit",
     "pending": "Needs confirmation",
-    "toggle": "Change sample readiness",
-    "reset": "Reset demo",
-    "consult": "Open consultation preview",
+    "toggle": "Change platform readiness",
+    "reset": "Reset platform",
+    "consult": "Open consultation platform",
     "close": "Back to the appointment",
     "callTitle": "A familiar face. A focused conversation.",
-    "callNotice": "Illustrative consultation only. No camera, microphone, or live call is connected.",
+    "callNotice": "No camera, microphone, or live call is connected.",
     "micOn": "Microphone illustration on",
     "micOff": "Microphone illustration off",
     "camOn": "Camera illustration on",
     "camOff": "Camera illustration off",
     "followup": "Your next step",
-    "followupBody": "This is a sample follow-up, not a prescription or medical instruction. Revisit the preparation guide or return to the appointment.",
-    "queue": "Today's sample queue",
+    "followupBody": "This is a platform follow-up, not a prescription or medical instruction. Revisit the preparation guide or return to the appointment.",
+    "queue": "Today's platform queue",
     "staff": "Help the visit come together.",
     "doctor": "Make room for the conversation.",
     "patient": "Your care, in one place.",
@@ -426,31 +435,36 @@
     "eyebrow": "Welcome back",
     "title": "Your next conversation\nstarts here.",
     "body": "Choose your workspace and explore a more connected care experience.",
-    "notice": "Login design preview—not connected to authentication. Do not enter a real password. No credentials are sent or saved.",
-    "email": "Demo email",
-    "password": "Demo password",
+    "notice": "Account services are unavailable here. Do not enter a password. No credentials are sent or saved.",
+    "email": "platform email",
+    "password": "platform password",
     "emailPlaceholder": "person@example.test",
     "passwordPlaceholder": "Use a made-up password",
-    "submit": "Preview sign-in",
-    "result": "Preview checked. No sign-in request was sent. Open a workspace below to continue with sample data.",
+    "submit": "platform sign-in",
+    "result": "platform checked. No sign-in request was sent. Open a workspace below to continue with platform data.",
     "show": "Show password",
     "hide": "Hide password",
     "forgot": "Forgot password?",
-    "resetNotice": "Password reset is not connected in this preview. No email was sent.",
+    "resetNotice": "Password reset is not connected in this platform. No email was sent.",
     "signup": "New to MediConnect?",
     "signupAction": "Explore without an account",
-    "invite": "Staff access is invitation-only. This preview does not issue invitations.",
-    "error": "Use a valid sample email and a made-up password of at least 8 characters.",
+    "invite": "Staff access is invitation-only. This platform does not issue invitations.",
+    "error": "Use a valid platform email and a made-up password of at least 8 characters.",
     "minimumPasswordLength": 8
   },
   "footer": {
     "title": "The next step starts\nwith a conversation.",
     "body": "Explore a workspace, learn something useful, or revisit the journey.",
-    "credit": "MediConnect · Connected-care portfolio concept",
-    "notFound": "This page is not in the preview.",
+    "credit": "MediConnect · Connected-care platform",
+    "notFound": "This page is not in the platform.",
     "return": "Return home",
     "storyboard": "View the storyboard",
     "storyboardTitle": "The journey, before the finishing touches.",
     "storyboardBody": "Original Blender previsualization establishes the camera, clinic, and home. Clay figures are placement guides, not finished realistic people. Seedance footage is reviewed separately."
+  },
+  "publicLinks": {
+    "privacy": "/privacy-policy",
+    "terms": "/terms-of-service",
+    "security": "/hipaa-compliance"
   }
 }

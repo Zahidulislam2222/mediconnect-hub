@@ -35,7 +35,6 @@ import Analytics from "./pages/Analytics";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
 import TermsOfService from "./pages/TermsOfService";
 import HipaaCompliance from "./pages/HipaaCompliance";
-import Contact from "./pages/Contact";
 import AdminStaffAuth from "./pages/AdminStaffAuth";
 import NotFound from "./pages/NotFound";
 import Billing from "./pages/Billing";
@@ -224,7 +223,6 @@ const AppContent = () => {
       <Route path="/privacy-policy" element={<PrivacyPolicy />} />
       <Route path="/terms-of-service" element={<TermsOfService />} />
       <Route path="/hipaa-compliance" element={<HipaaCompliance />} />
-      <Route path="/contact" element={<Contact />} />
 
       {/* PROTECTED ZONE — HipaaGuard applied inside ProtectedRoute */}
       <Route element={<ProtectedRoute />}>

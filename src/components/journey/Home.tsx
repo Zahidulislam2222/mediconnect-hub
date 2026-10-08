@@ -18,14 +18,9 @@ import {
 } from "lucide-react";
 import { journey as c } from "@/content/journey";
 import Film from "./Film";
+import { publicSite as site } from "@/content/public-site";
 
-export default function Home({
-  slot,
-  ready,
-}: {
-  slot: string;
-  ready: boolean;
-}) {
+export default function Home() {
   const routes = useJourneyRoutes();
   const track = useRef<HTMLElement>(null);
   const reduced = useReducedMotion();
@@ -146,7 +141,7 @@ export default function Home({
             </h1>
             <p className="jy-story-body">{stage.body}</p>
             <div className="jy-actions">
-              <Link className="jy-button jy-button-light" to={`${routes.workspace}/patient`}>
+              <Link className="jy-button jy-button-light" to={routes.auth}>
                 {c.hero.primary}
                 <ArrowUpRight size={20} />
               </Link>
@@ -164,7 +159,7 @@ export default function Home({
             <div className="jy-card-top">
               <HeartHandshake size={25} />
               <span>{stage.cardLabel}</span>
-              <span className="jy-card-id">{c.sample.appointment}</span>
+              <span className="jy-card-id">{c.brand}</span>
             </div>
             <h3>{stage.cardTitle}</h3>
             <div className="jy-card-bottom">
@@ -235,16 +230,8 @@ export default function Home({
         <h2 id="plan-title">{stage.cardTitle}</h2>
         <p>{stage.cardBody}</p>
         <div className="jy-card-detail">
-          <strong>{c.sample.doctor}</strong>
-          <span>
-            {c.sample.date} · {slot}
-          </span>
-          <span>{ready ? c.workspace.ready : c.workspace.pending}</span>
-          <p className="jy-local-notice">{c.workspace.notice}</p>
-          <Link className="jy-button" to={`${routes.workspace}/patient`}>
-            {c.workspace.details}
-            <ArrowUpRight size={20} />
-          </Link>
+          <p className="jy-local-notice">{site.status}</p>
+          <Link className="jy-button" to={routes.auth}>{site.accountLabel}<ArrowUpRight size={20} /></Link>
         </div>
       </dialog>
       <section id="explore" className="jy-explore jy-section" tabIndex={-1}>
@@ -269,7 +256,7 @@ export default function Home({
               </div>
               <h3>{role.title}</h3>
               <p>{role.body}</p>
-              <Link to={`${routes.workspace}/${role.id}`} className="jy-text-link">
+              <Link to={role.id === "staff" ? routes.adminAuth : routes.auth} className="jy-text-link">
                 {role.action}
                 <ArrowUpRight />
               </Link>

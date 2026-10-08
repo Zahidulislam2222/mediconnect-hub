@@ -1,12 +1,11 @@
 import { test, expect } from './test';
-
 for (const route of ['/', '/auth']) {
   test(`security badges remain qualified at ${route}`, async ({ page }) => {
     await page.goto(route);
     await expect(page.locator('body')).not.toContainText('GDPR Ready');
     await expect(page.locator('body')).not.toContainText('AES-256');
     await expect(page.locator('body')).toContainText(route === '/auth'
-      ? 'Security controls under review' : 'not a claim of regulatory certification');
+      ? 'Security controls under review' : 'Account and clinical services are currently unavailable');
   });
 }
 
@@ -21,9 +20,9 @@ test('forged browser state cannot enter private administration', async ({ page }
 });
 
 for (const route of ['/privacy-policy', '/hipaa-compliance', '/terms-of-service']) {
-  test(`public notice accurately labels the demonstration at ${route}`, async ({ page }) => {
+  test(`public notice accurately states current service availability at ${route}`, async ({ page }) => {
     await page.goto(route);
-    await expect(page.getByRole('main')).toContainText('Demonstration only.');
+    await expect(page.getByRole('main')).toContainText('Account and clinical services are currently unavailable');
     await expect(page.getByRole('main')).not.toContainText('We have signed Business Associate Agreements');
     await expect(page.getByRole('main')).not.toContainText('7 years as required by HIPAA');
   });

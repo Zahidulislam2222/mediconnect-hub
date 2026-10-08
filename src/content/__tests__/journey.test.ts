@@ -100,8 +100,8 @@ describe("connected-care content boundary", () => {
     ).toBe(false);
   });
   it("keeps clinical claims out of sample appointment content", () => {
-    expect(journey.notice).toContain("No real appointments");
-    expect(journey.notice).toContain("not a claim of regulatory certification");
+    expect(journey.notice).toContain("currently unavailable");
+    expect(journey.notice).toContain("do not submit health records or payment information");
     expect(journey.auth.notice).toContain("No credentials are sent or saved");
     expect(journey.workspace.callNotice).toContain(
       "No camera, microphone, or live call",

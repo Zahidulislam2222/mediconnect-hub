@@ -10,11 +10,11 @@
   },
   "application": {
     "home": "/",
-    "knowledge": "/demo/knowledge",
+    "knowledge": "/guides",
     "blog": "/blog",
     "auth": "/auth",
     "adminAuth": "/admin-auth",
-    "workspace": "/demo",
+    "workspace": "/workspace",
     "storyboard": "/storyboard"
   }
 }

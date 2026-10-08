@@ -1,0 +1,84 @@
+{
+  "status": "Account and clinical services are currently unavailable on this public site. Please do not submit health records or payment information.",
+  "navigationLabel": "Main navigation",
+  "footerLabel": "Footer navigation",
+  "homeLabel": "Home",
+  "accountLabel": "Account access",
+  "backLabel": "Back to home",
+  "learnLabel": "Learn more",
+  "contactLabel": "Contact",
+  "privacyLabel": "Privacy",
+  "termsLabel": "Terms",
+  "securityLabel": "Security",
+  "navigation": [
+    { "id": "about", "label": "About" },
+    { "id": "services", "label": "Services" },
+    { "id": "clinicians", "label": "For clinicians" },
+    { "id": "help", "label": "Help" }
+  ],
+  "pages": {
+    "about": {
+      "eyebrow": "About MediConnect",
+      "title": "Care starts with a connection.",
+      "intro": "MediConnect brings appointment management, health information and care-team communication into a connected platform for patients, clinicians and clinic teams.",
+      "sections": [
+        { "title": "People first", "body": "Patients need a clear next step. Clinicians need useful context. Clinic teams need a way to keep each visit organized. These needs shape how MediConnect is built." },
+        { "title": "One connected journey", "body": "The platform links preparation, appointments, consultation tools and follow-up information. Each role has its own workspace and access rules." },
+        { "title": "Clear boundaries", "body": "A public website is not a clinical service. Account access, payments and care delivery require verified service activation and a participating care provider." }
+      ],
+      "related": "services",
+      "actionLabel": "Explore the services"
+    },
+    "services": {
+      "eyebrow": "Platform services",
+      "title": "A clearer path through care.",
+      "intro": "Explore the tools MediConnect is building around the care journey. Availability depends on your clinic, account and verified service activation.",
+      "sections": [
+        { "title": "Appointments and preparation", "body": "Appointment tools bring scheduling, visit details, reminders and preparation together. Your clinic confirms whether booking and notifications are available." },
+        { "title": "Consultation and communication", "body": "Care-team communication includes messages and video-consultation tools. A visit is confirmed only through an active account and participating provider." },
+        { "title": "Records and follow-up", "body": "Patient workspaces organize health information, prescriptions and follow-up details with role-specific access. Medical decisions remain with qualified care professionals." },
+        { "title": "Billing and account management", "body": "Account tools include billing, receipts, preferences and privacy requests. Payment and account changes require confirmation from the active service." }
+      ],
+      "related": "help",
+      "actionLabel": "Read the getting-started guide"
+    },
+    "clinicians": {
+      "eyebrow": "For clinicians and clinic teams",
+      "title": "More room for the conversation.",
+      "intro": "MediConnect organizes the operational side of a visit so care teams can keep patient context and the next step in view.",
+      "sections": [
+        { "title": "Prepare for each visit", "body": "Practitioner tools include schedules, queues, patient context and clinical records. Access must be tied to an authorized role and patient relationship." },
+        { "title": "Keep the team connected", "body": "Staff tools support schedules, tasks and coordination. Administrative permissions are separate from clinical access." },
+        { "title": "Activate carefully", "body": "Clinic onboarding requires verified identity, access, integrations and operational readiness. This website does not provide an active clinical account or claim certification." }
+      ],
+      "related": "contact",
+      "actionLabel": "Find contact information"
+    },
+    "help": {
+      "eyebrow": "Help and getting started",
+      "title": "Know your next step.",
+      "intro": "Find clear answers about accounts, service availability and where to turn for support.",
+      "sections": [
+        { "title": "Can I book a visit here?", "body": "Booking is currently unavailable on this public site. A visit requires an active clinic service and confirmed appointment. Browsing a page does not create a booking." },
+        { "title": "How do I access my account?", "body": "Use Account access to reach the existing sign-in page. Authentication availability is still being verified. Do not enter health records or payment information while services are unavailable." },
+        { "title": "Where can I find practical information?", "body": "The Guides section contains general information about preparing for visits and connected care. It does not replace advice from your own care team." },
+        { "title": "What if I need urgent care?", "body": "This site is not an emergency service. Contact your local emergency service or an appropriate care provider for urgent medical help." },
+        { "title": "Where are privacy and account rules explained?", "body": "Use the Privacy, Terms and Security links in the footer. Verified operating and service details are required before patient information can be processed." }
+      ],
+      "related": "contact",
+      "actionLabel": "View contact options"
+    },
+    "contact": {
+      "eyebrow": "Contact MediConnect",
+      "title": "Start with the right contact.",
+      "intro": "A verified public support address and enquiry service have not been configured yet. There is no active contact form on this page.",
+      "sections": [
+        { "title": "Existing care or appointments", "body": "Contact your clinic through the contact details it has already provided. This public website cannot confirm, change or cancel an appointment." },
+        { "title": "Account and platform enquiries", "body": "Verified support contact details will be published here when the service is activated. Until then, do not send passwords, payment details or medical records through unverified channels." },
+        { "title": "Need help finding information?", "body": "The Help page explains current service availability, account access and the available public guides." }
+      ],
+      "related": "help",
+      "actionLabel": "Visit the help page"
+    }
+  }
+}
