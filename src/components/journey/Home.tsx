@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { journey as c } from "@/content/journey";
 import Film from "./Film";
+import HomeSections from './HomeSections';
 import { publicSite as site } from "@/content/public-site";
 
 export default function Home() {
@@ -276,6 +277,7 @@ export default function Home() {
           </Link>
         </div>
       </section>
+      <HomeSections />
     </main>
   );
 }

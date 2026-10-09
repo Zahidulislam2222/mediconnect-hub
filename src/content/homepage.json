@@ -1,0 +1,35 @@
+{
+  "steps": {
+    "eyebrow": "A little clarity, at every step",
+    "title": "Before, during and beyond your visit.",
+    "body": "Care is more than a single conversation. Explore how a connected journey can make the next step easier to understand.",
+    "items": [
+      {"title": "Prepare with purpose", "body": "Write down your questions, gather the information your clinic requests and understand what you would like to discuss."},
+      {"title": "Make room to talk", "body": "Bring your concerns to a qualified care professional. Ask about options, expectations and anything that needs explaining."},
+      {"title": "Leave with a next step", "body": "Clarify your care plan, follow-up arrangements and who to contact if you have questions after the conversation."}
+    ]
+  },
+  "services": {"eyebrow": "Tools around the conversation", "title": "Less searching. More understanding.", "body": "Explore the platform’s capabilities. Your clinic and verified service activation determine which tools are available to you.", "action": "Explore all services"},
+  "clinicians": {"eyebrow": "For clinicians and clinic teams", "title": "Care is a team effort.", "body": "From preparation to follow-up, clear context and thoughtful coordination help teams keep the person at the center of the visit.", "action": "Discover the clinician workspace"},
+  "trust": {
+    "eyebrow": "Clarity builds trust", "title": "Your information deserves careful handling.",
+    "body": "Understand the platform’s boundaries before you share personal information. This public website provides information; account and clinical services are currently unavailable.",
+    "items": [
+      {"title": "Understand your privacy", "body": "Read how information is handled and which choices and requests are described in the privacy notice."},
+      {"title": "Know who can help", "body": "Clinical questions belong with a qualified professional. This website cannot diagnose, prescribe or provide emergency care."},
+      {"title": "Check availability first", "body": "Do not submit health records or payment information here. A participating clinic must confirm access before you use clinical tools."}
+    ],
+    "privacyAction": "Read the privacy notice", "securityAction": "Understand security boundaries"
+  },
+  "faq": {
+    "eyebrow": "A few useful answers", "title": "Questions before you begin?",
+    "items": [
+      {"question": "Can I book a consultation on this website?", "answer": "Account and clinical services are currently unavailable on this public site. A participating clinic must confirm an active service and your access before a booking can be made."},
+      {"question": "Who is MediConnect designed for?", "answer": "The platform is designed around patients, clinicians and clinic teams, with separate workspaces for their different responsibilities."},
+      {"question": "Should I upload my health records here?", "answer": "No. Do not submit health records, payment information or other sensitive details on this public site. Read the privacy notice and confirm the appropriate secure channel with your clinic."},
+      {"question": "Where can I find information about preparing for care?", "answer": "Explore the Guides section for general educational reading. It supports your understanding and does not replace advice from a qualified care professional."},
+      {"question": "What should I do in an emergency?", "answer": "Contact your local emergency services immediately. Do not wait for a website response or use MediConnect as an emergency service."}
+    ]
+  },
+  "closing": {"eyebrow": "Start with understanding", "title": "A clearer next step starts here.", "body": "Learn how the platform works, explore general care guides or find answers about availability before you go further.", "primaryAction": "Visit the help center", "secondaryAction": "Explore care guides"}
+}

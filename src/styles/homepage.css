@@ -1,0 +1,46 @@
+/* Homepage editorial sections reuse the connected-care palette and type system. */
+.jy-home-block { padding: clamp(56px, 7vw, 112px) 4%; }
+.jy-home-block h2 { max-width: 800px; margin: 18px 0 28px; font-size: clamp(34px, 4vw, 64px); line-height: 1.08; letter-spacing: -0.035em; }
+.jy-home-block h3 { font-size: 24px; line-height: 1.2; margin: 22px 0 16px; }
+.jy-home-block p { max-width: 680px; }
+.jy-home-step-list, .jy-home-service-grid, .jy-home-trust-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 36px; margin: 48px 0 0; }
+.jy-home-step-list { padding: 0; list-style: none; counter-reset: none; }
+.jy-home-step-list li { padding-top: 28px; border-top: 1px solid var(--jy-line); }
+.jy-home-number { color: var(--jy-blue); font-size: 18px; font-weight: 700; }
+.jy-home-step-list p, .jy-home-service-grid p, .jy-home-clinicians li p, .jy-home-faq details p { color: var(--jy-muted); font-size: 17px; }
+.jy-home-services { background: var(--jy-soft); }
+.jy-home-split-heading { display: grid; grid-template-columns: 1.2fr 1fr; gap: 64px; align-items: end; }
+.jy-home-service-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; margin-bottom: 36px; }
+.jy-home-service-grid article { padding: 36px; background: var(--jy-paper); border: 1px solid var(--jy-line); border-radius: 18px; }
+.jy-home-service-grid svg { color: var(--jy-blue); }
+.jy-home-clinicians { display: grid; grid-template-columns: 1fr 1fr; gap: clamp(32px, 5vw, 80px); align-items: center; }
+.jy-home-clinician-image { align-self: stretch; min-height: 480px; border-radius: 24px; overflow: hidden; background: var(--jy-soft); }
+.jy-home-clinician-image img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.jy-home-clinicians ul { list-style: none; padding: 0; margin: 32px 0; }
+.jy-home-clinicians li { display: flex; gap: 18px; margin-bottom: 24px; }
+.jy-home-clinicians li svg { flex-shrink: 0; margin-top: 4px; color: var(--jy-blue); }
+.jy-home-clinicians li h3 { font-size: 20px; margin: 0 0 8px; }
+.jy-home-clinicians li p { margin: 0; }
+.jy-home-trust { color: var(--jy-paper); background: var(--jy-ink); }
+.jy-home-trust .jy-section-heading > p:last-child { color: inherit; }
+.jy-home-trust-grid { margin-bottom: 40px; }
+.jy-home-trust-grid article { border-top: 1px solid currentColor; }
+.jy-home-trust-grid p { font-size: 17px; opacity: 0.85; }
+.jy-home-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 28px; }
+.jy-home-faq { display: grid; grid-template-columns: 0.8fr 1.2fr; gap: 64px; }
+.jy-home-faq details { border-bottom: 1px solid var(--jy-line); padding: 24px 0; }
+.jy-home-faq details:first-child { border-top: 1px solid var(--jy-line); }
+.jy-home-faq summary { cursor: pointer; font-weight: 600; padding-right: 16px; }
+.jy-home-faq summary:focus-visible { outline: 2px solid var(--jy-blue); outline-offset: 6px; }
+.jy-home-faq details p { margin: 18px 0 0; }
+.jy-home-closing { text-align: center; background: var(--jy-soft); }
+.jy-home-closing h2, .jy-home-closing p { margin-left: auto; margin-right: auto; }
+.jy-home-closing .jy-home-actions { justify-content: center; margin-top: 32px; }
+@media (max-width: 800px) {
+  .jy-home-step-list, .jy-home-service-grid, .jy-home-trust-grid, .jy-home-split-heading, .jy-home-clinicians, .jy-home-faq { grid-template-columns: 1fr; gap: 28px; }
+  .jy-home-block h2 { overflow-wrap: anywhere; }
+  .jy-home-service-grid article { padding: 26px; }
+  .jy-home-clinician-image { min-height: 0; aspect-ratio: 4 / 3; }
+  .jy-home-actions { align-items: flex-start; flex-direction: column; }
+  .jy-home-closing .jy-home-actions { align-items: center; }
+}
