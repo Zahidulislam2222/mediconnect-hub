@@ -43,8 +43,21 @@ describe('installed static release packaging', () => {
     const output = result as string;
     const escaped = '&lt;tag&gt; &amp; &quot;quoted&quot; $&amp; $$ $1';
     expect(output).toContain(`<p>${escaped}</p>`);
+    expect(output).toContain('class="release-shell"');
+    expect(output).toContain('<noscript><p>');
     expect(output).toContain(`name="description" content="${escaped}"`);
     expect(output).toContain(`property="og:description" content="${escaped}"`);
     expect(output).not.toContain('<tag>');
+  });
+  it('embeds critical scoped styling after asset processing using the current theme', () => {
+    const plugin = config.plugins?.flat().find(item => item && typeof item === 'object' && 'name' in item && item.name === 'critical-release-shell');
+    if (!plugin || typeof plugin !== 'object' || !('transformIndexHtml' in plugin)) throw new Error('Missing critical shell plugin');
+    const transform = plugin.transformIndexHtml;
+    if (!transform || typeof transform !== 'object' || !('handler' in transform)) throw new Error('Missing critical shell handler');
+    expect(transform.order).toBe('post');
+    const tags = transform.handler('', {} as IndexHtmlTransformContext);
+    expect(tags).toEqual(expect.arrayContaining([expect.objectContaining({
+      tag: 'style', injectTo: 'head-prepend', children: expect.stringContaining('min-height: 100svh'),
+    })]));
   });
 });

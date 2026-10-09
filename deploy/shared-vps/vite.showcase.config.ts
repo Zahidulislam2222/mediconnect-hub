@@ -1,12 +1,21 @@
 import { defineConfig, mergeConfig } from 'vite';
 import path from 'node:path';
+import { readFileSync } from 'node:fs';
 import baseConfig from '../../vite.config';
 import { journey } from '../../src/content/journey';
 
 const escapeHtml = (value: string) => value.replace(/[&<>"']/g, character => ({
   '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
 })[character]!);
-const fallback = `<main><h1>${escapeHtml(journey.brand)}</h1><h2>${escapeHtml(journey.hero.title)} ${escapeHtml(journey.hero.emphasis)}</h2><p>${escapeHtml(journey.hero.body)}</p><p>${escapeHtml(journey.notice)}</p><p>${escapeHtml(journey.labels.noScript)}</p></main>`;
+const fallback = `<main class="release-shell"><header>${escapeHtml(journey.brand)}<span aria-hidden="true">.</span></header><section><h1>${escapeHtml(journey.hero.title)} <em>${escapeHtml(journey.hero.emphasis)}</em></h1><p>${escapeHtml(journey.hero.body)}</p><aside><p>${escapeHtml(journey.notice)}</p><noscript><p>${escapeHtml(journey.labels.noScript)}</p></noscript></aside></section></main>`;
+// Read the existing theme rather than introducing a second brand palette.
+const theme = readFileSync(path.resolve(__dirname, '../../src/index.css'), 'utf8');
+const shellTokens = ['primary', 'primary-foreground', 'accent'].map(name => {
+  const value = theme.match(new RegExp(`--${name}:\\s*([^;]+);`))?.[1];
+  if (!value) throw new Error(`Missing shell theme token: ${name}`);
+  return `--${name}:${value};`;
+}).join('');
+const shellStyles = readFileSync(path.resolve(__dirname, 'release-shell.css'), 'utf8');
 
 export default defineConfig((environment) => mergeConfig(baseConfig(environment), {
   // Root-relative assets are required for direct navigation to nested SPA routes.
@@ -24,6 +33,13 @@ export default defineConfig((environment) => mergeConfig(baseConfig(environment)
         .replace(/(<meta (?:name="description"|property="og:description") content=")[^"]*("\s*\/>)/g, (_match, prefix: string, suffix: string) => `${prefix}${escapeHtml(journey.hero.body)}${suffix}`)
         .replace('content="summary_large_image"', 'content="summary"'),
     },
+  }, {
+    name: 'critical-release-shell',
+    // Post keeps critical CSS inside the HTML, independent of asset downloads.
+    transformIndexHtml: { order: 'post', handler: () => [{
+      tag: 'style', attrs: { id: 'release-shell-styles' },
+      children: `.release-shell{${shellTokens}}${shellStyles}`, injectTo: 'head-prepend',
+    }] },
   }],
   resolve: {
     alias: [{
