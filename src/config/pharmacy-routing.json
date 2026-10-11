@@ -4,5 +4,6 @@
   "billing": "/billing",
   "pay": "/billing/pay",
   "pickup": "/pharmacy/generate-qr",
-  "refill": "/pharmacy/request-refill"
+  "refill": "/pharmacy/request-refill",
+  "cancelPrescription": "/prescriptions/{prescriptionId}/cancel"
 }

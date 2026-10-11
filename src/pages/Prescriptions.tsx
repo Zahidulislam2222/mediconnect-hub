@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { getCurrentUser, signOut, fetchAuthSession } from 'aws-amplify/auth';
 import {
@@ -21,7 +21,7 @@ import { useToast } from "@/hooks/use-toast";
 
 import { api, isRejection, rejectionReason } from "@/lib/api";
 import copy from "@/content/pharmacy";
-import { pharmacyRoutes, refillApprovalFrom } from "@/lib/pharmacy-contract";
+import { pharmacyRoutes, refillApprovalFrom, prescriptionCancellationPath, prescriptionCancellationFrom } from "@/lib/pharmacy-contract";
 import { clearAllSensitive } from "@/lib/secure-storage";
 
 export default function Prescriptions() {
@@ -44,6 +44,8 @@ export default function Prescriptions() {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [approvingIds, setApprovingIds] = useState<ReadonlySet<string>>(new Set());
+    const mutationLocks = useRef(new Set<string>());
+    const [cancellationTarget, setCancellationTarget] = useState<string | null>(null);
     const [interactionError, setInteractionError] = useState<string | null>(null);
 
     const [formData, setFormData] = useState({
@@ -195,9 +197,20 @@ export default function Prescriptions() {
     // previous fill was never collected, that fill restored (ISSUED). Nothing changes on screen until it has answered.
     // A rejection (4xx) was not applied. Any other failure may have committed, so the doctor is told to check the list
     // first rather than approve again.
+    const lockPrescription = (id: string) => {
+        if (mutationLocks.current.has(id)) return false;
+        mutationLocks.current.add(id);
+        setApprovingIds(current => new Set(current).add(id));
+        return true;
+    };
+    const unlockPrescription = (id: string) => {
+        mutationLocks.current.delete(id);
+        setApprovingIds(current => { const next = new Set(current); next.delete(id); return next; });
+    };
     const handleApproveRefill = async (rx: any) => {
         const id = rx.prescriptionId;
-        setApprovingIds(current => new Set(current).add(id));
+        if (!lockPrescription(id)) return;
+        let uncertain = false;
         try {
             const approval = refillApprovalFrom(await api.post(pharmacyRoutes.refill, { prescriptionId: id }));
             const { status } = approval;
@@ -208,11 +221,31 @@ export default function Prescriptions() {
                 : approval.paymentStatus === "PAID" ? copy.restoredTemplate : copy.restoredUnpaidTemplate;
             toast({ title: status === "PENDING" ? copy.approvedTitle : copy.restoredTitle, description: template.replace('{medication}', rx.medication) });
         } catch (e) {
+            uncertain = !isRejection(e);
             toast(!isRejection(e)
                 ? { variant: "destructive", title: copy.approveUnconfirmedTitle, description: copy.approveUnconfirmedDescription }
                 : { variant: "destructive", title: copy.approveRejectedTitle, description: rejectionReason(e) ?? copy.approveRejectedDescription });
         } finally {
-            setApprovingIds(current => { const next = new Set(current); next.delete(id); return next; });
+            if (!uncertain) unlockPrescription(id);
+        }
+    };
+
+    const handleCancelPrescription = async () => {
+        const id = cancellationTarget;
+        if (!id || !lockPrescription(id)) return;
+        let uncertain = false;
+        try {
+            prescriptionCancellationFrom(await api.put(prescriptionCancellationPath(id), {}), id);
+            setPrescriptions(current => current.map(item => item.prescriptionId === id ? { ...item, status: 'CANCELLED' } : item));
+            toast({ title: copy.cancelledTitle, description: copy.cancelledDescription });
+        } catch (error) {
+            uncertain = !isRejection(error);
+            toast({ variant: 'destructive',
+                title: uncertain ? copy.cancelUnconfirmedTitle : copy.cancelRejectedTitle,
+                description: uncertain ? copy.cancelUnconfirmedDescription : rejectionReason(error) ?? copy.cancelRejectedDescription });
+        } finally {
+            setCancellationTarget(null);
+            if (!uncertain) unlockPrescription(id);
         }
     };
 
@@ -424,10 +457,15 @@ export default function Prescriptions() {
                                                 </div>
                                                 <Button
                                                     className="bg-green-600 hover:bg-green-700 text-white"
-                                                    disabled={approvingIds.has(rx.prescriptionId)}
+                                                    disabled={approvingIds.has(rx.prescriptionId) || cancellationTarget === rx.prescriptionId}
                                                     onClick={() => handleApproveRefill(rx)}
                                                 >
                                                     <CheckCircle2 className="w-4 h-4 mr-2" /> Approve
+                                                </Button>
+                                                <Button variant="outline"
+                                                    disabled={approvingIds.has(rx.prescriptionId) || cancellationTarget === rx.prescriptionId}
+                                                    onClick={() => setCancellationTarget(rx.prescriptionId)}>
+                                                    {copy.cancelPrescription}
                                                 </Button>
                                             </Card>
                                         ))}
@@ -437,6 +475,23 @@ export default function Prescriptions() {
                         </Tabs>
                     </div>
                 )}
+
+                <Dialog open={cancellationTarget !== null} onOpenChange={open => {
+                    if (!open && cancellationTarget && !approvingIds.has(cancellationTarget)) setCancellationTarget(null);
+                }}>
+                    <DialogContent>
+                        <DialogHeader>
+                            <DialogTitle>{copy.cancelConfirmTitle}</DialogTitle>
+                            <DialogDescription>{copy.cancelConfirmDescription}</DialogDescription>
+                        </DialogHeader>
+                        <DialogFooter>
+                            <Button variant="outline" disabled={cancellationTarget !== null && approvingIds.has(cancellationTarget)}
+                                onClick={() => setCancellationTarget(null)}>{copy.cancelDismiss}</Button>
+                            <Button variant="destructive" disabled={cancellationTarget === null || approvingIds.has(cancellationTarget)}
+                                onClick={handleCancelPrescription}>{copy.cancelConfirm}</Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
 
                 {/* MODAL: NEW PRESCRIPTION */}
                 <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>

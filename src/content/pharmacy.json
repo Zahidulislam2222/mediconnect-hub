@@ -52,5 +52,16 @@
   "restoredUnpaidTemplate": "{medication} was never collected, so no new refill was charged. Its existing bill must be paid before pickup.",
   "approveRejectedDescription": "The pharmacy service did not apply this approval. Refresh the list to see the prescription's current state.",
   "refillRejectedTitle": "Refill not requested",
-  "refillRejectedDescription": "The pharmacy did not accept this refill request. Sync to see the prescription's current state."
+  "refillRejectedDescription": "The pharmacy did not accept this refill request. Sync to see the prescription's current state.",
+  "cancelPrescription": "Cancel prescription",
+  "cancelConfirmTitle": "Cancel this prescription?",
+  "cancelConfirmDescription": "This cancels the prescription, including its pending refill. Unpaid bills are closed; paid bills are flagged for refund review. This does not confirm that a refund has been issued.",
+  "cancelConfirm": "Confirm cancellation",
+  "cancelDismiss": "Keep prescription",
+  "cancelledTitle": "Prescription cancelled",
+  "cancelledDescription": "The service confirmed cancellation. Review Billing for any payment or refund follow-up.",
+  "cancelRejectedTitle": "Cancellation not applied",
+  "cancelRejectedDescription": "The service refused cancellation. Refresh the list to check its current state.",
+  "cancelUnconfirmedTitle": "Cancellation outcome unconfirmed",
+  "cancelUnconfirmedDescription": "Check the current prescription and billing status before another action. Contact support if the outcome remains unclear."
 }

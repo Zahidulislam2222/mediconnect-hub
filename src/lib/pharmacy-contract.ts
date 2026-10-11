@@ -3,7 +3,17 @@ import routing from '@/config/pharmacy-routing.json';
 import paymentCopy from '@/content/payment';
 
 const route = z.string().regex(/^\/[A-Za-z0-9/-]+$/);
-export const pharmacyRoutes = z.object({ profile: route, prescriptions: route, billing: route, pay: route, pickup: route, refill: route }).strict().parse(routing);
+export const pharmacyRoutes = z.object({ profile: route, prescriptions: route, billing: route, pay: route, pickup: route, refill: route,
+  cancelPrescription: z.string().regex(/^\/[A-Za-z0-9/-]+\/\{prescriptionId\}\/[A-Za-z0-9/-]+$/),
+}).strict().parse(routing);
+
+export function prescriptionCancellationPath(prescriptionId: string) {
+  return pharmacyRoutes.cancelPrescription.replace('{prescriptionId}', encodeURIComponent(z.string().trim().min(1).parse(prescriptionId)));
+}
+
+export function prescriptionCancellationFrom(value: unknown, prescriptionId: string) {
+  return z.object({ status: z.literal('CANCELLED'), prescriptionId: z.literal(prescriptionId) }).parse(value);
+}
 
 // The pharmacy service records a completed pickup as DISPENSED; PICKED_UP is the legacy name for the same state.
 export function isDispensed(status: string) { return status === 'DISPENSED' || status === 'PICKED_UP'; }
