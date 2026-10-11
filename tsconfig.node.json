@@ -18,5 +18,5 @@
     "noUnusedParameters": false,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["vite.config.ts"]
+  "include": ["vite.config.ts", "deploy/shared-vps/vite.showcase.config.ts", "deploy/connected/vite.connected.config.ts"]
 }

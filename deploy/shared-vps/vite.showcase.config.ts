@@ -1,4 +1,4 @@
-import { defineConfig, mergeConfig } from 'vite';
+import { defineConfig, mergeConfig, type ConfigEnv } from 'vite';
 import path from 'node:path';
 import { readFileSync } from 'node:fs';
 import baseConfig from '../../vite.config';
@@ -17,20 +17,20 @@ const shellTokens = ['primary', 'primary-foreground', 'accent'].map(name => {
 }).join('');
 const shellStyles = readFileSync(path.resolve(__dirname, 'release-shell.css'), 'utf8');
 
-export default defineConfig((environment) => mergeConfig(baseConfig(environment), {
+export const createReleaseConfig = (environment: ConfigEnv, disablePayments: boolean) => mergeConfig(baseConfig(environment), {
   // Root-relative assets are required for direct navigation to nested SPA routes.
   base: '/',
   plugins: [{
     name: 'isolated-showcase-entry',
     transformIndexHtml: {
       order: 'pre',
-      handler: (html) => html
+      handler: (html: string) => html
         .replace('/src/main.tsx', '/src/showcase-main.tsx')
         .replace('<div id="root"></div>', () => `<div id="root">${fallback}</div>`)
         // Self-contained system typography: no external fonts or template branding.
         .replace(/<link\b[^>]*href="https:\/\/fonts\.[^"]*"[^>]*>/g, '')
         .replace(/<meta\b[^>]*(?:property="og:image"|name="twitter:(?:image|site)")[^>]*>/g, '')
-        .replace(/(<meta (?:name="description"|property="og:description") content=")[^"]*("\s*\/>)/g, (_match, prefix: string, suffix: string) => `${prefix}${escapeHtml(journey.hero.body)}${suffix}`)
+        .replace(/(<meta (?:name="description"|property="og:description") content=")[^"]*("\s*\/>)/g, (_match: string, prefix: string, suffix: string) => `${prefix}${escapeHtml(journey.hero.body)}${suffix}`)
         .replace('content="summary_large_image"', 'content="summary"'),
     },
   }, {
@@ -42,9 +42,11 @@ export default defineConfig((environment) => mergeConfig(baseConfig(environment)
     }] },
   }],
   resolve: {
-    alias: [{
+    alias: disablePayments ? [{
       find: /^@stripe\/stripe-js(?:\/pure)?$/,
       replacement: path.resolve(__dirname, 'stripe-showcase.mjs'),
-    }],
+    }] : [],
   },
-}));
+});
+
+export default defineConfig(environment => createReleaseConfig(environment, true));

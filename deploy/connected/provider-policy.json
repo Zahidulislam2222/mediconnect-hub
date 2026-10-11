@@ -1,0 +1,14 @@
+{
+  "optionalNames": [
+    "VITE_API_PRIMARY_TIMEOUT_MS", "VITE_API_BACKUP_TIMEOUT_MS", "VITE_API_AI_TIMEOUT_MS",
+    "VITE_PATIENT_SERVICE_URL", "VITE_STRAPI_API_URL",
+    "VITE_MONITORING_SOCKET_URL_US", "VITE_MONITORING_SOCKET_URL_EU"
+  ],
+  "awsDnsSuffix": "amazonaws.com",
+  "awsBrowserServices": ["cognito-idp", "cognito-identity"],
+  "stripe": {
+    "connect": ["https://api.stripe.com"],
+    "frame": ["https://js.stripe.com", "https://hooks.stripe.com"],
+    "script": ["https://js.stripe.com"]
+  }
+}
