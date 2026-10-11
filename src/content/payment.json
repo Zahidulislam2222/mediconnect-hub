@@ -36,5 +36,6 @@
   "subscriptionStatusUnavailable": "We could not confirm your subscription status. Please try again.",
   "refundedBadge": "Refunded",
   "refundPendingBadge": "Refund pending",
-  "refundReviewBadge": "Refund under review"
+  "refundReviewBadge": "Refund under review",
+  "partialRefundBadge": "Partial refund"
 }

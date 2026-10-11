@@ -324,7 +324,8 @@ function BillingContent() {
                                     .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
                                     .map((tx: any, i: number) => {
                                         // 🟢 CATEGORY LOGIC
-                                        const isRefund = tx.type === 'REFUND' || tx.status === 'REFUNDED' || tx.amount < 0;
+                                        const partialRefund = tx.status === 'PARTIALLY_REFUNDED';
+                                        const isRefund = !partialRefund && (tx.type === 'REFUND' || tx.status === 'REFUNDED' || tx.amount < 0);
                                         const isUnpaid = tx.status === 'PENDING' || tx.status === 'DUE' || tx.status === 'UNPAID';
                                         // Only a refund that went through is money back; a pending or failed one is not.
                                         const refundPending = isRefund && tx.refundStatus === 'PENDING';
@@ -365,6 +366,11 @@ function BillingContent() {
                                                             {isUnpaid && (
                                                                 <Badge variant="outline" className="text-[9px] h-5 px-1.5 border-orange-200 text-orange-700 bg-orange-50 rounded-md">
                                                                     Unpaid
+                                                                </Badge>
+                                                            )}
+                                                            {partialRefund && (
+                                                                <Badge variant="outline" className="text-[9px] h-5 px-1.5 rounded-md">
+                                                                    {paymentCopy.partialRefundBadge}
                                                                 </Badge>
                                                             )}
                                                             {isRefunded && (

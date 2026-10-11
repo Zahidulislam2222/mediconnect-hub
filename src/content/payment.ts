@@ -37,6 +37,7 @@ const schema = z.object({
   portalUnavailableDescription: z.string().min(1),
   subscriptionStatusUnavailable: z.string().min(1),
   refundedBadge: z.string().min(1),
+  partialRefundBadge: z.string().min(1),
   refundPendingBadge: z.string().min(1),
   refundReviewBadge: z.string().min(1),
 }).strict();

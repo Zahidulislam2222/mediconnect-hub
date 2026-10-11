@@ -28,6 +28,7 @@ describe('Billing refund rows', () => {
         refund('bbbbbbbb-manual', -40, 'FAILED_REQUIRES_MANUAL_REFUND', { description: 'Refund Failed - Contact Support' }),
         refund('cccccccc-pending', -30, 'PROCESSED', { refundStatus: 'PENDING', description: 'User requested cancellation' }),
         refund('dddddddd-unknown', -20, 'SOMETHING_ELSE', { description: 'System cancellation' }),
+        refund('eeeeeeee-partial', 50, 'PARTIALLY_REFUNDED', { type: 'CPT_CHARGE', description: 'Partial service refund' }),
       ] }
       : { name: 'Test Patient' });
   });
@@ -38,6 +39,14 @@ describe('Billing refund rows', () => {
     const issued = await row('aaaaaaaa');
     expect(issued.getByText(paymentCopy.refundedBadge)).toBeTruthy();
     expect(issued.getByText('+$50.00').className).toContain('text-green-600');
+  });
+
+  it('labels partial refunds without claiming the entire charge came back', async () => {
+    render(<MemoryRouter><Billing /></MemoryRouter>);
+    const partial = await row('eeeeeeee');
+    expect(partial.getByText('Partial refund')).toBeTruthy();
+    expect(partial.queryByText(paymentCopy.refundedBadge)).toBeNull();
+    expect(partial.queryByText('+$50.00')).toBeNull();
   });
 
   it.each([
