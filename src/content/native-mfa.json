@@ -1,0 +1,14 @@
+{
+  "completeEndpoint": "/me/mfa/complete",
+  "title": "Verify your identity",
+  "description": "Use your password and authenticator code to verify this session.",
+  "passwordLabel": "Current password",
+  "codeLabel": "Authenticator code",
+  "continueLabel": "Continue",
+  "verifyLabel": "Verify session",
+  "cancelLabel": "Cancel",
+  "error": "Verification failed. Start again with your password and a fresh authenticator code.",
+  "verifiedTitle": "Session verified",
+  "verifiedDescription": "Retry your original action when you are ready. No export or erasure has been started automatically.",
+  "stepUpCode": "MFA_STEP_UP_REQUIRED"
+}

@@ -1,3 +1,5 @@
+import { SensitiveOperationMfaDialog } from '@/components/settings/SensitiveOperationMfaDialog';
+import { isMfaStepUpRequired, nativeMfaContent } from '@/lib/cognito-native-auth';
 import privacyNotices from '@/content/privacy-notices.json';
 import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
@@ -49,6 +51,7 @@ export default function Settings() {
     const [isLoading, setIsLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
     const [isExporting, setIsExporting] = useState(false);
+    const [mfaOpen, setMfaOpen] = useState(false);
     const [userRole] = useState<"patient" | "doctor">(() =>
         (localUser.role === 'doctor' || localUser.role === 'provider') ? 'doctor' : 'patient'
     );
@@ -325,7 +328,8 @@ export default function Settings() {
             URL.revokeObjectURL(url);
             toast({ title: "Export Complete", description: "Your data has been downloaded as a FHIR R4 JSON bundle." });
         } catch (error: any) {
-            toast({ variant: "destructive", title: "Export Failed", description: error?.message || "Could not export your data." });
+            if (isMfaStepUpRequired(error)) setMfaOpen(true);
+            else toast({ variant: "destructive", title: "Export Failed", description: error?.message || "Could not export your data." });
         } finally {
             setIsExporting(false);
         }
@@ -344,7 +348,8 @@ export default function Settings() {
                     toast({ title: "Erasure request recorded", description: "Your request is pending review or processing. Erasure has not been confirmed." });
                 }
             } catch (e) {
-                toast({ variant: "destructive", title: "Error", description: "Could not complete deletion." });
+                if (isMfaStepUpRequired(e)) setMfaOpen(true);
+                else toast({ variant: "destructive", title: "Error", description: "Could not complete deletion." });
             }
         } else if (closureStatus === "APPROVED_FOR_DELETION") {
             const confirm = window.confirm(
@@ -380,6 +385,7 @@ export default function Settings() {
             userAvatar={formData.avatar || localUser.avatar}
             onLogout={handleLogout}
         >
+            <SensitiveOperationMfaDialog open={mfaOpen} onOpenChange={setMfaOpen} onVerified={() => toast({ title: nativeMfaContent.verifiedTitle, description: nativeMfaContent.verifiedDescription })} />
             {isLoading ? (
                 <SettingsSkeleton userRole={userRole} />
             ) : (

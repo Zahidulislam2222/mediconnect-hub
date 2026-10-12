@@ -185,3 +185,16 @@ export function optionalStripePublishableKey(): string | undefined {
   if (raw === undefined || (typeof raw === 'string' && raw.trim() === '')) return undefined;
   return publicEnv('VITE_STRIPE_PUBLISHABLE_KEY');
 }
+
+/** Native step-up uses only the configured issuer and the current token's configured audience. */
+export function configuredNativeMfaProvider(issuer: unknown, audience: unknown) {
+  if (typeof issuer !== 'string' || typeof audience !== 'string') throw new Error('NATIVE_MFA_CONFIGURATION_UNAVAILABLE');
+  for (const region of ['US', 'EU'] as const) {
+    if (issuer !== configuredCognitoIssuer(region)) continue;
+    const clients = region === 'EU'
+      ? [publicEnv('VITE_COGNITO_CLIENT_PATIENT_EU'), publicEnv('VITE_COGNITO_CLIENT_DOCTOR_EU'), publicEnv('VITE_COGNITO_CLIENT_ADMIN_EU')]
+      : [publicEnv('VITE_COGNITO_CLIENT_PATIENT_US'), publicEnv('VITE_COGNITO_CLIENT_DOCTOR_US'), publicEnv('VITE_COGNITO_CLIENT_ADMIN_US')];
+    if (clients.includes(audience)) return { origin: new URL(issuer).origin, clientId: audience };
+  }
+  throw new Error('NATIVE_MFA_CONFIGURATION_UNAVAILABLE');
+}
