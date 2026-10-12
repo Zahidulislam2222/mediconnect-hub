@@ -14,6 +14,11 @@ import { publicEnv, optionalBackupUrl, requestTimeout } from "@/config/env";
 import DOMPurify from 'dompurify';
 import { PublicHeader } from "@/components/PublicHeader";
 import { api } from "../lib/api";
+import { fetchCmsArticle } from "@/lib/cms-content";
+import { cmsContent } from "@/config/cms";
+import { CmsImage } from "@/components/CmsImage";
+import { CmsBlocks } from "@/components/CmsBlocks";
+import { articleRouteSource } from "@/lib/article-identity";
 
 const categoryIcons: Record<string, any> = {
   "Heart Health": Heart,
@@ -40,7 +45,10 @@ const categoryColors: Record<string, string> = {
 // If the article isn't found in the user's region, try the other region.
 // This is needed because doctors publish articles in their own region's DB.
 // =========================================================================
-async function fetchArticleCrossRegion(slug: string): Promise<any> {
+async function fetchArticleCrossRegion(slug: string, signal?: AbortSignal): Promise<any> {
+  const route = articleRouteSource(slug);
+  if (route.source === 'cms') return fetchCmsArticle(route.id, signal);
+  slug = route.id;
   // 1. Try user's current region first (fastest path)
   try {
     const item = await api.get(`/public/knowledge/${encodeURIComponent(slug)}`);
@@ -111,7 +119,11 @@ export default function KnowledgeBasePost({ role = "patient" }: KnowledgeBasePos
   const [error, setError] = useState("");
 
   useEffect(() => {
+    let active = true;
+    const controller = new AbortController();
     async function fetchArticle() {
+      setError("");
+      setArticle(null);
       if (!slug || slug === "undefined") {
         setError("Invalid Article ID");
         setIsLoading(false);
@@ -122,7 +134,8 @@ export default function KnowledgeBasePost({ role = "patient" }: KnowledgeBasePos
         setIsLoading(true);
 
         // Cross-region fetch: tries user's region first, then the other
-        const item = await fetchArticleCrossRegion(slug);
+        const item = await fetchArticleCrossRegion(slug, controller.signal);
+        if (!active) return;
 
         if (!item || !item.id) {
           setError("This article is no longer available.");
@@ -135,22 +148,26 @@ export default function KnowledgeBasePost({ role = "patient" }: KnowledgeBasePos
 
         setArticle({
           id: item.id,
+          _sourceCms: item._sourceCms === true,
           title: item.description || item.title,
           category: item.legacyData?.category || item.category || "General",
           content: content,
-          image: item.content?.[0]?.attachment?.url || item.coverImage,
+          image: item._sourceCms ? item.coverImage : item.content?.[0]?.attachment?.url || item.coverImage,
+          coverImages: item.coverImages ?? [],
+          unavailableCoverCount: item.unavailableCoverCount ?? 0,
           publishDate: publishedAt ? new Date(publishedAt).toLocaleDateString('en-US', {
             month: 'long', day: 'numeric', year: 'numeric'
           }) : 'Recently published',
         });
       } catch (error: any) {
         console.error("Failed to fetch article details:", error);
-        setError("This article is no longer available.");
+        if (active) setError("This article is no longer available.");
       } finally {
-        setIsLoading(false);
+        if (active) setIsLoading(false);
       }
     }
     fetchArticle();
+    return () => { active = false; controller.abort(); };
   }, [slug]);
 
   const renderContent = (content: any[]) => {
@@ -213,7 +230,8 @@ export default function KnowledgeBasePost({ role = "patient" }: KnowledgeBasePos
     );
   }
 
-  const Icon = categoryIcons[article.category] || BookOpen;
+  const Icon = Object.prototype.hasOwnProperty.call(categoryIcons, article.category) ? categoryIcons[article.category] : BookOpen;
+  const categoryStyle = Object.prototype.hasOwnProperty.call(categoryColors, article.category) ? categoryColors[article.category] : "";
 
   return (
     <div className="min-h-screen bg-background">
@@ -238,7 +256,9 @@ export default function KnowledgeBasePost({ role = "patient" }: KnowledgeBasePos
 
         {/* Hero Banner */}
         <div className="relative h-64 sm:h-80 md:h-[420px] w-full rounded-3xl overflow-hidden shadow-elevated group border border-border">
-          {article.image ? (
+          {article.image && article._sourceCms ? (
+            <CmsImage src={article.image} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" alt={article.title} />
+          ) : article.image ? (
             <img src={article.image} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" alt={article.title} />
           ) : (
             <div className="w-full h-full bg-secondary flex items-center justify-center">
@@ -268,10 +288,10 @@ export default function KnowledgeBasePost({ role = "patient" }: KnowledgeBasePos
                 </div>
                 <div>
                   <h4 className="font-semibold text-foreground text-base flex items-center gap-2">
-                    MediConnect Medical Board
+                    {article._sourceCms ? cmsContent.authorName : "MediConnect Medical Board"}
                     <ShieldCheck className="h-4 w-4 text-primary" />
                   </h4>
-                  <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">Clinical Compliance Reviewer</p>
+                  <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider">{article._sourceCms ? cmsContent.authorRole : "Clinical Compliance Reviewer"}</p>
                 </div>
               </div>
               <div className="flex items-center gap-4 sm:gap-6 text-sm">
@@ -281,13 +301,17 @@ export default function KnowledgeBasePost({ role = "patient" }: KnowledgeBasePos
                 </div>
                 <div className="text-center px-3">
                   <p className="text-[10px] uppercase font-semibold text-muted-foreground/60 mb-0.5">Duration</p>
-                  <p className="text-sm font-medium text-foreground">5 min read</p>
+                  <p className="text-sm font-medium text-foreground">{article._sourceCms ? cmsContent.sourceLabel : "5 min read"}</p>
                 </div>
               </div>
             </div>
 
             <article className="prose prose-slate max-w-none dark:prose-invert">
-              {renderContent(article.content)}
+              {article._sourceCms ? <>
+                {!!article.unavailableCoverCount && <p>{cmsContent.unavailableMediaLabel}</p>}
+                {article.coverImages.slice(1).map((image: string) => <CmsImage key={image} src={image} alt={article.title} />)}
+                <CmsBlocks content={article.content} />
+              </> : renderContent(article.content)}
             </article>
 
             {/* Disclaimer */}
@@ -337,8 +361,8 @@ export default function KnowledgeBasePost({ role = "patient" }: KnowledgeBasePos
                   <p className="text-sm text-muted-foreground">Related Clinical Area</p>
                 </div>
                 <div className="flex items-center gap-4 p-4 rounded-xl bg-secondary/50 border border-border">
-                  <div className={cn("h-11 w-11 rounded-xl flex items-center justify-center", categoryColors[article.category]?.split(" ")[0] || "bg-secondary")}>
-                    <Icon className={cn("h-5 w-5", categoryColors[article.category]?.split(" ")[1] || "text-muted-foreground")} />
+                  <div className={cn("h-11 w-11 rounded-xl flex items-center justify-center", categoryStyle.split(" ")[0] || "bg-secondary")}>
+                    <Icon className={cn("h-5 w-5", categoryStyle.split(" ")[1] || "text-muted-foreground")} />
                   </div>
                   <div>
                     <p className="font-semibold text-foreground">{article.category}</p>

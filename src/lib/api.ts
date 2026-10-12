@@ -1,7 +1,9 @@
 import { fetchAuthSession } from 'aws-amplify/auth';
 import { getUser } from './secure-storage';
-import { publicEnv, optionalBackupUrl, requestTimeout } from '@/config/env';
+import { publicEnv, optionalBackupUrl, optionalCmsUrl, requestTimeout } from '@/config/env';
 import apiErrors from '@/content/api-errors.json';
+import { cmsContent } from '@/config/cms';
+import { CMS_UPLOAD_PATH_PREFIX } from '@/lib/cms-protocol';
 
 
 function getServiceConfig(endpoint: string) {
@@ -147,7 +149,7 @@ export class MutationOutcomeUnknownError extends Error {
     constructor() { super(apiErrors.outcomeUnknown); }
 }
 
-async function fetchWithTimeout(url: string, options: RequestInit, timeoutMs: number) {
+async function fetchWithTimeout(url: string, options: RequestInit, timeoutMs: number, consume?: (response: Response) => Promise<unknown>) {
     const caller = options.signal;
     caller?.throwIfAborted();
     const controller = new AbortController();
@@ -185,7 +187,7 @@ async function fetchWithTimeout(url: string, options: RequestInit, timeoutMs: nu
             throw new RetryableReadError(`API Error: ${status}`);
         }
         // Keep the deadline active through body consumption and JSON parsing.
-        return await handleResponse(response);
+        return consume ? await consume(response) : await handleResponse(response);
     };
     try {
         return await Promise.race([read(), deadline, cancelled]);
@@ -262,3 +264,41 @@ async function handleResponse(response: Response) {
     }
     return await response.json();
 }
+
+function cmsUrl(path: string) {
+        const base = optionalCmsUrl();
+        if (!base) throw new Error('CMS_UNCONFIGURED');
+        const decoded = decodeURIComponent(path.split('?')[0]);
+        if (!decoded.startsWith('/') || decoded.startsWith('//') || decoded.includes('\\') ||
+            decoded.split('/').some(part => part === '..' || part === '.')) throw new Error('INVALID_CMS_PATH');
+        const origin = new URL(base);
+        const url = new URL(path, origin);
+        if (url.origin !== origin.origin || url.username || url.password) throw new Error('INVALID_CMS_ORIGIN');
+        return url;
+}
+
+/** Public editorial CMS is a separate trust boundary: no application authentication. */
+export const cmsApi = {
+    get: async (path: string, options?: ApiRequestOptions): Promise<unknown> => {
+        options?.signal?.throwIfAborted();
+        return fetchWithTimeout(cmsUrl(path).href, { method: 'GET', headers: { Accept: 'application/json' },
+            credentials: 'omit', redirect: 'error', signal: options?.signal }, requestTimeout('VITE_API_PRIMARY_TIMEOUT_MS'));
+    },
+    media: async (source: string, options?: ApiRequestOptions): Promise<Blob> => {
+        options?.signal?.throwIfAborted();
+        const origin = cmsUrl('/');
+        const candidate = new URL(source, origin);
+        if (candidate.origin !== origin.origin || candidate.username || candidate.password) throw new Error('INVALID_CMS_MEDIA');
+        const url = cmsUrl(candidate.pathname + candidate.search);
+        if (!url.pathname.startsWith(CMS_UPLOAD_PATH_PREFIX)) throw new Error('INVALID_CMS_MEDIA');
+        const value = await fetchWithTimeout(url.href, { method: 'GET', credentials: 'omit', redirect: 'error',
+            signal: options?.signal }, requestTimeout('VITE_API_PRIMARY_TIMEOUT_MS'), async response => {
+            if (!response.ok || response.redirected) throw new Error('CMS_MEDIA_UNAVAILABLE');
+            const blob = await response.blob();
+            if (!cmsContent.mediaMimeTypes.includes(blob.type) || blob.size > cmsContent.mediaMaxBytes) throw new Error('INVALID_CMS_MEDIA');
+            return blob;
+        });
+        if (!(value instanceof Blob)) throw new Error('INVALID_CMS_MEDIA');
+        return value;
+    },
+};

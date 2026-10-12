@@ -1,8 +1,21 @@
 import { useJourneyRoutes } from './Routing';
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { ArrowLeft, ArrowUpRight, Search } from "lucide-react";
 import { journey as c } from "@/content/journey";
+import { fetchCmsArticles, fetchCmsArticle } from '@/lib/cms-content';
+import { cmsContent } from '@/config/cms';
+import { CmsBlocks } from '@/components/CmsBlocks';
+import { CmsImage } from '@/components/CmsImage';
+
+type EditorialArticle = Awaited<ReturnType<typeof fetchCmsArticle>>;
+type LibraryRequest = { kind: 'knowledge' | 'blog'; slug?: string };
+
+function editorialCard(article: EditorialArticle) {
+  return { slug: article.id, title: article.title, summary: article.description,
+    category: article.category, audience: cmsContent.sourceLabel, minutes: null,
+    sections: [], cms: article };
+}
 
 export default function Library({ kind }: { kind: "knowledge" | "blog" }) {
   const routes = useJourneyRoutes();
@@ -10,8 +23,30 @@ export default function Library({ kind }: { kind: "knowledge" | "blog" }) {
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState(c.library.all);
   const copy = kind === "knowledge" ? c.library : c.journal;
-  const items = c.articles.filter((item) => item.kind === kind);
+  const [editorial, setEditorial] = useState<{ request: LibraryRequest; items: EditorialArticle[] }>();
+  const [settled, setSettled] = useState<LibraryRequest>();
+  const request = useMemo(() => ({ kind, slug }), [kind, slug]);
+  const curated = c.articles.filter((item) => item.kind === kind);
+  const curatedArticle = curated.find((item) => item.slug === slug);
+  const cmsDetail = kind === 'knowledge' && !!slug?.startsWith(cmsContent.idPrefix) && !curatedArticle;
+  useEffect(() => {
+    if (kind !== 'knowledge' || (slug && !cmsDetail)) return;
+    const controller = new AbortController();
+    let active = true;
+    const pending = cmsDetail ? fetchCmsArticle(slug!, controller.signal).then(item => [item])
+      : fetchCmsArticles(controller.signal);
+    pending.then(items => {
+      if (active) setEditorial({ request, items });
+    }).catch(() => { /* Curated guides remain available during CMS outages. */ })
+      .finally(() => { if (active) setSettled(request); });
+    return () => { active = false; controller.abort(); };
+  }, [kind, slug, cmsDetail, request]);
+  const cmsItems = editorial?.request === request ? editorial.items : [];
+  const items = [...curated.map(item => ({ ...item, cms: undefined as EditorialArticle | undefined })),
+    ...cmsItems.filter(item => !curated.some(guide => guide.slug === item.id)).map(editorialCard)];
   const article = items.find((item) => item.slug === slug);
+  if (cmsDetail && settled !== request && !article)
+    return <main id="main" tabIndex={-1} className="jy-section jy-inner" aria-busy="true"><p>{c.labels.loading}</p></main>;
   if (slug && !article)
     return (
       <main id="main" tabIndex={-1} className="jy-section jy-inner">
@@ -31,12 +66,17 @@ export default function Library({ kind }: { kind: "knowledge" | "blog" }) {
             {copy.back}
           </Link>
           <p className="jy-eyebrow">
-            {article.category} · {article.minutes} {c.labels.minutesRead}
+            {article.category} · {article.cms ? cmsContent.sourceLabel : `${article.minutes} ${c.labels.minutesRead}`}
           </p>
           <h1>{article.title}</h1>
           <p className="jy-article-lead">{article.summary}</p>
           <p className="jy-editorial-note">{copy.disclaimer}</p>
-          {article.sections.map((section) => (
+          {article.cms ? <>
+            <p className="jy-eyebrow">{cmsContent.authorName} · {cmsContent.authorRole}</p>
+            {!!article.cms.unavailableCoverCount && <p className="jy-editorial-note">{cmsContent.unavailableMediaLabel}</p>}
+            {article.cms.coverImages.map(src => <CmsImage key={src} src={src} alt={article.title} />)}
+            <CmsBlocks content={article.cms.content} />
+          </> : article.sections.map((section) => (
             <section key={section.heading}>
               <h2>{section.heading}</h2>
               <p>{section.body}</p>
@@ -102,16 +142,17 @@ export default function Library({ kind }: { kind: "knowledge" | "blog" }) {
           <Link
             className="jy-article-card"
             key={item.slug}
-            to={`${routes[kind]}/${item.slug}`}
+            to={`${routes[kind]}/${encodeURIComponent(item.slug)}`}
           >
             <div className="jy-article-art" aria-hidden="true">
+              {item.cms?.coverImage && <CmsImage src={item.cms.coverImage} alt="" />}
               <span>0{index + 1}</span>
               <div className="jy-art-ring" />
               <div className="jy-art-ring second" />
             </div>
             <div className="jy-article-card-body">
               <span className="jy-eyebrow">
-                {item.category} · {item.minutes} {c.labels.minutes}
+                {item.category} · {item.cms ? cmsContent.sourceLabel : `${item.minutes} ${c.labels.minutes}`}
               </span>
               <h2>{item.title}</h2>
               <p>{item.summary}</p>

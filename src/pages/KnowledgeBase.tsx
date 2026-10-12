@@ -9,6 +9,10 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { PublicHeader } from "@/components/PublicHeader";
 import { api } from "../lib/api";
+import { fetchCmsArticles } from "@/lib/cms-content";
+import { cmsContent } from "@/config/cms";
+import { CmsImage } from "@/components/CmsImage";
+import { clinicalArticleRouteId } from "@/lib/article-identity";
 import { publicEnv, optionalBackupUrl, requestTimeout } from "@/config/env";
 
 // =========================================================================
@@ -121,21 +125,27 @@ export default function KnowledgeBase({ role = "patient" }: KnowledgeBaseProps) 
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    let active = true;
+    const controller = new AbortController();
     async function fetchData() {
       try {
         setIsLoading(true);
 
         // GLOBAL FETCH: Get articles from ALL regions
-        const rawList = await fetchGlobalKnowledgeBase();
+        const [clinical, editorial] = await Promise.allSettled([fetchGlobalKnowledgeBase(), fetchCmsArticles(controller.signal)]);
+        if (!active) return;
+        const rawList = [...(clinical.status === 'fulfilled' ? clinical.value : []),
+          ...(editorial.status === 'fulfilled' ? editorial.value : [])];
 
         if (rawList.length > 0) {
           const mappedArticles = rawList.map((item: any) => ({
-            id: item.id || item.topic,
+            id: item._sourceCms ? item.id : clinicalArticleRouteId(String(item.id || item.topic)),
             title: item.description || item.title || "Untitled",
             category: item.legacyData?.category || item.category || "General",
-            image: item.content?.[0]?.attachment?.url || item.coverImage || null,
+            image: item._sourceCms ? item.coverImage : item.content?.[0]?.attachment?.url || item.coverImage || null,
             content: item.legacyData?.content || item.content || "",
-            readTime: "5 min",
+            readTime: item._sourceCms ? cmsContent.sourceLabel : "5 min",
+            _sourceCms: item._sourceCms === true,
             _sourceRegion: item._sourceRegion || 'US',
           }));
 
@@ -147,7 +157,7 @@ export default function KnowledgeBase({ role = "patient" }: KnowledgeBaseProps) 
           const allCategoryNames = [...new Set([...mainCategories, ...uniqueFromDB])];
 
           const finalCategories = allCategoryNames.map((catName: any) => {
-            const style = STYLE_MAP[catName] || STYLE_MAP["Default"];
+            const style = Object.prototype.hasOwnProperty.call(STYLE_MAP, catName) ? STYLE_MAP[catName] : STYLE_MAP["Default"];
             return { name: catName, icon: style.icon, color: style.color, bg: style.bg, description: style.desc };
           });
           setCategories(finalCategories);
@@ -155,10 +165,11 @@ export default function KnowledgeBase({ role = "patient" }: KnowledgeBaseProps) 
       } catch (error) {
         console.error("Failed to fetch articles:", error);
       } finally {
-        setIsLoading(false);
+        if (active) setIsLoading(false);
       }
     }
     fetchData();
+    return () => { active = false; controller.abort(); };
   }, []);
 
   const filteredArticles = articles.filter(article => {
@@ -268,7 +279,10 @@ export default function KnowledgeBase({ role = "patient" }: KnowledgeBaseProps) 
                   )}
                 >
                   <div className="h-44 overflow-hidden relative">
-                    {article.image ? (
+                    {article.image && article._sourceCms ? (
+                      <CmsImage src={article.image} alt={article.title}
+                        className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />
+                    ) : article.image ? (
                       <img
                         src={article.image}
                         alt={article.title}

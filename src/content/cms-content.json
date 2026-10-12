@@ -1,0 +1,14 @@
+{
+  "collectionPath": "/api/articles",
+  "idPrefix": "cms:",
+  "clinicalIdPrefix": "clinical:",
+  "pageSize": 100,
+  "maxPages": 10,
+  "fallbackCategory": "General",
+  "sourceLabel": "Editorial article",
+  "authorName": "MediConnect editorial team",
+  "authorRole": "Educational content",
+  "unavailableMediaLabel": "Some images are currently unavailable.",
+  "mediaMimeTypes": ["image/jpeg", "image/png", "image/webp", "image/gif", "image/avif"],
+  "mediaMaxBytes": 10485760
+}
