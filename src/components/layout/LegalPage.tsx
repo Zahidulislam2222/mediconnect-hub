@@ -8,7 +8,7 @@ export function LegalPage({ page }: { page: keyof typeof legalContent.pages }) {
       <Link to="/" className="font-display font-bold">{legalContent.brand}</Link>
       <Link to="/" className="text-primary underline">{legalContent.backLabel}</Link>
     </nav>
-    <main className="max-w-4xl mx-auto px-6 py-12 space-y-8">
+    <main className="max-w-4xl mx-auto px-6 py-12 space-y-8 break-words">
       <h1 className="text-3xl font-display font-bold">{content.title}</h1>
       <time dateTime={legalContent.updated} className="text-muted-foreground">{legalContent.updated}</time>
       <p className="border border-border rounded-xl bg-secondary p-5">{legalContent.notice}</p>

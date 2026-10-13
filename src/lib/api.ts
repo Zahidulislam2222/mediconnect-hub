@@ -1,4 +1,3 @@
-import { fetchAuthSession } from 'aws-amplify/auth';
 import { getUser } from './secure-storage';
 import { publicEnv, optionalBackupUrl, optionalCmsUrl, requestTimeout } from '@/config/env';
 import apiErrors from '@/content/api-errors.json';
@@ -204,6 +203,8 @@ async function request(endpoint: string, method: string, body?: any, options?: A
     const headers: HeadersInit = isFormData ? {} : { 'Content-Type': 'application/json' };
     
     try {
+        const { fetchAuthSession } = await import('aws-amplify/auth');
+        options?.signal?.throwIfAborted();
         const session = await fetchAuthSession();
         const token = session.tokens?.idToken?.toString();
         if (token) headers['Authorization'] = `Bearer ${token}`;

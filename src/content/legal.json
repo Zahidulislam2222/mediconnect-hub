@@ -1,5 +1,5 @@
 {
-  "updated": "2026-10-08",
+  "updated": "2026-10-13",
   "brand": "MediConnect",
   "backLabel": "Back to Home",
   "notice": "Account and clinical services are currently unavailable on this public site. Please do not submit health records or payment information.",
@@ -8,12 +8,16 @@
       "title": "Privacy notice",
       "sections": [
         {
+          "title": "MediConnect contact and service scope",
+          "body": "MediConnect is the public service name. For general platform and privacy enquiries, email muhammadzahidulislam2222@gmail.com without including health records, passwords or payment information. The intended service scope includes the United States and European Union. Applicable US federal and state laws and EU data protection requirements depend on the service and people involved; this notice does not establish legal compliance or activate clinical services."
+        },
+        {
           "title": "Current information handling",
           "body": "Account and clinical services are currently unavailable on this public site. Do not submit health records or payment information. Browsing public pages does not establish that retained service integrations are active."
         },
         {
           "title": "Before personal data can be processed",
-          "body": "An operating organization must publish its identity and verified privacy contact, purposes and lawful bases, applicable health-data conditions, recipients and processors, transfer arrangements, retention schedule and rights procedures. Those operating details have not been verified for this release."
+          "body": "Before account or clinical data can be processed, the operating organization must publish its full legal identity and address, purposes and lawful bases, applicable health-data conditions, recipients and processors, transfer arrangements, retention schedule and rights procedures. Those operating details have not been verified for this release."
         },
         {
           "title": "Rights and retention",

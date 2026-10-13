@@ -28,7 +28,7 @@ function send() { fireEvent.change(screen.getByRole('textbox'), { target: { valu
 
 it.each(['leave', 'sign out'])('prevents assessment dispatch after %s while authentication is pending', async action => {
   const view = await open(); const auth = deferred<typeof session>(); mocks.session.mockReturnValueOnce(auth.promise);
-  send(); expect(mocks.session).toHaveBeenCalledTimes(2);
+  send(); await waitFor(() => expect(mocks.session).toHaveBeenCalledTimes(2));
   if (action === 'leave') view.unmount(); else fireEvent.click(screen.getByText('Sign out test'));
   await act(async () => { auth.resolve(session); });
   expect(mocks.fetch).toHaveBeenCalledTimes(1); expect(mocks.toast).not.toHaveBeenCalled();

@@ -72,7 +72,7 @@ test('public actions fit a narrow screen while local fonts are still loading', a
   const fontGate = new Promise<void>(resolve => { releaseFonts = resolve; });
   await page.route('**/*.woff2', async route => { await fontGate; await route.fallback(); });
   try {
-    for (const destination of Object.values(routes)) {
+    for (const destination of [...Object.values(routes), '/privacy-policy', '/terms-of-service', '/hipaa-compliance']) {
       await page.goto(destination, { waitUntil: 'domcontentloaded' });
       await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
       const size = await page.evaluate(() => ({ width: innerWidth, scroll: document.documentElement.scrollWidth }));

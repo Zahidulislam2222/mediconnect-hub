@@ -23,6 +23,7 @@
   .jy-nav-login { margin-left: 0; }
 }
 .jy-public-page {
+  overflow-wrap: anywhere;
   max-width: 1120px;
 }
 .jy-public-intro {

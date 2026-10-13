@@ -4,3 +4,4 @@ export const symptomRouting = routes;
 export const publicEnv = () => 'https://symptoms.example.test';
 export const optionalBackupUrl = () => '';
 export const requestTimeout = name => timeouts[name];
+export const optionalCmsUrl = () => undefined;

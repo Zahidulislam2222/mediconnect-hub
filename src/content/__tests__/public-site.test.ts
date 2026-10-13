@@ -15,8 +15,9 @@ describe('public website content', () => {
   });
   it('states actual availability and does not invent contact details', () => {
     expect(publicSite.status).toContain('currently unavailable');
-    expect(publicSite.pages.contact.intro).toContain('not been configured');
+    expect(publicSite.pages.contact.intro).toContain('muhammadzahidulislam2222@gmail.com');
+    expect(JSON.stringify(publicSite.pages.contact)).toContain('Do not send passwords');
     expect(JSON.stringify(publicSite)).not.toMatch(/\b(?:demo(?:nstrat\w*)?|preview|sample|fictional|portfolio|mockup|simulation|concept)\b/i);
-    expect(JSON.stringify(publicSite.pages.contact)).not.toMatch(/@[a-z0-9.-]+\.[a-z]+|\+\d[\d ()-]{7,}/i);
+    expect(JSON.stringify(publicSite.pages.contact)).not.toMatch(/\+\d[\d ()-]{7,}/i);
   });
 });

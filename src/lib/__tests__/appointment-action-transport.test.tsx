@@ -43,7 +43,7 @@ it.each(['Check in', 'Cancel appointment'])('does not dispatch %s after deferred
   let resolve!: (value: typeof session) => void;
   mocks.session.mockImplementationOnce(() => new Promise(done => { resolve = done; }));
   fireEvent.click(screen.getByText(label));
-  expect(mocks.session).toHaveBeenCalledTimes(4);
+  await waitFor(() => expect(mocks.session).toHaveBeenCalledTimes(4));
   view.unmount();
   await act(async () => { resolve(session); });
   expect(mocks.fetch).toHaveBeenCalledTimes(3);

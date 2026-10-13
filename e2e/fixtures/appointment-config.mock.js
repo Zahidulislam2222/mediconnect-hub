@@ -5,3 +5,4 @@ export const publicEnv = () => 'https://appointments.example.test';
 export const optionalBackupUrl = () => '';
 export const optionalStripePublishableKey = () => undefined;
 export const requestTimeout = name => timeouts[name];
+export const optionalCmsUrl = () => undefined;

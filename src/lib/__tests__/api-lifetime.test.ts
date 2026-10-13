@@ -28,6 +28,7 @@ describe('caller lifetime at the actual authenticated transport', () => {
     mocks.auth.mockImplementation(() => new Promise(done => { complete = done; }));
     const controller = new AbortController();
     const result = api.post('/appointments', {}, { signal: controller.signal }).catch(error => error);
+    await vi.waitFor(() => expect(mocks.auth).toHaveBeenCalledTimes(1));
     controller.abort(); complete(session);
     expect(await result).toMatchObject({ name: 'AbortError' }); expect(mocks.fetch).not.toHaveBeenCalled();
   });
@@ -36,6 +37,7 @@ describe('caller lifetime at the actual authenticated transport', () => {
     mocks.auth.mockImplementation(() => new Promise((_, failed) => { reject = failed; }));
     const controller = new AbortController();
     const result = api.post('/appointments', {}, { signal: controller.signal }).catch(error => error);
+    await vi.waitFor(() => expect(mocks.auth).toHaveBeenCalledTimes(1));
     controller.abort(); reject(new Error('test-session-ended'));
     expect(await result).toMatchObject({ name: 'AbortError' }); expect(mocks.fetch).not.toHaveBeenCalled();
   });
