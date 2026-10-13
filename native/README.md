@@ -1,5 +1,7 @@
 # Native mobile clients
 
+Updated 2026-10-13: native source and prior evidence are preserved. Further native implementation and new gates follow non-mobile completion. The counts below are prior scoped verification, not new tests in this documentation release.
+
 Android uses Kotlin and Jetpack Compose. iOS uses Swift and SwiftUI. The React website and
 existing Capacitor project remain separate and are preserved during migration.
 
@@ -13,9 +15,9 @@ consultations, records and staff/admin workspaces remain unfinished.
 
 The public welcome preserves the approved clinic-to-home story and shared poster assets.
 Knowledge and journal lists, search/category filters, article readers and policy viewers use
-canonical local content. Fictional patient, clinician and clinic-team demos share a sample
+canonical local content. Fictional patient, clinician and clinic-team interface studies share a sample
 schedule and an in-memory note. Only the patient edits that note; the clinician reads it and
-clinic-team screens omit it. Demo state is not a patient record and grants no authenticated role.
+clinic-team screens omit it. Illustrative state is not a patient record and grants no authenticated role.
 The consultation preview uses illustrative controls without microphone, camera or calling APIs.
 
 Policy citations open only after a tap. Viewing a policy does not accept registration consent.
@@ -39,7 +41,7 @@ The subsequent keyboard-resize correction changes Android files only.
 These results use synthetic data and blank provider configuration. They do not establish
 physical-device behavior, signing, actual regional providers, complete feature parity or
 permanent elimination of intermittent test failures. The export checksum foundation is a
-separate candidate and is not a complete export feature in this checkout.
+separate revision and is not a complete export feature in this checkout.
 
 ## Configuration
 

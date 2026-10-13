@@ -21,6 +21,7 @@
     "build:cinematic": "vite build --config vite.cinematic.config.ts",
     "typecheck:cinematic": "tsc -p tsconfig.cinematic.json --noEmit",
     "build": "vite build",
+    "build:public": "node deploy/shared-vps/build-showcase.mjs",
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
     "preview": "vite preview",

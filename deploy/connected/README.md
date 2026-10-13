@@ -1,4 +1,6 @@
-# Connected release candidate
+# Connected application release
+
+Reviewed 2026-10-13. Current platform acceptance is tracked in the [release ledger](https://github.com/Zahidulislam2222/mediconnect-infrastructure-production/blob/main/docs/RELEASE-STATUS.md); this guide retains its bounded component contract.
 
 This compiler preserves the public entry, critical fallback and lazy application
 routes while resolving the installed Stripe loader. The static release remains
@@ -9,7 +11,7 @@ The destination must be fresh and verified gitignored. The input is an object
 containing only names owned by `src/config/env.ts`; use actual verified public
 settings, never server credentials. The boundary rejects unrecognized names,
 secret-like values, unsafe endpoints, inconsistent regional identifiers, invalid
-timeouts and live/showcase payment keys. Optional absent Vite values are explicitly
+timeouts and live or public-only payment keys. Optional absent Vite values are explicitly
 cleared, and Vite environment-file discovery is disabled, so local `.env` files
 cannot silently supplement the artifact.
 
@@ -31,4 +33,4 @@ The provider policy permits exact Stripe.js/API/3DS origins. Optional Link,
 Address Element, Checkout and performance subdomain origins are not enabled by
 this policy; add only a reviewed, tested integration requirement to the maintained
 data. See [Stripe CSP requirements](https://docs.stripe.com/security/guide#content-security-policy).
-This candidate does not establish live payment, identity, privacy or clinical readiness.
+This release design does not establish live payment, identity, privacy or clinical readiness.

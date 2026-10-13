@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { afterEach, beforeAll, beforeEach, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 const mocks = vi.hoisted(() => ({ list: vi.fn(), detail: vi.fn(), navigate: vi.fn(), api: vi.fn(), fetch: vi.fn(), media: vi.fn(), slug: 'cms:test-editorial' }));
 vi.mock('react-router-dom', () => ({ useNavigate: () => mocks.navigate, useParams: () => ({ slug: mocks.slug }) }));
@@ -13,6 +13,9 @@ import { cmsContent } from '@/config/cms';
 const content = [{ type: 'paragraph', children: [{ type: 'text', text: '<script>Editorial fixture text</script>' }] }];
 const editorial = { id: 'cms:test-editorial', title: 'Published editorial fixture', description: 'Published editorial fixture', category: 'Wellness', content,
   legacyData: { content, category: 'Wellness' }, date: '2025-01-01T00:00:00.000Z', coverImage: null, _sourceCms: true };
+// Resolve the declared mock before cases; cold dependency discovery is fixture
+// setup. This loads the mock factory without invoking an identity/provider call.
+beforeAll(async () => { await import('aws-amplify/auth'); });
 beforeEach(() => {
   vi.clearAllMocks(); mocks.slug = 'cms:test-editorial'; mocks.list.mockResolvedValue([editorial]); mocks.detail.mockResolvedValue(editorial);
   mocks.media.mockResolvedValue(new Blob(['test-image'], { type: 'image/png' }));

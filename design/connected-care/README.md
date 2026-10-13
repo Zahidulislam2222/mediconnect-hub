@@ -1,7 +1,9 @@
 # Connected-care local design study
 
-An isolated frontend review candidate: a fictional clinic-to-home care story, public learning
-pages, login designs and patient/clinician/staff demonstrations. This is not an operating clinic,
+Updated 2026-10-13: this guide records a retained design/media workflow. Its dated verification counts and historical application warnings describe that workflow, not the current release. See the [current release ledger](https://github.com/Zahidulislam2222/mediconnect-infrastructure-production/blob/main/docs/RELEASE-STATUS.md).
+
+An isolated frontend review revision: a fictional clinic-to-home care story, public learning
+pages, login designs and patient/clinician/staff interface studies. This is not an operating clinic,
 medical advice, real authentication, a video-call service or evidence of clinical outcomes.
 
 ## Run locally
@@ -18,7 +20,7 @@ npm run preview:journey
 
 The new entry is separate from the original application and previous design studies. No
 deployment is included. Preview settings live in the project's private configuration layer;
-maintained UI copy, sample data and media/motion settings live in validated `src/content/journey.json`.
+maintained UI copy, illustrative data and media/motion settings live in validated `src/content/journey.json`.
 
 ## Visual production
 
@@ -34,7 +36,7 @@ maintained UI copy, sample data and media/motion settings live in validated `src
 
 ## Routes and behavior
 
-Home, knowledge base with six sample guides, journal with three sample stories, article pages,
+Home, knowledge base with six illustrative guides, journal with three illustrative stories, article pages,
 patient/clinician/staff workspaces, login/staff entry and the original Blender storyboard are available.
 Workspace data is shared in memory only. Staff sees scheduling/readiness, not clinical notes.
 Forms clear credentials without sending or storing them. Call controls are explicitly illustrative.
@@ -46,7 +48,7 @@ native dialog. Skip remains available throughout the story.
 
 ## Review status
 
-Local candidate for owner review, not production-ready or aesthetically approved. Independent
+Local design revision for owner review; visual approval remains separate. Independent
 review found no remaining blocking defect in its tested scope. Unit tests77/77; original E2E10/10;
 new strict types and builds pass. The historical full application still has five type errors;
 full lint has43 existing warnings. Eighteen automated accessibility scans found no violations,

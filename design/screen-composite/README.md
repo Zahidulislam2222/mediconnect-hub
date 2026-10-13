@@ -1,6 +1,8 @@
 # Blender screen-compositing study
 
-This is a separate local comparison of the accepted connected-care film. The original film and
+Updated 2026-10-13: this guide records a retained design/media workflow. Its dated verification counts and historical application warnings describe that workflow, not the current release. See the [current release ledger](https://github.com/Zahidulislam2222/mediconnect-infrastructure-production/blob/main/docs/RELEASE-STATUS.md).
+
+This is a separate local media comparison of the accepted connected-care film. The original film and
 homepage remain unchanged. No additional AI footage, image generation or paid service was used.
 
 ## What Blender actually does
@@ -58,7 +60,7 @@ The comparison supports synchronized play/pause, keyboard timeline seeking, entr
 stacked mobile layout, without autoplay. Eleven forward/reverse presented-frame pairs matched in
 the local browser test. Four automated accessibility scans reported no violations; reduced-motion
 and missing-media flows were exercised. Independent source/render/browser review found no blocking
-defect for this bounded local comparison.
+defect for this bounded local media comparison.
 
 Manual tracking and sampled visual review do not prove perfect alignment on every frame. Branding
 is small on mobile; use desktop/full-resolution footage to judge detail. This is not production

@@ -1,58 +1,28 @@
-# Shared-VPS static showcase package
+# Public website release package
 
-Published 2026-09-09: https://mediconnect.zahidul-islam.com — static UI showcase, with backend
-operations unavailable. Public HTTPS and browser smoke checks passed; release files matched local
-hashes. The broader application is not certified or claimed operational from this static release.
+Updated 2026-10-13. The current public website is https://mediconnect.zahidul-islam.com. The reviewed release has 43 matching local/live artifact files. Editorial/contact/legal content is verified; external-request privacy acceptance remains open. Account, payment and clinical activation have separate gates.
 
-This package serves the already compiled MediConnect frontend. It does not start the backend,
-Kubernetes, Terraform, a database, a secret store, or any cloud deployment.
+This package serves the locally compiled frontend. It does not activate backend services or provision infrastructure. A static health result covers delivery only; verify each enabled journey separately.
 
-The frontend can still contain URLs for intentionally retired cloud integrations. A successful
-static health check proves only that the compiled site is being served; it does not prove login,
-clinical, AI, payment, database, upload, WebSocket or regional-failover behavior.
+## Build and local checks
 
-The approved hostname is `mediconnect.zahidul-islam.com`. Its Caddy configuration restricts browser
-connections and form submissions to the same origin and disables embedded frames, so this release
-does not activate external login, payment or backend integrations. Build it with
-`node deploy/shared-vps/build-showcase.mjs`: the public `build-env.json` supplies unmistakably fake
-storage/payment values without changing existing development or production environment files.
-Client-side encryption with a key shipped in JavaScript is not protection for real patient data.
-The showcase Vite configuration keeps asset URLs root-relative and substitutes a payment loader
-that resolves to `null`, the supported unavailable state for React Stripe Elements. The normal
-application build keeps its real Stripe integration.
+From the frontend root:
 
-## Frontend craft revision
+```bash
+npm ci
+npm test
+npm run typecheck
+npm run lint
+npm run verify:config
+npm run test:e2e
+npm run build:public
+```
 
-The public homepage uses `src/pages/Showcase.tsx`: a responsive care-journey illustration with
-three stage controls, three role perspectives, a local follow-up preview and an honest status FAQ.
-All names and records are fictional; no action creates a real booking or sends clinical data.
-Copy and example records belong to `src/content/showcase.json`, validated by `showcase.ts`.
-Design rationale and scoped semantic-token styling live in `src/styles/showcase.css`.
+The existing public builder uses maintained `build-env.json`, a dedicated public entry and an unavailable payment-loader boundary. It preserves normal application/provider builds and existing environment files. Public build settings are client-visible and cannot hold private encryption keys. Editorial settings must use the validated configuration and approved content origin for the intended release.
 
-The showcase build starts at `src/showcase-main.tsx`, without loading the cloud application on the
-homepage. Original routes lazy-load the retained app; its home route points to the same showcase.
-The previous landing source remains in `src/pages/Index.tsx`. No backend or infrastructure
-implementation was removed. Original HTML/CSS interface illustrations and existing Lucide icons
-are used; no third-party photography, paid generation, video, fonts or new packages are needed.
-The HTML includes a readable fallback when JavaScript is unavailable.
-
-## Local verification
-
-1. Build the frontend from the repository root with the intended non-secret public Vite settings:
-   `npm ci`, `npm test`, `npx tsc --noEmit`, `npm run lint`, then
-   `node deploy/shared-vps/build-showcase.mjs`. Do not substitute the normal application build
-   when publishing this inactive-backend showcase.
-2. Copy `.env.example` to `.env` in this directory and recheck that the selected port is unused.
-3. Run `docker compose config --quiet`, then `docker compose up -d --wait`.
-4. Request `http://127.0.0.1:18082/healthz` and `/`; verify the marker and expected HTML.
-5. Run `docker compose down` without `-v`. This package has no application data volume.
-
-Local Docker validation is mandatory before upload. Do not substitute a successful frontend build
-for the container/HTTP test.
+Copy this directory's `.env.example` to an ignored `.env`, verify the configured loopback host port is unused, and inspect `docker compose config --quiet`. Start only the approved owned project for local container/HTTP checks, verify its configured health route and content, then stop it without deleting volumes. Record the actual image, port, configuration and results; do not infer container behavior from a build alone.
 
 ## Release layout
-
-Upload a versioned release that preserves these relative paths:
 
 ```text
 <release-id>/
@@ -64,16 +34,10 @@ Upload a versioned release that preserves these relative paths:
         └── nginx.conf
 ```
 
-The `.env` file contains only the loopback host port; never upload frontend source environment
-files or backend credentials. Use Compose project name `mediconnect-showcase`.
+The deployment environment contains only the package's documented non-secret service settings. Do not upload development environments or backend credentials. Preserve the configured existing project identity and exclusive release directory; do not start a duplicate stack.
 
-## Live deployment gate
+## Activation and rollback
 
-Before upload, repeat the read-only VPS listener/capacity inventory and compare any existing
-MediConnect release with local source. Keep the previous verified release for rollback.
+Capture live/local drift, listener/capacity and neighboring workload health before upload. Freeze the artifact manifest, preserve the prior release and validate the complete reverse-proxy policy before an approved reload. The Caddy file is a template, not authority to add DNS/cloud resources.
 
-The Caddy file is only a template. Do not create a Caddy site or DNS record until the hostname is
-explicitly approved. Validate the complete Caddy configuration before reload, then prove direct
-origin and proxied HTTPS behavior. The shared infrastructure handoff remains read-only for this
-task, so the project dossier carries the candidate port until the owner chooses another recording
-location.
+Deploy only the reviewed allowlisted package. Prove direct and HTTPS behavior, all touched-file hashes, active release identity, browser requests, original article content and sibling health. Keep privacy failures open until fresh network evidence passes. Roll back to the previous verified artifact only after checking configuration compatibility and verifying the resulting live flow.

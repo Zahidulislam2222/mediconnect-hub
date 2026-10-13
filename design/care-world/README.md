@@ -1,7 +1,9 @@
 # Care pavilion — local design review
 
+Updated 2026-10-13: this guide records a retained design/media workflow. Its dated verification counts and historical application warnings describe that workflow, not the current release. See the [current release ledger](https://github.com/Zahidulislam2222/mediconnect-infrastructure-production/blob/main/docs/RELEASE-STATUS.md).
+
 This is an original illustrative environment, not a real clinic or a functioning medical service.
-The existing application, auth implementation and published showcase remain preserved.
+The existing application, auth implementation and published website remain preserved.
 
 ## Preview
 
@@ -23,7 +25,7 @@ Do not deploy this revision until the owner explicitly approves its visual resul
 ## Sources and provenance
 
 - `build_scene.py` + `scene.json`: original procedural Blender artwork; no imported third-party models.
-- Editable `.blend` and original render: project-private `memory/cinematic-assets/`.
+- Editable `.blend` and original render: private original-asset archive.
 - `public/media/cinematic/care-world-v1.glb`: exported geometry for genuine browser 3D.
 - `care-world-v1.webp`: Blender still fallback for mobile, reduced motion or unavailable WebGL.
 - `care-atmosphere-v1.webp`: built-in AI image tool treatment of the original Blender render;
