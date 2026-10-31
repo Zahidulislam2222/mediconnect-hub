@@ -44,8 +44,7 @@
     "chapters": "Journey chapters",
     "knowledgeLink": "Find a clearer next step.",
     "journalLink": "Read the thinking behind the care.",
-    "illustration": "Connected-care animation",
-    "blockout": "Connected-care animation"
+    "illustration": "Connected-care 3D illustration"
   },
   "stages": [
     {
@@ -100,25 +99,15 @@
   "motion": {
     "scrollHeightVh": 400,
     "mobileScrollHeightVh": 340,
-    "seekToleranceSeconds": 0.035,
-    "seekWatchdogMs": 1200,
     "minimumHeight": 760,
     "cardTravelPx": 28,
     "cardTiltDegrees": 5,
-    "chapterFadeFraction": 0.035,
-    "seekMinimumIntervalMs": 32
+    "chapterFadeFraction": 0.035
   },
   "media": {
-    "film": "/media/journey/connected-care-v1.mp4",
-    "poster": "/media/journey/connected-care-v1.webp",
-    "homePoster": "/media/journey/home-followup-v1.webp",
-    "finished": true,
-    "alt": "A consultation space connected to a warm home environment.",
-    "duration": 22.333333,
-    "storyboard": [
-      "/media/journey/clinic-blockout-v1.webp",
-      "/media/journey/home-blockout-v1.webp"
-    ]
+    "poster": "/media/journey/care-thread-clinic-v1.webp",
+    "homePoster": "/media/journey/care-thread-home-v1.webp",
+    "alt": "Illustrated rooms with no people: a clinic consultation room and a calm living room at home."
   },
   "explore": {
     "eyebrow": "One connection. Different perspectives.",
@@ -466,5 +455,112 @@
     "privacy": "/privacy-policy",
     "terms": "/terms-of-service",
     "security": "/hipaa-compliance"
+  },
+  "scene": {
+    "loadTimeoutMs": 10000,
+    "maxPixelRatio": 1.75,
+    "softwarePixelRatio": 0.5,
+    "shadowMapSize": 2048,
+    "fov": 38,
+    "maxFov": 64,
+    "referenceAspect": 1.6,
+    "threadReveal": [
+      0.14,
+      0.86
+    ],
+    "fog": {
+      "near": 24,
+      "far": 48
+    },
+    "lights": {
+      "hemisphere": 1.6,
+      "sun": 2.4,
+      "glow": 2.5,
+      "glowDistance": 3.5,
+      "lamp": 0.6
+    },
+    "opacity": {
+      "glass": 0.18,
+      "halo": 0.2,
+      "headHalo": 0.22
+    },
+    "palette": {
+      "sky": "#e8edf2",
+      "ground": "#dfe6d8",
+      "clinicFloor": "#eef0ee",
+      "homeFloor": "#d9c3a5",
+      "wall": "#f4f1ec",
+      "wood": "#c49a6c",
+      "chair": "#2f6f73",
+      "sofa": "#2c5e5a",
+      "table": "#d8b98f",
+      "plant": "#5f8f62",
+      "pot": "#e9e4dc",
+      "trunk": "#8a6a4f",
+      "metal": "#4b5563",
+      "glass": "#cfe3f0",
+      "screen": "#0f172a",
+      "card": "#f8fafc",
+      "accent": "#3b82f6",
+      "lamp": "#ffe2b0",
+      "books": [
+        "#2f6f73",
+        "#c49a6c",
+        "#e9e4dc",
+        "#3b82f6",
+        "#8a6a4f"
+      ],
+      "sun": "#fff6ea"
+    },
+    "cameras": [
+      {
+        "position": [
+          -3.6,
+          3.3,
+          7.6
+        ],
+        "target": [
+          -7.4,
+          1.1,
+          -1.6
+        ]
+      },
+      {
+        "position": [
+          -3.4,
+          2.3,
+          3.2
+        ],
+        "target": [
+          -6.6,
+          0.85,
+          -1.1
+        ]
+      },
+      {
+        "position": [
+          2.2,
+          6.0,
+          10.5
+        ],
+        "target": [
+          -0.9,
+          1.2,
+          -1.6
+        ]
+      },
+      {
+        "position": [
+          8.6,
+          2.4,
+          3.4
+        ],
+        "target": [
+          5.2,
+          0.7,
+          -1.2
+        ]
+      }
+    ]
   }
 }

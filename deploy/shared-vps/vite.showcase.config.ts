@@ -1,6 +1,6 @@
 import { defineConfig, mergeConfig, type ConfigEnv } from 'vite';
 import path from 'node:path';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, rmSync } from 'node:fs';
 import baseConfig from '../../vite.config';
 import { journey } from '../../src/content/journey';
 
@@ -16,6 +16,22 @@ const shellTokens = ['primary', 'primary-foreground', 'accent'].map(name => {
   return `--${name}:${value};`;
 }).join('');
 const shellStyles = readFileSync(path.resolve(__dirname, 'release-shell.css'), 'utf8');
+// The release serves only the public journey, so it ships only the media that journey names.
+// Local preview and retired media (including earlier footage of people) stay in public/ on disk.
+const collectMedia = (value: unknown): string[] => typeof value === 'string'
+  ? (value.startsWith('/media/') ? [path.posix.normalize(value)] : [])
+  : value && typeof value === 'object' ? Object.values(value).flatMap(collectMedia) : [];
+export const servedMedia: ReadonlySet<string> = new Set(collectMedia(journey));
+const keepServedMedia = (directory: string, prefix: string) => {
+  for (const entry of readdirSync(directory, { withFileTypes: true })) {
+    const file = path.join(directory, entry.name);
+    const url = `${prefix}/${entry.name}`;
+    if (entry.isDirectory()) {
+      keepServedMedia(file, url);
+      if (readdirSync(file).length === 0) rmSync(file, { recursive: true });
+    } else if (!servedMedia.has(url)) rmSync(file);
+  }
+};
 
 export const createReleaseConfig = (environment: ConfigEnv, disablePayments: boolean) => mergeConfig(baseConfig(environment), {
   // Root-relative assets are required for direct navigation to nested SPA routes.
@@ -40,6 +56,18 @@ export const createReleaseConfig = (environment: ConfigEnv, disablePayments: boo
       tag: 'style', attrs: { id: 'release-shell-styles' },
       children: `.release-shell{${shellTokens}}${shellStyles}`, injectTo: 'head-prepend',
     }] },
+  }, {
+    name: 'served-media-only',
+    // Runs after Vite copies public/ into the output directory.
+    writeBundle: ({ dir }) => {
+      if (!dir) throw new Error('Release output directory is unknown');
+      const missing = () => [...servedMedia].filter(url => !existsSync(path.join(dir, url)));
+      if (missing().length) throw new Error(`Release media missing: ${missing().join(', ')}`);
+      const media = path.join(dir, 'media');
+      if (existsSync(media)) keepServedMedia(media, '/media');
+      // A served path that only matched on disk by case would have been removed above.
+      if (missing().length) throw new Error(`Release media removed by name mismatch: ${missing().join(', ')}`);
+    },
   }],
   resolve: {
     alias: disablePayments ? [{

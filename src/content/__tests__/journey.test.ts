@@ -69,13 +69,20 @@ describe("connected-care content boundary", () => {
       ).toBe(false);
     }
   });
-  it("rejects falsely finished absent footage", () => {
-    expect(
-      journeySchema.safeParse({
-        ...journey,
-        media: { ...journey.media, finished: true, film: "" },
-      }).success,
-    ).toBe(false);
+  it("requires one valid camera stop per chapter and a forward thread reveal", () => {
+    const scene = journey.scene;
+    for (const broken of [
+      { ...scene, cameras: scene.cameras.slice(1) },
+      { ...scene, threadReveal: [0.8, 0.2] },
+      { ...scene, palette: { ...scene.palette, accent: "url(javascript:alert(1))" } },
+      { ...scene, maxFov: scene.fov - 1 },
+      { ...scene, cameras: [{ ...scene.cameras[0], position: [0, Number.NaN, 0] }, ...scene.cameras.slice(1)] },
+    ]) expect(journeySchema.safeParse({ ...journey, scene: broken }).success).toBe(false);
+  });
+  it("keeps realistic-people footage out of the hero and shared posters", () => {
+    expect(journey.media).not.toHaveProperty("film");
+    for (const image of [journey.media.poster, journey.media.homePoster])
+      expect(image).toMatch(/^\/media\/journey\/care-thread-/);
   });
   it("requires ordered well-spaced scene stops", () => {
     const stages = structuredClone(journey.stages);

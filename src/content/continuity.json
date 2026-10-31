@@ -18,7 +18,7 @@
     "secondary": "View clinician workspace",
     "footnote": "No account needed · All sample data",
     "caption": "A familiar face. A clearer next step.",
-    "mediaLabel": "AI-generated clinician portrait · illustrative",
+    "mediaLabel": "Illustrated clinic consultation room with no people · illustrative",
     "scroll": "Follow one appointment",
     "appointmentLabel": "YOUR NEXT CONVERSATION"
   },
@@ -217,7 +217,7 @@
     "title": "A more connected\nway to care.",
     "body": "Explore the complete sample journey, at your own pace.",
     "credit": "MediConnect · Telehealth platform concept",
-    "disclosure": "Generated portraits depict fictional people. This local preview is not a healthcare provider.",
+    "disclosure": "Illustrated rooms contain no people; names and records are fictional. This local preview is not a healthcare provider.",
     "notFound": "This page isn’t part of the sample.",
     "return": "Return to the care journey"
   },
@@ -228,15 +228,15 @@
     "passwordMax": 128
   },
   "media": {
-    "clinicianPoster": "/media/continuity/clinician-v1.webp",
-    "clinicianVideo": "/media/continuity/clinician-v1.mp4",
-    "patientPoster": "/media/continuity/patient-v2.webp",
-    "patientVideo": "/media/continuity/patient-v2.mp4",
-    "patientLabel": "AI-generated fictional patient portrait",
+    "clinicianPoster": "/media/journey/care-thread-film-start-v1.webp",
+    "clinicianVideo": "/media/journey/care-thread-film-v1.mp4",
+    "patientPoster": "/media/journey/care-thread-home-v1.webp",
+    "patientVideo": "/media/journey/care-thread-home-loop-v1.mp4",
+    "patientLabel": "Illustrated living room at home with no people",
     "fallback": "MC",
-    "play": "Play portrait film",
-    "pause": "Pause portrait film",
-    "failed": "Portrait unavailable — the demo still works."
+    "play": "Play room film",
+    "pause": "Pause room film",
+    "failed": "Room image unavailable — the demo still works."
   },
   "motion": {
     "stageStops": [0, 0.32, 0.64, 1],

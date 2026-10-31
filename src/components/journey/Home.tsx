@@ -17,7 +17,7 @@ import {
   Plus,
 } from "lucide-react";
 import { journey as c } from "@/content/journey";
-import Film from "./Film";
+import CareThread from "./CareThread";
 import HomeSections from './HomeSections';
 import { publicSite as site } from "@/content/public-site";
 
@@ -106,7 +106,7 @@ export default function Home() {
         aria-label={c.navigation.journey}
       >
         <div className="jy-stage" data-phase={active}>
-          <Film
+          <CareThread
             progress={progress}
             enabled={enabled}
             poster={active >= 2 ? c.media.homePoster : c.media.poster}
@@ -193,7 +193,7 @@ export default function Home() {
               ))}
             </div>
             <p className="jy-film-credit">
-              {c.media.finished ? c.hero.illustration : c.hero.blockout}
+              {c.hero.illustration}
             </p>
           </div>
         </div>

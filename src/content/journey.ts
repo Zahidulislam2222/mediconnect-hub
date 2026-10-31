@@ -1,5 +1,7 @@
 import { z } from "zod";
 import raw from "./journey.json";
+// Relative, not "@/": the release and preview Vite configs import this file before aliases exist.
+import { careThreadSceneSchema } from "../lib/care-thread-config";
 
 const text = z.string().trim().min(1);
 const path = z
@@ -73,7 +75,6 @@ export const journeySchema = z
       "knowledgeLink",
       "journalLink",
       "illustration",
-      "blockout",
     ]),
     library: copy([
       "title",
@@ -112,23 +113,17 @@ export const journeySchema = z
     motion: z.object({
       scrollHeightVh: z.number().min(200).max(900),
       mobileScrollHeightVh: z.number().min(200).max(700),
-      seekMinimumIntervalMs: z.number().min(8).max(100),
-      seekToleranceSeconds: z.number().positive().max(0.2),
-      seekWatchdogMs: z.number().int().min(250).max(5000),
       minimumHeight: z.number().min(400).max(900),
       cardTravelPx: z.number().min(0).max(100),
       cardTiltDegrees: z.number().min(0).max(15),
       chapterFadeFraction: z.number().min(0.01).max(0.08),
     }),
     media: z.object({
-      film: z.union([path, z.literal("")]),
       poster: path,
       homePoster: path,
-      finished: z.boolean(),
       alt: text,
-      duration: z.number().positive().max(120),
-      storyboard: z.array(path).min(2),
     }),
+    scene: careThreadSceneSchema,
     explore: z.object({
       eyebrow: text,
       title: text,
@@ -243,11 +238,11 @@ export const journeySchema = z
         });
       }
     }
-    if (data.media.finished && !data.media.film)
+    if (data.scene.cameras.length !== data.stages.length)
       ctx.addIssue({
         code: "custom",
-        path: ["media", "film"],
-        message: "Finished media needs a film",
+        path: ["scene", "cameras"],
+        message: "Each chapter needs one camera stop",
       });
     for (const kind of ["knowledge", "blog"])
       if (!data.articles.some((item) => item.kind === kind))
