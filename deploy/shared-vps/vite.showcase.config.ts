@@ -59,7 +59,7 @@ export const createReleaseConfig = (environment: ConfigEnv, disablePayments: boo
   }, {
     name: 'served-media-only',
     // Runs after Vite copies public/ into the output directory.
-    writeBundle: ({ dir }) => {
+    writeBundle: ({ dir }: { dir?: string }) => {
       if (!dir) throw new Error('Release output directory is unknown');
       const missing = () => [...servedMedia].filter(url => !existsSync(path.join(dir, url)));
       if (missing().length) throw new Error(`Release media missing: ${missing().join(', ')}`);
