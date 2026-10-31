@@ -165,23 +165,28 @@ html.jy-document body {
 }
 .jy-film,
 .jy-film > img,
-.jy-film > video,
+.jy-scene,
 .jy-shade {
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
 }
-.jy-film > img,
-.jy-film > video {
+.jy-film > img {
   object-fit: cover;
   object-position: 55% center;
 }
-.jy-film > video {
+.jy-scene {
   opacity: 0;
+  transition: opacity 0.5s ease;
 }
-.jy-film > video.is-painted {
+.jy-scene.is-ready {
   opacity: 1;
+}
+.jy-scene > canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
 }
 .jy-shade {
   background:
@@ -1323,8 +1328,7 @@ html.jy-document body {
       ),
       linear-gradient(0deg, var(--jy-ink), transparent 42%);
   }
-  .jy-film > img,
-  .jy-film > video {
+  .jy-film > img {
     object-position: 65% center;
   }
   .jy-track.is-static .jy-stage {
@@ -1646,8 +1650,7 @@ html.jy-document body {
     height: 40%;
     bottom: auto;
   }
-  .jy-film > img,
-  .jy-film > video {
+  .jy-film > img {
     object-position: 50% center;
   }
   .jy-shade,
