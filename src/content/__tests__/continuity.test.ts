@@ -20,6 +20,13 @@ describe("Appointment continuity boundary", () => {
       }),
     ).toThrow();
   });
+  it("shows only people-free care-thread rooms", () => {
+    const { clinicianPoster, clinicianVideo, patientPoster, patientVideo } =
+      continuity.media;
+    for (const media of [clinicianPoster, clinicianVideo, patientPoster, patientVideo])
+      expect(media).toMatch(/^\/media\/journey\/care-thread-/);
+    expect(continuity.footer.disclosure).toContain("no people");
+  });
   it("rejects remote, executable and parent-traversal media", () => {
     for (const url of [
       "https://example.test/a.mp4",

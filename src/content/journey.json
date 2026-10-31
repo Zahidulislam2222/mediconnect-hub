@@ -107,11 +107,7 @@
   "media": {
     "poster": "/media/journey/care-thread-clinic-v1.webp",
     "homePoster": "/media/journey/care-thread-home-v1.webp",
-    "alt": "Illustrated rooms with no people: a clinic consultation room and a calm living room at home.",
-    "storyboard": [
-      "/media/journey/clinic-blockout-v1.webp",
-      "/media/journey/home-blockout-v1.webp"
-    ]
+    "alt": "Illustrated rooms with no people: a clinic consultation room and a calm living room at home."
   },
   "explore": {
     "eyebrow": "One connection. Different perspectives.",

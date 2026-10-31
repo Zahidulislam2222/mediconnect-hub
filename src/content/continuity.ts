@@ -2,7 +2,8 @@ import { z } from "zod";
 import raw from "./continuity.json";
 
 const text = z.string().min(1);
-const path = z.string().regex(/^\/media\/continuity\/[a-z0-9-]+\.(webp|mp4)$/);
+// Continuity reuses the people-free care-thread renders shared with the homepage.
+const path = z.string().regex(/^\/media\/(?:continuity|journey)\/[a-z0-9-]+\.(webp|mp4)$/);
 const requiredTextFields = (template: object, exclude: string[] = []) =>
   z.object(
     Object.fromEntries(

@@ -10,7 +10,7 @@ const sources = import.meta.glob<string>(
   },
 );
 
-describe("Blender comparison boundary", () => {
+describe("Renderer comparison boundary", () => {
   it("keeps the comparison offline and configuration-owned", () => {
     expect(Object.keys(sources)).toHaveLength(1);
     for (const source of Object.values(sources)) {
@@ -24,12 +24,16 @@ describe("Blender comparison boundary", () => {
       expect(source).toContain("@/content/screen-review");
     }
   });
-  it("preserves the original and uses a distinct composite", () => {
-    expect(screenReview.original).toContain("connected-care-v1.mp4");
+  it("compares two distinct people-free care-thread films", () => {
+    for (const media of [
+      screenReview.original,
+      screenReview.composite,
+      screenReview.poster,
+      screenReview.compositePoster,
+    ])
+      expect(media).toMatch(/^\/media\/journey\/care-thread-/);
     expect(screenReview.composite).not.toBe(screenReview.original);
-    expect(screenReview.notice).toContain(
-      "homepage still uses your accepted original",
-    );
+    expect(screenReview.notice).toContain("recorded from the homepage scene");
   });
   it("rejects remote and traversing film paths", () => {
     for (const composite of [

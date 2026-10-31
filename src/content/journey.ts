@@ -1,6 +1,7 @@
 import { z } from "zod";
 import raw from "./journey.json";
-import { careThreadSceneSchema } from "@/lib/care-thread-config";
+// Relative, not "@/": the release and preview Vite configs import this file before aliases exist.
+import { careThreadSceneSchema } from "../lib/care-thread-config";
 
 const text = z.string().trim().min(1);
 const path = z
@@ -121,7 +122,6 @@ export const journeySchema = z
       poster: path,
       homePoster: path,
       alt: text,
-      storyboard: z.array(path).min(2),
     }),
     scene: careThreadSceneSchema,
     explore: z.object({
