@@ -14,7 +14,7 @@ for (const role of ['staff', 'patient', 'doctor']) {
 test('main entry preserves the connected-care design', async ({ page }) => {
   await page.goto('/');
   await expect(page.getByRole('heading', { level: 1 })).toHaveText(/Care that stays\s*with you\./);
-  await expect(page.locator('.jy-track')).toBeVisible();
+  await expect(page.locator('.jy-hero')).toBeVisible();
   await expect(page.locator('.jy-header')).toBeVisible();
   await expect(page.locator('button').filter({ has: page.locator('svg.lucide-message-circle') })).toHaveCount(0);
 });
@@ -68,11 +68,13 @@ test('protected routes still require a verified session after public browsing', 
   await expect(page.locator('.jy-auth')).toHaveCount(0);
 });
 
-test('reduced-motion entry keeps useful navigation without starting the film', async ({ page }) => {
+test('reduced-motion entry keeps useful navigation and a usable hero', async ({ page }) => {
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.goto('/');
   await expect(page.locator('.jy-header')).toBeVisible();
   await expect(page.locator('video')).toHaveCount(0);
-  await page.getByRole('button', { name: /Beyond the clinic/ }).click();
-  await expect(page.getByRole('heading', { level: 1 })).toContainText('Different places.');
+  await expect(page.locator('canvas')).toHaveCount(0);
+  const visit = page.locator('.jy-hero').getByRole('button', { name: /2 Visit$/ });
+  await visit.click();
+  await expect(visit).toHaveAttribute('aria-pressed', 'true');
 });

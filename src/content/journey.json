@@ -31,83 +31,146 @@
     "eyebrow": "From your first hello, to what comes next.",
     "title": "Care that stays",
     "emphasis": "with you.",
-    "body": "A conversation in the clinic. A familiar face at home. One connected care journey.",
+    "body": "From booking to follow-up, MediConnect is designed to keep every step of a visit connected: the conversation, the plan and what comes next.",
     "primary": "Account access",
-    "secondary": "Meet the care team",
-    "scroll": "Scroll to follow the story",
-    "skip": "Skip the journey",
-    "motionOff": "Reduce motion",
-    "motionOn": "Enable motion",
-    "motionStatic": "Static journey",
-    "openDetail": "Read about this step",
-    "closeDetail": "Close step information",
-    "chapters": "Journey chapters",
+    "secondary": "See how it connects",
+    "momentsLabel": "One appointment, four connected moments",
+    "illustrationNote": "Illustration only. The appointment and names shown are not real.",
     "knowledgeLink": "Find a clearer next step.",
     "journalLink": "Read the thinking behind the care.",
-    "illustration": "Connected-care 3D illustration"
+    "illustration": "Connected-care illustration"
   },
+  "heroMotion": {
+    "startDelayMs": 400,
+    "stepMs": 700,
+    "segmentMs": 450,
+    "revealMs": 500
+  },
+  "moments": [
+    {
+      "id": "book",
+      "label": "Book",
+      "title": "A place to begin.",
+      "body": "Booking is designed around a time that suits you and the questions you want answered."
+    },
+    {
+      "id": "visit",
+      "label": "Visit",
+      "title": "Someone who listens.",
+      "body": "A video visit is designed to keep the same appointment in view for you and your clinician."
+    },
+    {
+      "id": "plan",
+      "label": "Plan",
+      "title": "Leave with a plan.",
+      "body": "Your care plan, prescriptions and next steps are meant to stay where you can read them again."
+    },
+    {
+      "id": "follow",
+      "label": "Follow up",
+      "title": "Room for what comes next.",
+      "body": "Follow-up is designed so you can return with new questions and continue the conversation."
+    }
+  ],
   "stages": [
     {
       "id": "arrive",
-      "at": 0,
       "label": "A place to begin",
       "title": "Care that stays",
       "emphasis": "with you.",
-      "body": "A conversation in the clinic. A familiar face at home. One connected care journey.",
-      "cardLabel": "Your next conversation",
-      "cardTitle": "Start with what matters to you.",
-      "cardBody": "Make room for your questions, your concerns, and your story.",
-      "cardStatus": "Your questions"
+      "body": "A conversation in the clinic. A familiar face at home. One connected care journey."
     },
     {
       "id": "listen",
-      "at": 0.12,
       "label": "Someone who listens",
       "title": "More than a visit.",
       "emphasis": "A connection.",
-      "body": "Space to ask. Time to understand. A care plan shaped around the conversation.",
-      "cardLabel": "Your conversation, connected",
-      "cardTitle": "Bring your questions with you.",
-      "cardBody": "The same appointment stays in view as patient and clinician come together.",
-      "cardStatus": "Your conversation"
+      "body": "Space to ask. Time to understand. A care plan shaped around the conversation."
     },
     {
       "id": "connect",
-      "at": 0.46,
       "label": "Beyond the clinic",
       "title": "Different places.",
       "emphasis": "The same care.",
-      "body": "Follow the story from the consultation room to a familiar space at home.",
-      "cardLabel": "A familiar face, wherever you are",
-      "cardTitle": "Keep the conversation going.",
-      "cardBody": "Explore how a video visit and shared appointment information could fit together.",
-      "cardStatus": "Staying connected"
+      "body": "Follow the story from the consultation room to a familiar space at home."
     },
     {
       "id": "continue",
-      "at": 0.8,
       "label": "Room for what comes next",
       "title": "Leave with a plan.",
       "emphasis": "Stay connected.",
-      "body": "Find your next step, revisit useful information, and return with new questions.",
-      "cardLabel": "Your next step",
-      "cardTitle": "A little more clarity.",
-      "cardBody": "Explore the patient workspace or learn how to prepare for a conversation.",
-      "cardStatus": "Your next step"
+      "body": "Find your next step, revisit useful information, and return with new questions."
     }
   ],
-  "motion": {
-    "scrollHeightVh": 400,
-    "mobileScrollHeightVh": 340,
-    "minimumHeight": 760,
-    "cardTravelPx": 28,
-    "cardTiltDegrees": 5,
-    "chapterFadeFraction": 0.035
+  "heroPreview": {
+    "book": {
+      "kicker": "Appointment",
+      "title": "Follow-up visit",
+      "mode": "Video visit",
+      "status": "Confirmed"
+    },
+    "visit": {
+      "kicker": "Video visit",
+      "status": "Connected",
+      "elapsed": "12:04"
+    },
+    "plan": {
+      "kicker": "After your visit",
+      "items": [
+        {
+          "label": "Visit summary shared with you",
+          "done": true
+        },
+        {
+          "label": "Prescription sent to your pharmacy",
+          "done": true
+        },
+        {
+          "label": "Book a check-in",
+          "done": false
+        }
+      ]
+    },
+    "follow": {
+      "kicker": "Check-in",
+      "when": "In two weeks",
+      "message": "New question? Message your care team."
+    }
+  },
+  "clinicPreview": {
+    "schedule": {
+      "kicker": "Today",
+      "unit": "visits",
+      "now": "Now",
+      "rows": [
+        {
+          "label": "New visit",
+          "initials": "MK"
+        },
+        {
+          "label": "Follow-up visit",
+          "initials": "AR"
+        },
+        {
+          "label": "Check-in",
+          "initials": "LN"
+        }
+      ]
+    },
+    "call": {
+      "kicker": "Video visit",
+      "status": "Connected"
+    },
+    "notes": {
+      "kicker": "Shared notes",
+      "status": "Visit summary shared"
+    },
+    "note": "Illustration only. The schedule and visit shown are not real."
   },
   "media": {
-    "poster": "/media/journey/care-thread-clinic-v1.webp",
-    "homePoster": "/media/journey/care-thread-home-v1.webp",
-    "alt": "Illustrated rooms with no people: a clinic consultation room and a calm living room at home."
+    "poster": "/media/journey/care-thread-clinic-v2.webp",
+    "homePoster": "/media/journey/care-thread-home-v2.webp",
+    "alt": "Illustration with no people: appointment and video visit screens joined by one glowing thread."
   },
   "explore": {
     "eyebrow": "One connection. Different perspectives.",
@@ -455,112 +518,5 @@
     "privacy": "/privacy-policy",
     "terms": "/terms-of-service",
     "security": "/hipaa-compliance"
-  },
-  "scene": {
-    "loadTimeoutMs": 10000,
-    "maxPixelRatio": 1.75,
-    "softwarePixelRatio": 0.5,
-    "shadowMapSize": 2048,
-    "fov": 38,
-    "maxFov": 64,
-    "referenceAspect": 1.6,
-    "threadReveal": [
-      0.14,
-      0.86
-    ],
-    "fog": {
-      "near": 24,
-      "far": 48
-    },
-    "lights": {
-      "hemisphere": 1.6,
-      "sun": 2.4,
-      "glow": 2.5,
-      "glowDistance": 3.5,
-      "lamp": 0.6
-    },
-    "opacity": {
-      "glass": 0.18,
-      "halo": 0.2,
-      "headHalo": 0.22
-    },
-    "palette": {
-      "sky": "#e8edf2",
-      "ground": "#dfe6d8",
-      "clinicFloor": "#eef0ee",
-      "homeFloor": "#d9c3a5",
-      "wall": "#f4f1ec",
-      "wood": "#c49a6c",
-      "chair": "#2f6f73",
-      "sofa": "#2c5e5a",
-      "table": "#d8b98f",
-      "plant": "#5f8f62",
-      "pot": "#e9e4dc",
-      "trunk": "#8a6a4f",
-      "metal": "#4b5563",
-      "glass": "#cfe3f0",
-      "screen": "#0f172a",
-      "card": "#f8fafc",
-      "accent": "#3b82f6",
-      "lamp": "#ffe2b0",
-      "books": [
-        "#2f6f73",
-        "#c49a6c",
-        "#e9e4dc",
-        "#3b82f6",
-        "#8a6a4f"
-      ],
-      "sun": "#fff6ea"
-    },
-    "cameras": [
-      {
-        "position": [
-          -3.6,
-          3.3,
-          7.6
-        ],
-        "target": [
-          -7.4,
-          1.1,
-          -1.6
-        ]
-      },
-      {
-        "position": [
-          -3.4,
-          2.3,
-          3.2
-        ],
-        "target": [
-          -6.6,
-          0.85,
-          -1.1
-        ]
-      },
-      {
-        "position": [
-          2.2,
-          6.0,
-          10.5
-        ],
-        "target": [
-          -0.9,
-          1.2,
-          -1.6
-        ]
-      },
-      {
-        "position": [
-          8.6,
-          2.4,
-          3.4
-        ],
-        "target": [
-          5.2,
-          0.7,
-          -1.2
-        ]
-      }
-    ]
   }
 }

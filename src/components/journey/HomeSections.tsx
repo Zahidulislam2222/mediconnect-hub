@@ -5,6 +5,7 @@ import { publicSite } from '@/content/public-site';
 import { journey } from '@/content/journey';
 import { publicSiteRoutes } from '@/config/public-site-routing';
 import { useJourneyRoutes } from './Routing';
+import ClinicSketch from './ClinicSketch';
 import '@/styles/homepage.css';
 
 const serviceIcons = [CalendarDays, MessageCircle, FileText, CreditCard];
@@ -24,7 +25,7 @@ export default function HomeSections() {
       <Link className="jy-text-link" to={publicSiteRoutes.services}>{content.services.action}<ArrowUpRight aria-hidden="true" /></Link>
     </section>
     <section className="jy-home-block jy-home-clinicians" aria-labelledby="home-clinicians-title">
-      <div className="jy-home-clinician-image"><img src={journey.media.poster} alt="" loading="lazy" decoding="async" /></div>
+      <ClinicSketch />
       <div><p className="jy-eyebrow">{content.clinicians.eyebrow}</p><h2 id="home-clinicians-title">{content.clinicians.title}</h2><p>{content.clinicians.body}</p><ul>{publicSite.pages.clinicians.sections.map(item => <li key={item.title}><HeartHandshake size={22} aria-hidden="true" /><div><h3>{item.title}</h3><p>{item.body}</p></div></li>)}</ul><Link className="jy-text-link" to={publicSiteRoutes.clinicians}>{content.clinicians.action}<ArrowUpRight aria-hidden="true" /></Link></div>
     </section>
     <section className="jy-home-block jy-home-trust" aria-labelledby="home-trust-title">

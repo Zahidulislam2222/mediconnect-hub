@@ -1,24 +1,20 @@
 import { z } from "zod";
 import raw from "./journey.json";
 // Relative, not "@/": the release and preview Vite configs import this file before aliases exist.
-import { careThreadSceneSchema } from "../lib/care-thread-config";
+import { heroMotionSchema } from "../lib/hero-thread";
 
 const text = z.string().trim().min(1);
 const path = z
   .string()
   .regex(/^\/media\/[a-zA-Z0-9/_.-]+$/)
   .refine((value) => !value.includes(".."));
-const stage = z.object({
-  id: text,
-  at: z.number().min(0).max(1),
+/** Order is structural: each id is drawn by its own illustration in the hero. */
+export const MOMENT_IDS = ["book", "visit", "plan", "follow"] as const;
+const moment = z.object({
+  id: z.enum(MOMENT_IDS),
   label: text,
   title: text,
-  emphasis: text,
   body: text,
-  cardLabel: text,
-  cardTitle: text,
-  cardBody: text,
-  cardStatus: text,
 });
 const copy = <const T extends readonly string[]>(keys: T) =>
   z.object(
@@ -58,24 +54,55 @@ export const journeySchema = z
       "explore",
     ]),
     hero: copy([
+      // eyebrow and illustration are shown by the native clients, which read this same file.
       "eyebrow",
+      "illustration",
       "title",
       "emphasis",
       "body",
       "primary",
       "secondary",
-      "scroll",
-      "skip",
-      "motionOff",
-      "motionOn",
-      "motionStatic",
-      "openDetail",
-      "closeDetail",
-      "chapters",
+      "momentsLabel",
+      "illustrationNote",
       "knowledgeLink",
       "journalLink",
-      "illustration",
     ]),
+    heroMotion: heroMotionSchema(MOMENT_IDS.length),
+    moments: z
+      .array(moment)
+      .length(MOMENT_IDS.length)
+      .refine((items) => items.every((item, index) => item.id === MOMENT_IDS[index]), {
+        message: "Moments must follow the care journey order",
+      }),
+    /** Read by the native clients (native/android, native/ios); the web hero draws `moments` instead. */
+    stages: z
+      .array(copy(["id", "label", "title", "emphasis", "body"]))
+      .min(2)
+      .refine((items) => new Set(items.map((item) => item.id)).size === items.length, {
+        message: "Stage ids must be unique",
+      }),
+    heroPreview: z.object({
+      book: copy(["kicker", "title", "mode", "status"]),
+      visit: copy(["kicker", "status", "elapsed"]),
+      plan: z.object({
+        kicker: text,
+        items: z
+          .array(z.object({ label: text, done: z.boolean() }))
+          .min(2)
+          .max(4),
+      }),
+      follow: copy(["kicker", "when", "message"]),
+    }),
+    /** Clinician-side sketch on the homepage; one schedule row per sample slot, initials only. */
+    clinicPreview: z.object({
+      schedule: copy(["kicker", "unit", "now"]).extend({
+        // The panel is drawn for two or three rows; more would not fit its fixed desktop height.
+        rows: z.array(z.object({ label: text, initials: z.string().regex(/^[A-Z]{2}$/) })).min(2).max(3),
+      }),
+      call: copy(["kicker", "status"]),
+      notes: copy(["kicker", "status"]),
+      note: text,
+    }),
     library: copy([
       "title",
       "body",
@@ -100,30 +127,11 @@ export const journeySchema = z
       "storyboardTitle",
       "storyboardBody",
     ]),
-    stages: z
-      .array(stage)
-      .length(4)
-      .refine(
-        (items) =>
-          items[0].at === 0 &&
-          items.every(
-            (item, index) => !index || item.at > items[index - 1].at + 0.1,
-          ),
-      ),
-    motion: z.object({
-      scrollHeightVh: z.number().min(200).max(900),
-      mobileScrollHeightVh: z.number().min(200).max(700),
-      minimumHeight: z.number().min(400).max(900),
-      cardTravelPx: z.number().min(0).max(100),
-      cardTiltDegrees: z.number().min(0).max(15),
-      chapterFadeFraction: z.number().min(0.01).max(0.08),
-    }),
     media: z.object({
       poster: path,
       homePoster: path,
       alt: text,
     }),
-    scene: careThreadSceneSchema,
     explore: z.object({
       eyebrow: text,
       title: text,
@@ -174,7 +182,8 @@ export const journeySchema = z
         defaultSlot: text,
         note: text,
       })
-      .refine((value) => value.slots.includes(value.defaultSlot)),
+      .refine((value) => value.slots.includes(value.defaultSlot))
+      .refine((value) => new Set(value.slots).size === value.slots.length, { message: "Sample slots must be unique" }),
     workspace: copy([
       "coordinationArticleSlug",
       "preparationArticleSlug",
@@ -229,6 +238,12 @@ export const journeySchema = z
     ]).extend({ minimumPasswordLength: z.number().int().min(8).max(64) }),
   })
   .superRefine((data, ctx) => {
+    if (data.clinicPreview.schedule.rows.length !== data.sample.slots.length)
+      ctx.addIssue({
+        code: "custom",
+        path: ["clinicPreview", "schedule", "rows"],
+        message: "The clinician schedule needs one row for each sample slot",
+      });
     for (const field of ["coordinationArticleSlug", "preparationArticleSlug"] as const) {
       if (!data.articles.some(article => article.slug === data.workspace[field] && article.kind === "knowledge")) {
         ctx.addIssue({
@@ -238,12 +253,6 @@ export const journeySchema = z
         });
       }
     }
-    if (data.scene.cameras.length !== data.stages.length)
-      ctx.addIssue({
-        code: "custom",
-        path: ["scene", "cameras"],
-        message: "Each chapter needs one camera stop",
-      });
     for (const kind of ["knowledge", "blog"])
       if (!data.articles.some((item) => item.kind === kind))
         ctx.addIssue({

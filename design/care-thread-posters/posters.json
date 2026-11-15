@@ -1,0 +1,10 @@
+{
+  "viewport": { "width": 1280, "height": 720 },
+  "output": { "width": 1600, "height": 900, "quality": 0.9, "maxBytes": 153600 },
+  "contentFile": "src/content/journey.json",
+  "publicDirectory": "public",
+  "posters": [
+    { "mediaKey": "poster", "stage": "clinic", "ready": ".jy-clinic-sketch" },
+    { "mediaKey": "homePoster", "stage": "hero", "ready": ".jy-hero-moment.is-follow[data-state=\"current\"]" }
+  ]
+}

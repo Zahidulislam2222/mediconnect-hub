@@ -1,0 +1,241 @@
+/* Clinician-side illustration on the homepage, in the hero's language.
+   From hero-thread.css it takes the sketch primitives (.jy-hero-tile, .jy-hero-kicker, .jy-hero-time,
+   .jy-hero-status, .jy-hero-live), the thread tint, the chart-paper grid and the video-visit fill.
+   It sizes itself from its own box, whatever shape the layout gives it. */
+.jy-home-clinician-image.jy-clinic-sketch {
+  position: relative;
+  isolation: isolate;
+  display: grid;
+  place-items: center;
+  padding: 20px 16px;
+  background: var(--jy-ink);
+  color: var(--jy-paper);
+  container-type: size;
+}
+/* The grid and light pool are centred here; in the hero they sit behind the illustration on the right. */
+.jy-clinic-sketch::before {
+  -webkit-mask-image: radial-gradient(ellipse 80% 80% at 50% 50%, #000 10%, transparent 78%);
+  mask-image: radial-gradient(ellipse 80% 80% at 50% 50%, #000 10%, transparent 78%);
+}
+.jy-clinic-sketch::after {
+  background: radial-gradient(
+    ellipse 60% 60% at 50% 46%,
+    color-mix(in srgb, var(--jy-blue) 34%, transparent),
+    transparent 72%
+  );
+}
+
+/* One stacked column on the thread; every length is in em so the whole sketch scales as a unit. */
+.jy-clinic-sketch-art {
+  --jy-clinic-gap: 1.5em;
+  --jy-clinic-pulse: 2.6em;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--jy-clinic-gap);
+  width: min(100%, 25em);
+  /* Floors keep the smallest labels (0.88em kickers) at 10px or more. */
+  font-size: clamp(11.5px, min(3.6cqw, 2.4cqh), 20px);
+  line-height: 1.35;
+}
+.jy-clinic-sketch-art > * {
+  position: relative;
+}
+/* The thread between one item and the next. */
+.jy-clinic-sketch-art > :is(.jy-hero-tile, .jy-clinic-sketch-call)::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: 100%;
+  width: 2px;
+  height: var(--jy-clinic-gap);
+  margin-left: -1px;
+  background: var(--jy-hero-thread-color);
+  box-shadow: 0 0 8px var(--jy-blue);
+}
+.jy-clinic-sketch-art > .jy-clinic-sketch-schedule::before {
+  height: calc(var(--jy-clinic-gap) + var(--jy-clinic-pulse) / 2);
+}
+/* The thread arrives across the full width of the panel, with the heartbeat left of centre. */
+.jy-clinic-sketch-pulse {
+  display: flex;
+  align-items: center;
+  justify-self: center;
+  width: 100cqw;
+  height: var(--jy-clinic-pulse);
+}
+.jy-clinic-sketch-pulse > i {
+  flex: 1;
+  height: 2px;
+  background: linear-gradient(to right, transparent, var(--jy-hero-thread-color) 60%);
+  box-shadow: 0 0 8px var(--jy-blue);
+}
+.jy-clinic-sketch-pulse > i:last-child {
+  flex: 2.4;
+  background: linear-gradient(to right, var(--jy-hero-thread-color) 55%, transparent);
+}
+.jy-clinic-sketch-pulse > svg {
+  flex: none;
+  width: 4.75em;
+  height: 2.75em;
+  overflow: visible;
+  filter: drop-shadow(0 0 6px var(--jy-blue));
+}
+.jy-clinic-sketch-pulse path {
+  fill: none;
+  stroke: var(--jy-hero-thread-color);
+  stroke-width: 2;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+
+.jy-clinic-sketch-row {
+  display: flex;
+  align-items: center;
+  gap: 0.8em;
+  padding: 0.42em 0.5em;
+  border-radius: 0.85em;
+  font-size: 0.95em;
+  font-weight: 500;
+}
+.jy-clinic-sketch-row[data-now="true"] {
+  background: var(--jy-soft);
+  box-shadow: 0 0 0 2px var(--jy-blue);
+}
+.jy-clinic-sketch-row .jy-hero-time {
+  padding: 0.4em 0.6em;
+  font-size: 1.05em;
+}
+.jy-clinic-sketch-row[data-now="false"] .jy-hero-time {
+  background: var(--jy-soft);
+  color: var(--jy-ink);
+}
+.jy-clinic-sketch-label {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.2em 0.6em;
+  min-width: 0;
+}
+.jy-clinic-sketch-label > em {
+  padding: 0.15em 0.65em;
+  border-radius: 1em;
+  background: var(--jy-blue);
+  color: var(--jy-paper);
+  font-size: max(10px, 0.8em);
+  font-style: normal;
+  font-weight: 600;
+}
+.jy-clinic-sketch-initials {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 2.5em;
+  height: 2.5em;
+  margin-left: auto;
+  border-radius: 50%;
+  background: var(--jy-soft);
+  color: var(--jy-muted);
+  font-size: max(10px, 0.8em);
+  font-weight: 600;
+}
+.jy-clinic-sketch-row[data-now="true"] .jy-clinic-sketch-initials {
+  background: var(--jy-paper);
+}
+.jy-clinic-sketch-call {
+  display: flex;
+  align-items: center;
+  gap: 0.55em;
+  padding: 0.95em 1.25em;
+  border-radius: 1.15em;
+  box-shadow: 0 1.8em 3.6em -1.4em rgb(0 0 0 / 0.7);
+  font-size: 0.92em;
+  font-weight: 600;
+}
+.jy-clinic-sketch-call > svg {
+  width: 1.15em;
+  height: 1.15em;
+}
+.jy-clinic-sketch-lines {
+  display: grid;
+  gap: 0.55em;
+}
+.jy-clinic-sketch-lines > i {
+  height: 0.55em;
+  border-radius: 1em;
+  background: color-mix(in srgb, var(--jy-muted) 20%, transparent);
+}
+.jy-clinic-sketch-lines > i:nth-child(2) { width: 86%; }
+.jy-clinic-sketch-lines > i:nth-child(3) { width: 58%; }
+.jy-app .jy-clinic-sketch-note {
+  max-width: none;
+  margin-top: -0.4em;
+  font-size: max(13px, 0.85em);
+  line-height: 1.4;
+  text-align: center;
+  text-wrap: balance;
+  color: color-mix(in srgb, var(--jy-paper) 72%, transparent);
+}
+
+/* Wide boxes: the schedule sits beside the visit and notes, joined by the same thread.
+   The same layout is repeated in the phone block below, because there the panel has no fixed height and
+   a shape query cannot apply; change both together. */
+@container (min-aspect-ratio: 5 / 4) {
+  .jy-clinic-sketch-art {
+    grid-template-columns: minmax(0, 1.12fr) minmax(0, 1fr);
+    align-items: center;
+    width: min(100%, 46em);
+    font-size: clamp(11.5px, min(1.95cqw, 3.5cqh), 20px);
+  }
+  .jy-clinic-sketch-pulse,
+  .jy-clinic-sketch-note {
+    grid-column: 1 / -1;
+  }
+  .jy-clinic-sketch-schedule {
+    grid-row: 2 / span 2;
+  }
+  .jy-clinic-sketch-art > .jy-clinic-sketch-call::before {
+    left: auto;
+    right: 100%;
+    bottom: auto;
+    top: 50%;
+    width: var(--jy-clinic-gap);
+    height: 2px;
+    margin: -1px 0 0;
+  }
+}
+
+/* Single-column page (same 800px breakpoint as .jy-home-clinicians in homepage.css): the panel takes its
+   height from the sketch instead of from the text beside it. */
+@media (max-width: 800px) {
+  .jy-home-clinician-image.jy-clinic-sketch {
+    padding: 28px 16px;
+    container-type: inline-size;
+  }
+  .jy-clinic-sketch-art {
+    font-size: clamp(12px, 3.9cqw, 16px);
+  }
+  @container (min-width: 600px) {
+    .jy-clinic-sketch-art {
+      grid-template-columns: minmax(0, 1.12fr) minmax(0, 1fr);
+      align-items: center;
+      width: min(100%, 46em);
+      font-size: clamp(11.5px, 2.1cqw, 16px);
+    }
+    .jy-clinic-sketch-pulse,
+    .jy-clinic-sketch-note {
+      grid-column: 1 / -1;
+    }
+    .jy-clinic-sketch-schedule {
+      grid-row: 2 / span 2;
+    }
+    .jy-clinic-sketch-art > .jy-clinic-sketch-call::before {
+      left: auto;
+      right: 100%;
+      bottom: auto;
+      top: 50%;
+      width: var(--jy-clinic-gap);
+      height: 2px;
+      margin: -1px 0 0;
+    }
+  }
+}

@@ -8,9 +8,10 @@ const sources = import.meta.glob<string>(["../../components/journey/*.tsx", "!..
 
 describe("local journey configuration and secret boundary", () => {
   it("actually covers the complete presentation and routing entry", () => {
-    expect(Object.keys(sources)).toHaveLength(8);
+    expect(Object.keys(sources)).toHaveLength(9);
     expect(Object.keys(sources).some(path => path.endsWith('.test.tsx'))).toBe(false);
     expect(Object.keys(sources)).toContain('../../components/journey/HomeSections.tsx');
+    expect(Object.keys(sources)).toContain('../../components/journey/ClinicSketch.tsx');
   });
 
   it.each(Object.entries(sources))(

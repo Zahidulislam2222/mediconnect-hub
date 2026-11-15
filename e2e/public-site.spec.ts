@@ -12,7 +12,7 @@ for (const [id, destination] of Object.entries(routes)) {
     await expect(page.locator('.jy-public-section')).toHaveCount(site.pages[id as keyof typeof site.pages].sections.length);
     await page.locator('.jy-header .jy-brand').click();
     await expect(page).toHaveURL(/\/$/);
-    await expect(page.locator('.jy-track')).toBeVisible();
+    await expect(page.locator('.jy-hero')).toBeVisible();
   });
 }
 

@@ -1,0 +1,627 @@
+/* Homepage hero: one appointment as four connected moments joined by the care thread.
+   Colours come from the application theme; the thread tint is derived from the accent.
+   Timing arrives from validated content as --jy-hero-segment, --jy-hero-arrival and --jy-hero-reveal.
+   The clinician sketch further down the homepage (clinic-sketch.css) is drawn in the same language, so the
+   thread tint, the chart-paper stage and the video-visit fill are declared here once for both. */
+.jy-hero,
+.jy-clinic-sketch {
+  --jy-hero-thread-color: color-mix(in srgb, var(--jy-blue) 58%, var(--jy-paper));
+}
+.jy-hero {
+  --jy-hero-quiet: color-mix(in srgb, var(--jy-paper) 78%, transparent);
+  /* Height of the sticky .jy-header in journey.css at the widths where the hero sits side by side. */
+  --jy-hero-header: 86px;
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  background: var(--jy-ink);
+  color: var(--jy-paper);
+}
+/* Chart-paper grid and a pool of light seat the illustration without competing with it. */
+.jy-hero::before,
+.jy-hero::after,
+.jy-clinic-sketch::before,
+.jy-clinic-sketch::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+}
+.jy-hero::before,
+.jy-clinic-sketch::before {
+  background-image:
+    linear-gradient(to right, color-mix(in srgb, var(--jy-paper) 6%, transparent) 1px, transparent 1px),
+    linear-gradient(to bottom, color-mix(in srgb, var(--jy-paper) 6%, transparent) 1px, transparent 1px);
+  background-size: 32px 32px;
+}
+.jy-hero::before {
+  -webkit-mask-image: radial-gradient(ellipse 58% 78% at 72% 46%, #000 10%, transparent 72%);
+  mask-image: radial-gradient(ellipse 58% 78% at 72% 46%, #000 10%, transparent 72%);
+}
+.jy-hero::after {
+  background: radial-gradient(
+    ellipse 46% 62% at 74% 44%,
+    color-mix(in srgb, var(--jy-blue) 36%, transparent),
+    transparent 70%
+  );
+}
+.jy-hero-inner {
+  --jy-hero-pad-top: clamp(40px, 6.5vh, 84px);
+  --jy-hero-pad-bottom: clamp(32px, 5vh, 64px);
+  /* Room kept under the canvas for the caption, and under that for the note. */
+  --jy-hero-caption-space: 124px;
+  --jy-hero-note-space: 64px;
+  display: grid;
+  grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+  align-items: center;
+  gap: clamp(40px, 4.5vw, 88px);
+  max-width: 1600px;
+  min-height: min(calc(100svh - var(--jy-hero-header)), 880px);
+  margin: 0 auto;
+  padding: var(--jy-hero-pad-top) 4.5% var(--jy-hero-pad-bottom);
+}
+/* The headline is sized from its own column so its first line never wraps. */
+.jy-hero-copy {
+  container-type: inline-size;
+  min-width: 0;
+}
+.jy-app .jy-hero-copy h1 {
+  font-size: clamp(40px, 4.6vw, 80px);
+  font-size: clamp(40px, 13.6cqw, 88px);
+  font-weight: 500;
+  line-height: 0.99;
+  letter-spacing: -0.05em;
+  text-wrap: balance;
+}
+.jy-hero-copy em {
+  font-family: Georgia, "Times New Roman", serif;
+  font-weight: 400;
+  letter-spacing: -0.06em;
+}
+.jy-hero-body {
+  max-width: 31em;
+  margin-top: 30px !important;
+  font-size: clamp(18px, 1.45vw, 21px);
+  line-height: 1.55;
+  color: var(--jy-hero-quiet);
+  text-wrap: pretty;
+}
+.jy-hero .jy-actions {
+  margin-top: 36px;
+}
+.jy-app .jy-hero :is(a, button):focus-visible {
+  outline-color: var(--jy-hero-thread-color);
+}
+
+/* Illustration canvas: everything inside scales with its width. */
+.jy-hero-thread {
+  container-type: inline-size;
+  min-width: 0;
+}
+/* Side by side, the canvas also shrinks with the window height so the hero stays within one screen. */
+@media (min-width: 1101px) {
+  .jy-hero-thread {
+    justify-self: end;
+    width: 100%;
+    max-width: max(
+      480px,
+      calc(
+        (
+            100svh - var(--jy-hero-header) - var(--jy-hero-pad-top) - var(--jy-hero-pad-bottom) -
+              var(--jy-hero-caption-space) - var(--jy-hero-note-space)
+          ) * 800 / 590
+      )
+    );
+  }
+}
+.jy-hero-canvas {
+  position: relative;
+  aspect-ratio: 800 / 590;
+  margin-bottom: var(--jy-hero-caption-space);
+}
+.jy-hero-wires {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  color: var(--jy-hero-thread-color);
+  pointer-events: none;
+}
+.jy-hero-wires path {
+  fill: none;
+  stroke-width: 3;
+  stroke-linejoin: round;
+}
+.jy-hero-wire-route {
+  stroke: color-mix(in srgb, var(--jy-paper) 16%, transparent);
+  stroke-linecap: round;
+}
+.jy-hero-wires g:first-of-type .jy-hero-wire-route {
+  stroke: none;
+}
+.jy-hero-wire {
+  stroke: currentColor;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  filter: drop-shadow(0 0 7px var(--jy-blue));
+  transition: stroke-dashoffset var(--jy-hero-segment) linear;
+  transition-delay: calc(var(--jy-hero-order, 0) * var(--jy-hero-segment));
+}
+.jy-hero-wires g[data-lit="true"] .jy-hero-wire {
+  stroke-dashoffset: 0;
+}
+/* The list fills the canvas, so each moment is placed against the same box as the connectors. */
+.jy-hero-moments {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 13px;
+  font-size: clamp(9.5px, 1.9cqw, 16px);
+  line-height: 1.35;
+}
+.jy-hero-moment > button {
+  position: absolute;
+  display: block;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  text-align: left;
+  border-radius: 1.15em;
+  transition: transform 0.25s ease;
+}
+.jy-hero-moment.is-book > button { left: 2%; top: 16.5%; width: 35%; }
+.jy-hero-moment.is-visit > button { left: 51%; top: 7%; width: 49%; }
+.jy-hero-moment.is-plan > button { left: 8%; top: 62%; width: 40%; }
+.jy-hero-moment.is-follow > button { left: 59%; top: 70.5%; width: 39%; }
+/* The lift sits on the button, which has no sequencing delay, so it answers the pointer at once. */
+@media (hover: hover) {
+  .jy-hero-moment > button:hover {
+    transform: translateY(-0.3em);
+  }
+}
+
+/* The numbered tag is each control's visible name, so it keeps full contrast in every state. */
+.jy-hero-tag {
+  position: absolute;
+  left: 0;
+  bottom: calc(100% + 0.7em);
+  display: flex;
+  align-items: center;
+  gap: 0.6em;
+  font-size: max(13px, 1.12em);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.jy-hero-tag > span {
+  display: grid;
+  place-items: center;
+  width: 1.75em;
+  height: 1.75em;
+  border: 1.5px solid var(--jy-hero-thread-color);
+  border-radius: 50%;
+  background: var(--jy-hero-thread-color);
+  color: var(--jy-ink);
+  font-size: 0.86em;
+  font-weight: 700;
+  transition:
+    background var(--jy-hero-reveal) ease,
+    color var(--jy-hero-reveal) ease,
+    border-color var(--jy-hero-reveal) ease;
+  transition-delay: calc(var(--jy-hero-order, 0) * var(--jy-hero-segment) + var(--jy-hero-arrival));
+}
+.jy-hero-moment[data-state="ahead"] .jy-hero-tag > span {
+  border-color: color-mix(in srgb, var(--jy-paper) 55%, transparent);
+  background: transparent;
+  color: var(--jy-paper);
+}
+
+/* Interface sketches: illustration, hidden from assistive technology; the tag and caption carry the words. */
+.jy-hero-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 0.72em;
+  padding: 1.15em 1.25em 1.2em;
+  border-radius: 1.15em;
+  background: var(--jy-paper);
+  color: var(--jy-ink);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--jy-paper) 20%, transparent),
+    0 1.8em 3.6em -1.4em rgb(0 0 0 / 0.7);
+  transition:
+    opacity var(--jy-hero-reveal) ease,
+    transform var(--jy-hero-reveal) cubic-bezier(0.2, 0.7, 0.2, 1),
+    filter var(--jy-hero-reveal) ease,
+    box-shadow var(--jy-hero-reveal) ease;
+  transition-delay: calc(var(--jy-hero-order, 0) * var(--jy-hero-segment) + var(--jy-hero-arrival));
+}
+.jy-hero-moment[data-state="ahead"] .jy-hero-tile {
+  opacity: 0.42;
+  transform: translateY(0.55em) scale(0.985);
+  filter: saturate(0.4);
+}
+.jy-hero-moment[data-state="current"] .jy-hero-tile {
+  box-shadow:
+    0 0 0 2px var(--jy-hero-thread-color),
+    0 0 0 7px color-mix(in srgb, var(--jy-blue) 34%, transparent),
+    0 1.8em 3.6em -1.2em rgb(0 0 0 / 0.75);
+}
+.jy-hero-tile svg {
+  width: 1.15em;
+  height: 1.15em;
+}
+.jy-hero-kicker {
+  display: flex;
+  align-items: center;
+  gap: 0.5em;
+  font-size: 0.88em;
+  font-weight: 600;
+  color: var(--jy-muted);
+}
+.jy-hero-kicker > svg {
+  color: var(--jy-blue);
+}
+.jy-hero-aside {
+  margin-left: auto;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+.jy-hero-tile-title {
+  font-size: 1.32em;
+  font-weight: 600;
+  letter-spacing: -0.025em;
+  line-height: 1.15;
+}
+.jy-hero-slot {
+  display: flex;
+  align-items: center;
+  gap: 0.85em;
+  font-size: 0.9em;
+  color: var(--jy-muted);
+}
+.jy-hero-time {
+  padding: 0.5em 0.7em;
+  border-radius: 0.6em;
+  background: var(--jy-ink);
+  color: var(--jy-paper);
+  font-size: 1.28em;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+.jy-hero-status {
+  display: flex;
+  align-items: center;
+  gap: 0.4em;
+  padding-top: 0.72em;
+  border-top: 1px solid var(--jy-line);
+  font-size: 0.9em;
+  font-weight: 600;
+  color: hsl(var(--success));
+  color: color-mix(in srgb, hsl(var(--success)) 58%, var(--jy-ink));
+}
+
+/* The video visit is the one block of saturated colour in the composition. */
+.is-visit .jy-hero-tile {
+  gap: 0.9em;
+}
+.is-visit .jy-hero-tile,
+.jy-clinic-sketch-call {
+  background: var(--jy-blue);
+  background: linear-gradient(150deg, var(--jy-blue) 30%, color-mix(in srgb, var(--jy-blue) 62%, var(--jy-ink)));
+  color: var(--jy-paper);
+}
+.is-visit .jy-hero-kicker,
+.is-visit .jy-hero-kicker > svg {
+  color: inherit;
+}
+.jy-hero-live {
+  display: flex;
+  align-items: center;
+  gap: 0.5em;
+}
+.jy-hero-live > i {
+  width: 0.55em;
+  height: 0.55em;
+  border-radius: 50%;
+  background: hsl(var(--success));
+  box-shadow: 0 0 0 0.25em color-mix(in srgb, hsl(var(--success)) 35%, transparent);
+}
+.jy-hero-call {
+  display: grid;
+  justify-items: center;
+  gap: 0.75em;
+  padding: 0.9em 0 0.3em;
+}
+.jy-hero-monogram {
+  display: grid;
+  place-items: center;
+  width: 5.2em;
+  height: 5.2em;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--jy-paper) 16%, transparent);
+  box-shadow:
+    0 0 0 0.7em color-mix(in srgb, var(--jy-paper) 8%, transparent),
+    0 0 0 1.5em color-mix(in srgb, var(--jy-paper) 4%, transparent);
+  font-size: 1.25em;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+.jy-hero-wave {
+  display: flex;
+  align-items: center;
+  gap: 0.28em;
+  height: 1.5em;
+  margin-top: 0.75em;
+}
+.jy-hero-wave > i {
+  width: 0.24em;
+  height: 100%;
+  border-radius: 1em;
+  background: currentColor;
+  transform: scaleY(0.35);
+}
+.jy-hero-wave > i:nth-child(2) { transform: scaleY(0.75); }
+.jy-hero-wave > i:nth-child(3) { transform: scaleY(1); }
+.jy-hero-wave > i:nth-child(4) { transform: scaleY(0.55); }
+/* Speaks briefly when the visit is selected, then rests (well inside the five-second limit). */
+.jy-hero-moment[data-state="current"] .jy-hero-wave > i {
+  animation: jy-hero-speak 0.72s ease-in-out 4 alternate;
+}
+.jy-hero-moment[data-state="current"] .jy-hero-wave > i:nth-child(2n) {
+  animation-delay: 0.18s;
+}
+.jy-hero-moment[data-state="current"] .jy-hero-wave > i:nth-child(3) {
+  animation-delay: 0.36s;
+}
+@keyframes jy-hero-speak {
+  to {
+    transform: scaleY(0.2);
+  }
+}
+.jy-hero-caller {
+  font-size: 1.02em;
+  font-weight: 500;
+}
+.jy-hero-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.6em;
+  min-width: 0;
+}
+.jy-hero-controls > span {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 2.5em;
+  height: 2.5em;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--jy-paper) 16%, transparent);
+}
+.jy-hero-controls > .is-end {
+  background: hsl(var(--destructive));
+}
+.jy-hero-controls > .jy-hero-self {
+  flex: 0 1 4.4em;
+  min-width: 2.6em;
+  height: 3.1em;
+  margin-left: auto;
+  border-radius: 0.6em;
+  background: color-mix(in srgb, var(--jy-ink) 62%, transparent);
+  font-size: 0.9em;
+  font-weight: 600;
+}
+.jy-hero-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6em;
+  font-size: 0.98em;
+  font-weight: 500;
+}
+.jy-hero-check > svg {
+  margin-top: 0.1em;
+  color: var(--jy-blue);
+}
+.jy-hero-check[data-done="false"] {
+  color: var(--jy-muted);
+}
+.jy-hero-check[data-done="false"] > svg {
+  color: color-mix(in srgb, var(--jy-muted) 55%, transparent);
+}
+.jy-hero-trace {
+  width: 100% !important;
+  height: 2.6em !important;
+  overflow: visible;
+}
+.jy-hero-trace path {
+  fill: none;
+  stroke: var(--jy-blue);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+.jy-hero-message {
+  padding: 0.7em 0.9em;
+  border-radius: 0.8em 0.8em 0.8em 0.2em;
+  background: var(--jy-soft);
+  font-size: 0.92em;
+  font-weight: 500;
+}
+
+/* One caption at a time on wide screens; every button still carries its own description. */
+.jy-hero-caption {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(100% + 26px);
+  max-width: 34em;
+  font-size: 17px;
+  line-height: 1.5;
+  color: var(--jy-hero-quiet);
+  text-wrap: pretty;
+  opacity: 0;
+  visibility: hidden;
+  /* The outgoing caption clears before the next one appears, so they never overlap. */
+  transition: opacity 0.12s ease, visibility 0s 0.12s;
+}
+.jy-hero-caption > strong {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  line-height: 1.2;
+  color: var(--jy-paper);
+}
+.jy-hero-moment[data-state="current"] .jy-hero-caption {
+  opacity: 1;
+  visibility: visible;
+  transition: opacity calc(var(--jy-hero-reveal) - 0.12s) ease 0.12s, visibility 0s 0.12s;
+}
+.jy-hero-note {
+  max-width: 46em;
+  font-size: 14px;
+  line-height: 1.5;
+  color: color-mix(in srgb, var(--jy-paper) 68%, transparent);
+  text-wrap: pretty;
+}
+
+@media (max-width: 1100px) {
+  .jy-hero-inner {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 72px;
+    min-height: 0;
+    padding-top: 56px;
+  }
+  .jy-hero-thread {
+    width: 100%;
+    max-width: 900px;
+  }
+  .jy-hero::before {
+    -webkit-mask-image: radial-gradient(ellipse 90% 50% at 50% 66%, #000 10%, transparent 75%);
+    mask-image: radial-gradient(ellipse 90% 50% at 50% 66%, #000 10%, transparent 75%);
+  }
+  .jy-hero::after {
+    background: radial-gradient(
+      ellipse 80% 42% at 50% 66%,
+      color-mix(in srgb, var(--jy-blue) 28%, transparent),
+      transparent 70%
+    );
+  }
+}
+
+/* Phone widths: the weave becomes a vertical timeline and every caption is shown. */
+@media (max-width: 700px) {
+  .jy-hero-inner {
+    gap: 52px;
+    padding: 40px 6% 44px;
+  }
+  .jy-hero-body {
+    margin-top: 22px !important;
+  }
+  .jy-hero .jy-actions {
+    margin-top: 28px;
+    gap: 14px 24px;
+  }
+  .jy-hero-canvas {
+    aspect-ratio: auto;
+    margin-bottom: 28px;
+  }
+  .jy-hero-wires {
+    display: none;
+  }
+  .jy-hero-moments {
+    position: static;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 36px;
+    font-size: 14.5px;
+  }
+  .jy-hero-moment {
+    position: relative;
+    padding-left: 40px;
+  }
+  .jy-hero-moment + .jy-hero-moment::before {
+    content: "";
+    position: absolute;
+    left: 12px;
+    top: -36px;
+    height: 36px;
+    width: 2px;
+    background: var(--jy-hero-thread-color);
+    transition: background var(--jy-hero-reveal) ease;
+    transition-delay: calc(var(--jy-hero-order, 0) * var(--jy-hero-segment));
+  }
+  .jy-hero-moment::after {
+    content: "";
+    position: absolute;
+    left: 12px;
+    top: 26px;
+    bottom: 0;
+    width: 2px;
+    background: var(--jy-hero-thread-color);
+    transition: background var(--jy-hero-reveal) ease;
+    transition-delay: calc(var(--jy-hero-order, 0) * var(--jy-hero-segment));
+  }
+  .jy-hero-moment:last-child::after {
+    background: linear-gradient(var(--jy-hero-thread-color), transparent);
+  }
+  .jy-hero-moment[data-state="ahead"]::before,
+  .jy-hero-moment[data-state="ahead"]::after {
+    background: color-mix(in srgb, var(--jy-paper) 18%, transparent);
+  }
+  .jy-hero-moment > button,
+  .jy-hero-moment.is-book > button,
+  .jy-hero-moment.is-visit > button,
+  .jy-hero-moment.is-plan > button,
+  .jy-hero-moment.is-follow > button {
+    position: static;
+    width: 100%;
+  }
+  .jy-hero-tag {
+    position: static;
+    margin-bottom: 14px;
+    font-size: 17px;
+  }
+  .jy-hero-tag > span {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 26px;
+    height: 26px;
+    font-size: 14px;
+  }
+  .jy-hero-caption {
+    position: static;
+    max-width: none;
+    margin-top: 16px !important;
+    opacity: 1;
+    visibility: visible;
+    font-size: 17px;
+  }
+  .jy-hero-caption > strong {
+    font-size: 20px;
+  }
+  .jy-hero-note {
+    padding-left: 40px;
+  }
+}
+
+/* Narrowest phones: the sketches tighten so the call controls stay inside their tile. */
+@media (max-width: 360px) {
+  .jy-hero-moments {
+    font-size: 13px;
+  }
+  .jy-hero-moment,
+  .jy-hero-note {
+    padding-left: 34px;
+  }
+  .jy-hero-controls {
+    gap: 0.45em;
+  }
+}
